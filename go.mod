@@ -5,6 +5,7 @@ go 1.18
 require (
 	github.com/danielkov/gin-helmet v0.0.0-20171108135313-1387e224435e
 	github.com/gin-gonic/gin v1.8.1
+	github.com/satori/go.uuid v1.2.0
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/viper v1.12.0
 )

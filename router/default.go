@@ -1,8 +1,7 @@
 package router
 
 import (
-	"net/http"
-
+	"github.com/bizshuk/gin_default/middleware"
 	helmet "github.com/danielkov/gin-helmet"
 	"github.com/gin-gonic/gin"
 )
@@ -10,13 +9,11 @@ import (
 var r *gin.Engine = gin.Default()
 
 func Default() *gin.Engine {
-
-	r.GET("/ping", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "pong",
-		})
-	})
-
 	r.Use(helmet.Default())
+	r.Use(middleware.CorrelationID())
+
+	r.GET("user", userHandler)
+	r.GET("/stats", StatsHandler)  // http://localhost:8080/stats
+	r.GET("/health", HelloHandler) // http://localhost:8080/health
 	return r
 }
