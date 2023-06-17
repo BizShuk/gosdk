@@ -6,7 +6,7 @@ func TestIsNil(t *testing.T) {
 	type args struct {
 		p interface{}
 	}
-
+	var nilString *string
 	tests := []struct {
 		name string
 		args args
@@ -25,6 +25,13 @@ func TestIsNil(t *testing.T) {
 				p: StringPointer("abcd"),
 			},
 			want: false,
+		},
+		{
+			name: "nil string pointer Is Not nil",
+			args: args{
+				p: nilString,
+			},
+			want: true,
 		},
 		{
 			name: "int Is Not nil",
