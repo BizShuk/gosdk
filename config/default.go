@@ -5,7 +5,7 @@ import (
 )
 
 var (
-	Version string // This can use `go build -ldflags="-X 'github.com/bizshuk/gin_default/config.Version=$(cat version)'"` to inject version
+	Version string // This can use `go build -ldflags="-X 'github.com/bizshuk/gosdk/config.Version=$(cat version)'"` to inject version
 	Profile string // dev, qa, cert, prod, default: profile in .env
 )
 

@@ -1,4 +1,4 @@
-module github.com/bizshuk/gin_default
+module github.com/bizshuk/gosdk
 
 go 1.18
 

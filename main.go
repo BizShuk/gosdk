@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/bizshuk/gin_default/config"
-	"github.com/bizshuk/gin_default/router"
+	"github.com/bizshuk/gosdk/config"
+	"github.com/bizshuk/gosdk/router"
 	log "github.com/sirupsen/logrus"
 )
 

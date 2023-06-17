@@ -3,8 +3,7 @@ package router
 import (
 	"net/http"
 
-	"github.com/bizshuk/gin_default/config"
-	"github.com/bizshuk/gin_default/middleware"
+	"github.com/bizshuk/gosdk/config"
 	"github.com/gin-gonic/gin"
 
 	"github.com/spf13/viper"
@@ -25,7 +24,7 @@ func StatsHandler(c *gin.Context) {
 		Profile:       config.Profile,
 		ConfigFile:    viper.GetString("viper.file"),
 		Status:        GetStatus(),
-		CorrelationId: middleware.GetCorrelationID(c),
+		CorrelationId: mw.GetCorrelationID(c),
 	}
 
 	c.JSON(http.StatusOK, stats)
