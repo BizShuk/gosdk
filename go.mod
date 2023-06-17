@@ -1,6 +1,6 @@
 module github.com/bizshuk/gosdk
 
-go 1.18
+go 1.20
 
 require (
 	github.com/danielkov/gin-helmet v0.0.0-20171108135313-1387e224435e
