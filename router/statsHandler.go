@@ -34,7 +34,3 @@ func StatsHandler(c *gin.Context) {
 func GetStatus() string {
 	return "OK"
 }
-
-func HelloHandler(c *gin.Context) {
-	c.String(200, "Hello!!")
-}

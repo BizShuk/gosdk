@@ -9,6 +9,7 @@ const (
 	CorrelationHeader = "X-Correlation-Id"
 )
 
+// r.Use(CorrelationID())
 func CorrelationID() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		cid := ctx.Request.Header.Get(CorrelationHeader)
