@@ -22,6 +22,10 @@ func DefaultZap() {
 	log = logger.Sugar()
 }
 
+func init() {
+	DefaultZap()
+}
+
 func Info(args ...interface{}) {
 	log.Info(args...)
 }
