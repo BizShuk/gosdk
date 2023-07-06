@@ -1,6 +1,6 @@
 package sample
 
-//go:generate const_gen -type=SampleInt -output=stringer_string.go -trimprefix=COUNTER_
+//go:generate stringer -type=SampleInt -output=stringer_string.go -trimprefix=COUNTER_
 type SampleInt int
 
 // 123123sjdasio
