@@ -1,0 +1,17 @@
+package main
+
+
+func main () {
+{{.EventName}}
+    fmt.Println("")
+    fmt.Println("Customized:{{.Customized}}")
+
+{{- if .ConfigA}}
+    fmt.Println("ConfigA:{{.ConfigA}}")
+{{- end}}
+
+{{- if .ConfigB}}
+    fmt.Println("ConfigB:{{.ConfigB}}")
+{{- end }}
+
+}

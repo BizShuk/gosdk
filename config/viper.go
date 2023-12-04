@@ -17,6 +17,7 @@ func LoadViperConfig() {
 	// }
 
 	// Add extra config from env, `.env.local` should not commit in git
+	// .env.local .env.<idc> .env.<region> .env.<geo> [.env.dev|.env.stage|env.prod] .env
 	profiles := []string{}
 	profiles = append(profiles, "", GetProfile())
 
