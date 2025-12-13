@@ -9,7 +9,7 @@ import (
 )
 
 func NewDBConfig(confKey string) DBConfig {
-	confKey += "db." + confKey
+	confKey = "db." + confKey
 	fmt.Println("DBConfig:", viper.Get(confKey))
 	dbConfig := DBConfig{}
 	if err := viper.UnmarshalKey(confKey, &dbConfig); err != nil {
