@@ -8,7 +8,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func NewDBConfig(confKey string) (DBConfig, error) {
+func NewDBConfig(confKey string) DBConfig {
 	confKey += "db." + confKey
 	fmt.Println("DBConfig:", viper.Get(confKey))
 	dbConfig := DBConfig{}
@@ -16,7 +16,7 @@ func NewDBConfig(confKey string) (DBConfig, error) {
 		log.Fatalf("Unable to unmarshal server key: %v", err)
 	}
 	fmt.Println(dbConfig)
-	return dbConfig, nil
+	return dbConfig
 }
 
 type DBConfig struct {
