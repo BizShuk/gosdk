@@ -3,7 +3,6 @@ package router
 import (
 	"net/http"
 
-	"github.com/bizshuk/gosdk/config"
 	"github.com/bizshuk/gosdk/mw"
 	"github.com/gin-gonic/gin"
 
@@ -21,8 +20,8 @@ type Stats struct {
 
 func StatsHandler(c *gin.Context) {
 	stats := &Stats{
-		Version:       config.Version,
-		Profile:       config.Profile,
+		Version:       viper.GetString("Version"),
+		Profile:       viper.GetString("PROFILE"),
 		ConfigFile:    viper.GetString("viper.file"),
 		Status:        GetStatus(),
 		CorrelationId: mw.GetCorrelationID(c),
