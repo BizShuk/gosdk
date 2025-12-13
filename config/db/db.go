@@ -9,7 +9,8 @@ import (
 )
 
 func NewDBConfig(confKey string) (*DBConfig, error) {
-	fmt.Println("driver", viper.Get(confKey))
+	confKey += "db." + confKey
+	fmt.Println("DBConfig:", viper.Get(confKey))
 	dbConfig := DBConfig{}
 	if err := viper.UnmarshalKey(confKey, &dbConfig); err != nil {
 		log.Fatalf("Unable to unmarshal server key: %v", err)
