@@ -15,7 +15,7 @@ func NewDBConfig(confKey string) DBConfig {
 	if err := viper.UnmarshalKey(confKey, &dbConfig); err != nil {
 		log.Fatalf("Unable to unmarshal server key: %v", err)
 	}
-	fmt.Println(dbConfig)
+	fmt.Println("Load DBConfig:", dbConfig)
 	return dbConfig
 }
 
