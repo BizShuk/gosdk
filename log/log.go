@@ -20,46 +20,45 @@ func init() {
 	loggerConfig.EncoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout(time.DateTime)
 
 	log, _ = loggerConfig.Build()
-
 	zap.ReplaceGlobals(log)
 }
 
 func Info(args ...interface{}) {
-	log.Info(args...)
+	log.Sugar().Info(args...)
 }
 
 func Infof(format string, args ...interface{}) {
-	log.Infof(format, args...)
+	log.Sugar().Infof(format, args...)
 }
 
 func Fatal(args ...interface{}) {
-	log.Fatal(args...)
+	log.Sugar().Fatal(args...)
 }
 
 func Fatalf(format string, args ...interface{}) {
-	log.Fatalf(format, args...)
+	log.Sugar().Fatalf(format, args...)
 }
 
 func Panic(args ...interface{}) {
-	log.Panic(args...)
+	log.Sugar().Panic(args...)
 }
 
 func Panicf(format string, args ...interface{}) {
-	log.Panicf(format, args...)
+	log.Sugar().Panicf(format, args...)
 }
 
 func Error(args ...interface{}) {
-	log.Error(args...)
+	log.Sugar().Error(args...)
 }
 
 func Errorf(format string, args ...interface{}) {
-	log.Errorf(format, args...)
+	log.Sugar().Errorf(format, args...)
 }
 
 func Debug(args ...interface{}) {
-	log.Debug(args...)
+	log.Sugar().Debug(args...)
 }
 
 func Debugf(format string, args ...interface{}) {
-	log.Debugf(format, args...)
+	log.Sugar().Debugf(format, args...)
 }
