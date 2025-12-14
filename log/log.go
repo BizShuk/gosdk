@@ -3,6 +3,7 @@ package log
 import (
 	"time"
 
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -11,6 +12,10 @@ var log *zap.SugaredLogger
 
 func DefaultZap() {
 	loggerConfig := zap.NewProductionConfig()
+	profile := viper.GetString("PROFILE")
+	if profile != "prod" {
+		loggerConfig = zap.NewDevelopmentConfig()
+	}
 	loggerConfig.EncoderConfig.TimeKey = "timestamp"
 	loggerConfig.EncoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout(time.RFC3339)
 
