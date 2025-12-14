@@ -17,7 +17,7 @@ type EnvConfig struct{}
 // .env.local .env.<idc> .env.<region> .env.<geo> [.env.dev|.env.stage|env.prod] .env
 func (c EnvConfig) Load() *viper.Viper {
 	v := viper.New()
-	v.SetConfigName(c.GetConfigName())
+	v.SetConfigFile(c.GetConfigName())
 	v.SetConfigType("dotenv")
 	v.AddConfigPath(".")
 
