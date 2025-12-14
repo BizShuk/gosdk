@@ -33,7 +33,7 @@ func (c *JsonConfig) Load() *viper.Viper {
 		}
 	}
 
-	fmt.Println(v.ConfigFileUsed())
+	fmt.Println("JsonConfig used:", v.ConfigFileUsed())
 	return v
 }
 

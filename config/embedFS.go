@@ -36,7 +36,7 @@ func (c FSConfig) Load() *viper.Viper {
 		}
 	}
 
-	fmt.Println(v.ConfigFileUsed())
+	fmt.Println("FSConfig used:", v.ConfigFileUsed())
 	return v
 }
 

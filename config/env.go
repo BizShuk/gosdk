@@ -39,7 +39,7 @@ func (c EnvConfig) Load() *viper.Viper {
 		}
 	}
 
-	fmt.Println(v.ConfigFileUsed())
+	fmt.Println("EnvConfig used:", v.ConfigFileUsed())
 	return v
 }
 

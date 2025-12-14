@@ -29,7 +29,7 @@ func (c *YamlConfig) Load() *viper.Viper {
 		}
 	}
 
-	fmt.Println(v.ConfigFileUsed())
+	fmt.Println("YamlConfig used:", v.ConfigFileUsed())
 	return v
 }
 
