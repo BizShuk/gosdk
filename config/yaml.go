@@ -14,9 +14,9 @@ func NewYamlConfig() Config {
 }
 
 // Load reads the yaml config file and returns a viper instance.
-func (y *YamlConfig) Load() *viper.Viper {
+func (c *YamlConfig) Load() *viper.Viper {
 	v := viper.New()
-	v.SetConfigName(y.GetConfigName())
+	v.SetConfigName(c.GetConfigName())
 	v.SetConfigType("yaml")
 	v.AddConfigPath(".")
 	v.AddConfigPath("conf")
@@ -33,7 +33,7 @@ func (y *YamlConfig) Load() *viper.Viper {
 	return v
 }
 
-func (y *YamlConfig) GetConfigName() string {
+func (c *YamlConfig) GetConfigName() string {
 	profile := GetProfile()
-	return "config-" + profile
+	return "config." + profile
 }
