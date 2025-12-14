@@ -10,25 +10,21 @@ import (
 
 var log *zap.SugaredLogger
 
-func DefaultZap() {
+func init() {
 	loggerConfig := zap.NewProductionConfig()
 	profile := viper.GetString("PROFILE")
 	if profile != "prod" {
 		loggerConfig = zap.NewDevelopmentConfig()
 	}
 	loggerConfig.EncoderConfig.TimeKey = "timestamp"
-	loggerConfig.EncoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout(time.RFC3339)
+	loggerConfig.EncoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout(time.DateTime)
 
 	logger, err := loggerConfig.Build()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	log = logger.Sugar()
-}
-
-func init() {
-	DefaultZap()
+	zap.ReplaceGlobals(logger)
 }
 
 func Info(args ...interface{}) {
