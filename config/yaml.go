@@ -23,7 +23,7 @@ func (y *YamlConfig) Load() *viper.Viper {
 
 	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			log.Println("Config file not found. Using defaults and env variables.")
+			log.Println("Yaml Config file not found. Using defaults and env variables.")
 		} else { // 如果是其他讀取錯誤，則終止程式
 			log.Fatalf("Fatal error reading config file: %s \n", err)
 		}

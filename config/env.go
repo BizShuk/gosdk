@@ -17,13 +17,22 @@ type EnvConfig struct{}
 // .env.local .env.<idc> .env.<region> .env.<geo> [.env.dev|.env.stage|env.prod] .env
 func (c EnvConfig) Load() *viper.Viper {
 	v := viper.New()
-	v.SetConfigFile(c.GetConfigName())
 	v.SetConfigType("dotenv")
 	v.AddConfigPath(".")
 
+	v.SetConfigFile(".env")
 	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			log.Println("Config file not found. Using defaults and env variables.")
+			log.Println("1Config file not found. Using defaults and env variables.")
+		} else { // 如果是其他讀取錯誤，則終止程式
+			log.Fatalf("Fatal error reading config file: %s \n", err)
+		}
+	}
+
+	v.SetConfigFile(c.GetConfigName())
+	if err := v.MergeInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			log.Println("C2onfig file not found. Using defaults and env variables.")
 		} else { // 如果是其他讀取錯誤，則終止程式
 			log.Fatalf("Fatal error reading config file: %s \n", err)
 		}

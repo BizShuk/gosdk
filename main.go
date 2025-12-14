@@ -8,8 +8,11 @@ import (
 )
 
 func main() {
-	s := gin.Default()
 	config.Default()
+}
+
+func HTTPServer() {
+	s := gin.Default()
 	router.Default(s)
 	err := s.Run("localhost:8080") // localhost:8080
 	if err != nil {
