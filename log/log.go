@@ -8,7 +8,7 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-var log *zap.SugaredLogger
+var log *zap.Logger
 
 func init() {
 	loggerConfig := zap.NewProductionConfig()
@@ -19,12 +19,9 @@ func init() {
 	loggerConfig.EncoderConfig.TimeKey = "timestamp"
 	loggerConfig.EncoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout(time.DateTime)
 
-	logger, err := loggerConfig.Build()
-	if err != nil {
-		log.Fatal(err)
-	}
+	log, _ = loggerConfig.Build()
 
-	zap.ReplaceGlobals(logger)
+	zap.ReplaceGlobals(log)
 }
 
 func Info(args ...interface{}) {
