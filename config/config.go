@@ -21,6 +21,12 @@ func Default() {
 	v2 := NewYamlConfig().Load()
 	viper.MergeConfigMap(v2.AllSettings())
 
+	zap.L().Info("Load Configure...",
+		zap.String("CONFIG_DIR", GetConfigDir()),
+		zap.String("CONFIG_DIR", "."),
+		zap.String("CONFIG_DIR", "conf"),
+	)
+
 	// --- 4. 環境變數設定 (Environment Variables) ---
 	// 讓 Viper 知道要自動尋找以 APP 開頭的環境變數
 	// 例如：環境變數 APP_SERVER_PORT 會自動對應到配置鍵 server.port
@@ -38,12 +44,5 @@ func GetProfile() string {
 }
 
 func GetConfigDir() string {
-	dir := viper.GetString("CONFIG_DIR")
-
-	zap.L().Info("Load Configure...",
-		zap.String("CONFIG_DIR", dir),
-		zap.String("CONFIG_DIR", "."),
-		zap.String("CONFIG_DIR", "conf"),
-	)
-	return dir
+	return viper.GetString("CONFIG_DIR")
 }
