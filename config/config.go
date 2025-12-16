@@ -13,6 +13,11 @@ type Config interface {
 }
 
 func Default() {
+	viper.BindEnv("CONFIG_DIR", "CONFIG_DIR")
+	viper.BindEnv("PROFILE", "PROFILE")
+	viper.SetDefault("CONFIG_DIR", ".")
+	viper.SetDefault("PROFILE", "local")
+
 	v1 := NewEnvConfig().Load()
 	viper.MergeConfigMap(v1.AllSettings())
 	v2 := NewYamlConfig().Load()
@@ -36,9 +41,7 @@ func GetProfile() string {
 
 func GetConfigDir() string {
 	dir := viper.GetString("CONFIG_DIR")
-	if dir == "" {
-		dir = "."
-	}
+
 	zap.L().Info("Load Configure...",
 		zap.String("CONFIG_DIR", dir),
 		zap.String("CONFIG_DIR", "."),
