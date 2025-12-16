@@ -16,11 +16,12 @@ func NewYamlConfig() Config {
 // Load reads the yaml config file and returns a viper instance.
 func (c *YamlConfig) Load() *viper.Viper {
 	v := viper.New()
-	v.SetConfigName(c.GetConfigName())
-	v.SetConfigType("yaml")
 	v.AddConfigPath(".")
 	v.AddConfigPath("conf")
+	v.AddConfigPath(GetConfigDir())
 
+	v.SetConfigName(c.GetConfigName())
+	v.SetConfigType("yaml")
 	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			log.Println("Yaml Config file not found. Using defaults and env variables.")

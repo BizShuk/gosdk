@@ -17,11 +17,12 @@ type EnvConfig struct{}
 // .env.local .env.<idc> .env.<region> .env.<geo> [.env.dev|.env.stage|env.prod] .env
 func (c EnvConfig) Load() *viper.Viper {
 	v := viper.New()
-	v.SetConfigType("dotenv")
 	v.AddConfigPath(".")
 	v.AddConfigPath("conf")
+	v.AddConfigPath(GetConfigDir())
 
 	v.SetConfigFile(".env")
+	v.SetConfigType("dotenv")
 	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			log.Println("Config file not found. Using defaults and env variables.")

@@ -32,3 +32,11 @@ func GetProfile() string {
 	}
 	return "local"
 }
+
+func GetConfigDir() string {
+	dir := viper.GetString("CONFIG_DIR")
+	if dir == "" {
+		return "."
+	}
+	return dir
+}
