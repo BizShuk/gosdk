@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/spf13/viper"
+	"go.uber.org/zap"
 )
 
 type Config interface {
@@ -36,7 +37,12 @@ func GetProfile() string {
 func GetConfigDir() string {
 	dir := viper.GetString("CONFIG_DIR")
 	if dir == "" {
-		return "."
+		dir = "."
 	}
+	zap.L().Info("Load Configure...",
+		zap.String("CONFIG_DIR", dir),
+		zap.String("CONFIG_DIR", "."),
+		zap.String("CONFIG_DIR", "conf"),
+	)
 	return dir
 }
