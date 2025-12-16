@@ -1,8 +1,6 @@
 package config
 
 import (
-	"os"
-
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 )
@@ -32,7 +30,7 @@ func Default() {
 }
 
 func GetProfile() string {
-	profile := os.Getenv("PROFILE")
+	profile := viper.GetString("PROFILE")
 	if profile != "" {
 		return profile
 	}
