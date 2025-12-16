@@ -16,16 +16,16 @@ func Default() {
 	viper.SetDefault("CONFIG_DIR", ".")
 	viper.SetDefault("PROFILE", "local")
 
-	v1 := NewEnvConfig().Load()
-	viper.MergeConfigMap(v1.AllSettings())
-	v2 := NewYamlConfig().Load()
-	viper.MergeConfigMap(v2.AllSettings())
-
 	zap.L().Info("Load Configure...",
 		zap.String("CONFIG_DIR", GetConfigDir()),
 		zap.String("CONFIG_DIR", "."),
 		zap.String("CONFIG_DIR", "conf"),
 	)
+
+	v1 := NewEnvConfig().Load()
+	viper.MergeConfigMap(v1.AllSettings())
+	v2 := NewYamlConfig().Load()
+	viper.MergeConfigMap(v2.AllSettings())
 
 	// --- 4. 環境變數設定 (Environment Variables) ---
 	// 讓 Viper 知道要自動尋找以 APP 開頭的環境變數
