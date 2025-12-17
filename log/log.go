@@ -11,15 +11,17 @@ import (
 var log *zap.Logger
 
 func init() {
-	loggerConfig := zap.NewProductionConfig()
+	config := zap.NewProductionConfig()
 	profile := viper.GetString("PROFILE")
 	if profile != "prod" {
-		loggerConfig = zap.NewDevelopmentConfig()
+		config = zap.NewDevelopmentConfig()
 	}
-	loggerConfig.EncoderConfig.TimeKey = "timestamp"
-	loggerConfig.EncoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout(time.DateTime)
 
-	log, _ = loggerConfig.Build()
+	config.Level = zap.NewAtomicLevelAt(GetLogLevel())
+	config.EncoderConfig.TimeKey = "timestamp"
+	config.EncoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout(time.DateTime)
+
+	log, _ = config.Build()
 	zap.ReplaceGlobals(log)
 }
 
