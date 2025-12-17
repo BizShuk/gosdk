@@ -1,14 +1,13 @@
 package main
 
 import (
-	"github.com/bizshuk/gosdk/config"
 	"github.com/bizshuk/gosdk/router"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 )
 
 func main() {
-	config.Default()
+
 }
 
 func HTTPServer() {
