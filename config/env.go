@@ -21,7 +21,7 @@ func (c EnvConfig) Load() *viper.Viper {
 	v.AddConfigPath("conf")
 	v.AddConfigPath(GetConfigDir())
 
-	v.SetConfigFile(".env")
+	v.SetConfigName(".env")
 	v.SetConfigType("dotenv")
 	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
@@ -31,7 +31,7 @@ func (c EnvConfig) Load() *viper.Viper {
 		}
 	}
 
-	v.SetConfigFile(c.GetConfigName())
+	v.SetConfigName(c.GetConfigName())
 	if err := v.MergeInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			log.Println("Config file not found. Using defaults and env variables.")
