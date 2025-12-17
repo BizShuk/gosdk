@@ -9,7 +9,6 @@ import (
 
 	"github.com/bizshuk/gosdk/cmd/gotmpl/tmpl"
 	"github.com/hairyhenderson/gomplate/v4"
-	"github.com/hairyhenderson/gomplate/v4/data"
 )
 
 type TemplateLoader struct {
@@ -34,9 +33,9 @@ func (t TemplateLoader) Load() {
 }
 
 var (
-	tmplFuncs = gomplate.CreateFuncs(context.Background(), &data.Data{})
+	tmplFuncs = gomplate.CreateFuncs(context.Background())
 
-	tmplFuncSample = template.FuncMap{
+	TmplFuncSample = template.FuncMap{
 		"toLower": strings.ToLower,
 		"toUpper": strings.ToUpper,
 	}
