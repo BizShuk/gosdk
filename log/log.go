@@ -25,7 +25,7 @@ func Init() {
 	config.EncoderConfig.TimeKey = "timestamp"
 	config.EncoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout(time.DateTime)
 
-	log, _ = config.Build()
+	log, _ = config.Build(zap.AddStacktrace(zap.PanicLevel))
 	zap.ReplaceGlobals(log)
 }
 

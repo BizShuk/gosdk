@@ -10,7 +10,7 @@ require (
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.17.0
 	github.com/tavsec/gin-healthcheck v1.2.2
-	go.uber.org/zap v1.27.0
+	go.uber.org/zap v1.27.1
 	golang.org/x/tools v0.39.0
 	gorm.io/driver/mysql v1.6.0
 	gorm.io/driver/sqlite v1.6.0
