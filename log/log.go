@@ -11,6 +11,10 @@ import (
 var log *zap.Logger
 
 func init() {
+	Init()
+}
+
+func Init() {
 	config := zap.NewProductionConfig()
 	profile := viper.GetString("PROFILE")
 	if profile != "prod" {
