@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"go.uber.org/zap"
 )
@@ -73,4 +74,57 @@ func ParseCSVFile(fpath string) (*csv.Reader, *os.File, error) {
 	}
 
 	return csv.NewReader(f), f, nil
+}
+
+func GetFileName(fpath string) string {
+	base := filepath.Base(fpath)
+	fname := strings.TrimSuffix(base, filepath.Ext(base))
+	return fname
+}
+
+type FileCallback func(string) error
+
+func NewFilelistCallback(pattern string, f FileCallback) error {
+	fileList, err := filepath.Glob(pattern)
+	if err != nil {
+		zap.L().Error("failed to get file list", zap.Any("pattern", pattern), zap.Error(err))
+		return err
+	}
+
+	for _, fpath := range fileList {
+		if err := f(fpath); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func NewFileOpenCallback(fpath string, fn func(f *os.File) error) error {
+	f, err := os.Open(fpath)
+	if err != nil {
+		zap.L().Error("failed to open file", zap.Any("file", fpath), zap.Error(err))
+		return err
+	}
+	defer f.Close()
+
+	if err := fn(f); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func NewCSVFilelistCallback(pattern string, rowProcessor RecordProcessor) error {
+	fileList, err := filepath.Glob(pattern)
+	if err != nil {
+		zap.L().Error("file glob failed", zap.Any("pattern", pattern), zap.Error(err))
+		return err
+	}
+
+	for _, fpath := range fileList {
+		if err := ProcessCSVFile(fpath, rowProcessor); err != nil {
+			return err
+		}
+	}
+	return nil
 }
