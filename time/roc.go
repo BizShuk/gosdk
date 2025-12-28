@@ -34,6 +34,8 @@ func ParseROCDate(dateStr string) time.Time {
 	}
 
 	dateStrAD := fmt.Sprintf("%04d%02d%02d", year, month, day)
-	parsedTime, _ := time.Parse("20060102", dateStrAD)
+
+	loc, _ := time.LoadLocation("Asia/Taipei")
+	parsedTime, _ := time.ParseInLocation("20060102", dateStrAD, loc)
 	return parsedTime
 }
