@@ -36,3 +36,6 @@ gosdk
 .DS_Store
 
 *_string.go
+.aider*
+.env
+.env
