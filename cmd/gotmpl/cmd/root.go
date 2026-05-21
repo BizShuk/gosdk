@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/bizshuk/gosdk/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -30,10 +30,10 @@ to quickly create a Cobra application.`,
 		loader := &TemplateLoader{}
 		err := viper.Unmarshal(loader)
 		if err != nil {
-			log.Fatalln("Failed to load config.yaml")
+			log.Fatal("Failed to load config.yaml")
 		}
 
-		log.Infoln(loader)
+		log.Info(loader)
 		loader.Load()
 
 	},

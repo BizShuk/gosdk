@@ -6,7 +6,6 @@ require (
 	github.com/gin-gonic/gin v1.11.0
 	github.com/hairyhenderson/gomplate/v4 v4.3.3
 	github.com/satori/go.uuid v1.2.0
-	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.17.0
 	github.com/tavsec/gin-healthcheck v1.2.2

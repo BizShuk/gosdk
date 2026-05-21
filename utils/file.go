@@ -122,7 +122,8 @@ func NewCSVFilelistCallback(pattern string, rowProcessor RecordProcessor) error 
 	}
 
 	for _, fpath := range fileList {
-		if err := ProcessCSVFile(fpath, rowProcessor); err != nil {
+		// Default to archive=true for backward compatibility in file list callback
+		if err := ProcessCSVFile(fpath, true, rowProcessor); err != nil {
 			return err
 		}
 	}

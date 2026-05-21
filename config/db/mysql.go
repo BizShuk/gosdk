@@ -3,6 +3,7 @@ package db
 import (
 	"fmt"
 
+	"github.com/bizshuk/gosdk/log"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
@@ -10,7 +11,7 @@ import (
 // newMySQLClient 專門建立 MySQL 連接
 func NewMySQL(cfg DBConfig) (*gorm.DB, error) {
 	// DSN 範例: "user:pass@tcp(127.0.0.1:3306)/dbname?charset=utf8mb4&parseTime=True&loc=Local"
-	fmt.Printf("建立 MySQL 連接 (URL: %s)\n", cfg.URL)
+	log.Infof("建立 MySQL 連接 (URL: %s)", cfg.URL)
 
 	db, err := gorm.Open(mysql.Open(cfg.URL), &gorm.Config{})
 

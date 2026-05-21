@@ -13,14 +13,16 @@ type RecordProcessor func(fname string, row []string) error
 
 // ProcessCSVFile parses a CSV file and iterates over its rows.
 // It skips the specified number of header lines and ignores rows with fewer than minCols columns.
-func ProcessCSVFile(fpath string, processor RecordProcessor) error {
-
-	if _, err := os.Stat(fpath + ".archived"); err == nil {
-		return nil
+// archive parameter determines whether to create .archived mark file.
+func ProcessCSVFile(fpath string, archive bool, processor RecordProcessor) error {
+	if archive {
+		if _, err := os.Stat(fpath + ".archived"); err == nil {
+			return nil
+		}
 	}
 
 	defer func() {
-		if true {
+		if archive {
 			if _, err := os.Create(fpath + ".archived"); err != nil {
 				zap.L().Error("failed to create archived file", zap.Any("file", fpath))
 			}
@@ -35,7 +37,6 @@ func ProcessCSVFile(fpath string, processor RecordProcessor) error {
 	defer f.Close()
 
 	r := csv.NewReader(f)
-
 	fname := GetFileName(fpath)
 
 	for i := 0; ; i++ {
@@ -46,11 +47,9 @@ func ProcessCSVFile(fpath string, processor RecordProcessor) error {
 		if i < 1 {
 			continue
 		}
-
 		if len(row) < 2 {
 			continue
 		}
-
 		if err := processor(fname, row); err != nil {
 			zap.L().Error("process row failed", zap.Error(err))
 			continue

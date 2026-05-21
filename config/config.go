@@ -5,6 +5,27 @@ import (
 	"go.uber.org/zap"
 )
 
+type ServerConfig struct {
+	Host string `mapstructure:"host"`
+	Port int    `mapstructure:"port"`
+}
+
+type DBConnConfig struct {
+	Driver string `mapstructure:"driver"`
+	URL    string `mapstructure:"url"`
+}
+
+type ConfigSchema struct {
+	Name     string                  `mapstructure:"name"`
+	Version  string                  `mapstructure:"version"`
+	Profile  string                  `mapstructure:"profile"`
+	LogLevel string                  `mapstructure:"log_level"`
+	Server   ServerConfig            `mapstructure:"server"`
+	DB       map[string]DBConnConfig `mapstructure:"db"`
+}
+
+var GlobalConfig ConfigSchema
+
 type Config interface {
 	Load() *viper.Viper
 	GetConfigName() string
@@ -18,8 +39,6 @@ func Default() {
 
 	zap.L().Info("Load Configure...",
 		zap.String("CONFIG_DIR", GetConfigDir()),
-		zap.String("CONFIG_DIR", "."),
-		zap.String("CONFIG_DIR", "conf"),
 	)
 
 	v1 := NewEnvConfig().Load()
@@ -33,6 +52,11 @@ func Default() {
 	viper.SetEnvPrefix("APP")
 	// 啟用環境變數的綁定 環境變數中的底線 '_' 會被視為點號 '.'
 	viper.AutomaticEnv()
+
+	// Unmarshal into strong-typed global configuration schema
+	if err := viper.Unmarshal(&GlobalConfig); err != nil {
+		zap.L().Fatal("Failed to unmarshal configuration", zap.Error(err))
+	}
 }
 
 func GetProfile() string {

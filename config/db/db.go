@@ -2,8 +2,8 @@ package db
 
 import (
 	"fmt"
-	"log"
 
+	"github.com/bizshuk/gosdk/log"
 	"github.com/spf13/viper"
 	"gorm.io/gorm"
 )
@@ -12,9 +12,9 @@ func NewDBConfig(confKey string) DBConfig {
 	confKey = "db." + confKey
 	dbConfig := DBConfig{}
 	if err := viper.UnmarshalKey(confKey, &dbConfig); err != nil {
-		log.Fatalf("Unable to unmarshal server key: %v", err)
+		log.Fatalf("Unable to unmarshal db key: %v", err)
 	}
-	fmt.Println("Load DBConfig:", dbConfig)
+	log.Infof("Load DBConfig: %+v", dbConfig)
 	return dbConfig
 }
 

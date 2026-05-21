@@ -1,9 +1,7 @@
 package config
 
 import (
-	"fmt"
-	"log"
-
+	"github.com/bizshuk/gosdk/log"
 	"github.com/spf13/viper"
 )
 
@@ -25,22 +23,22 @@ func (c EnvConfig) Load() *viper.Viper {
 	v.SetConfigType("dotenv")
 	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			log.Println("Config file not found. Using defaults and env variables.")
+			log.Info("Config file not found. Using defaults and env variables.")
 		} else { // 如果是其他讀取錯誤，則終止程式
-			log.Fatalf("Fatal error reading config file: %s \n", err)
+			log.Fatalf("Fatal error reading config file: %s", err)
 		}
 	}
 
 	v.SetConfigName(c.GetConfigName())
 	if err := v.MergeInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			log.Println("Config file not found. Using defaults and env variables.")
+			log.Info("Config file not found. Using defaults and env variables.")
 		} else { // 如果是其他讀取錯誤，則終止程式
-			log.Fatalf("Fatal error reading config file: %s \n", err)
+			log.Fatalf("Fatal error reading config file: %s", err)
 		}
 	}
 
-	fmt.Println("EnvConfig used:", v.ConfigFileUsed())
+	log.Infof("EnvConfig used: %s", v.ConfigFileUsed())
 	return v
 }
 
