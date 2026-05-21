@@ -170,3 +170,10 @@ Based on codebase analysis:
 - [ ] 完善 `main.go` 入口: `main()` 為空函式，`HTTPServer()` 未被調用，考慮使用 Cobra 管理子命令或移除空 main
 - [ ] 實作 `helmet.go` 中介層: 目前僅有空 package 宣告和註解，未實作任何安全性標頭邏輯
 - [ ] 加入 CI/CD 設定: 缺少 `Makefile`、`Dockerfile` 或 CI workflow，建議加入自動化建置與測試流程
+- [ ] 補充測試覆蓋：目前 `statsHandler_test.go` 的測試案例為空 (TODO)，`utils/type_test.go` 存在但其他模組缺乏測試，建議系統性地補充單元測試
+- [ ] 設定結構化：`config/config.go` 目前以 flat key 存取 Viper，建議定義強型別 Config struct 並使用 `viper.Unmarshal()` 統一管理，降低 magic string 風險
+- [ ] `main.go` 入口完善：`main()` 函數目前為空，需補充初始化流程（設定載入 → log 初始化 → 資料庫連線 → 啟動伺服器）
+- [ ] 移除重複依賴：同時使用 `logrus` 和 `zap` 兩套日誌套件 (`main.go` 用 logrus，`log/` 套件用 zap)，建議統一為 zap
+- [ ] Dockerfile 更新：`build/dockerfile` 引用的是舊的 `ginsample` 倉庫且使用 Go 1.18，應更新為當前專案路徑與 Go 1.24
+- [ ] `processor.go` 硬編碼：`ProcessCSVFile` 中的 `if true` 條件為硬編碼，建議改為參數控制歸檔行為
+- [ ] 新增 Makefile：缺少統一的建置/測試/生成指令入口，建議加入 `make build`、`make test`、`make generate` 等常用目標

@@ -39,3 +39,4 @@ gosdk
 .aider*
 .env
 .env
+.claude/settings.local.json
