@@ -3,9 +3,8 @@ package config
 import (
 	"bytes"
 	"embed"
-	"fmt"
-	"log"
 
+	"github.com/bizshuk/gosdk/log"
 	"github.com/spf13/viper"
 )
 
@@ -22,7 +21,10 @@ func NewFSConfig(fs embed.FS, filename string) Config {
 }
 
 func (c FSConfig) Load() *viper.Viper {
-	r := GetFSReader(c.fs, c.fileName)
+	r, err := GetFSReader(c.fs, c.fileName)
+	if err != nil {
+		log.Fatalf("Fatal error reading embed config file: %s", err)
+	}
 	v := viper.New()
 
 	v.SetConfigType(GetFileExtension(c.fileName))
@@ -30,13 +32,13 @@ func (c FSConfig) Load() *viper.Viper {
 	if err := v.ReadConfig(r); err != nil {
 		// 如果找不到配置檔 (FileNotFoundError)，通常是可接受的
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			log.Fatalln("Config file not found. Using defaults and env variables.")
+			log.Fatal("Config file not found. Using defaults and env variables.")
 		} else { // 如果是其他讀取錯誤，則終止程式
-			log.Fatalf("Fatal error reading config file: %s \n", err)
+			log.Fatalf("Fatal error reading config file: %s", err)
 		}
 	}
 
-	fmt.Println("FSConfig used:", v.ConfigFileUsed())
+	log.Infof("FSConfig used: %s", c.fileName)
 	return v
 }
 
@@ -44,12 +46,12 @@ func (c FSConfig) GetConfigName() string {
 	return c.fileName
 }
 
-func GetFSReader(fs embed.FS, filename string) *bytes.Reader {
+func GetFSReader(fs embed.FS, filename string) (*bytes.Reader, error) {
 	data, err := fs.ReadFile(filename)
 	if err != nil {
-		fmt.Println(err)
+		return nil, err
 	}
-	return bytes.NewReader(data)
+	return bytes.NewReader(data), nil
 }
 
 // Get file extension from string

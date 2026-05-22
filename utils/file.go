@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	sdkcsv "github.com/bizshuk/gosdk/encode/csv"
 	"go.uber.org/zap"
 )
 
@@ -114,7 +115,7 @@ func NewFileOpenCallback(fpath string, fn func(f *os.File) error) error {
 	return nil
 }
 
-func NewCSVFilelistCallback(pattern string, rowProcessor RecordProcessor) error {
+func NewCSVFilelistCallback(pattern string, rowProcessor sdkcsv.RecordProcessor) error {
 	fileList, err := filepath.Glob(pattern)
 	if err != nil {
 		zap.L().Error("file glob failed", zap.Any("pattern", pattern), zap.Error(err))
@@ -123,7 +124,7 @@ func NewCSVFilelistCallback(pattern string, rowProcessor RecordProcessor) error 
 
 	for _, fpath := range fileList {
 		// Default to archive=true for backward compatibility in file list callback
-		if err := ProcessCSVFile(fpath, true, rowProcessor); err != nil {
+		if err := sdkcsv.ProcessCSVFile(fpath, true, rowProcessor); err != nil {
 			return err
 		}
 	}

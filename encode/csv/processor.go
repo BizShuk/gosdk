@@ -1,9 +1,11 @@
-package utils
+package csv
 
 import (
 	"encoding/csv"
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"go.uber.org/zap"
 )
@@ -37,7 +39,7 @@ func ProcessCSVFile(fpath string, archive bool, processor RecordProcessor) error
 	defer f.Close()
 
 	r := csv.NewReader(f)
-	fname := GetFileName(fpath)
+	fname := getFileName(fpath)
 
 	for i := 0; ; i++ {
 		row, err := r.Read()
@@ -57,4 +59,10 @@ func ProcessCSVFile(fpath string, archive bool, processor RecordProcessor) error
 	}
 
 	return nil
+}
+
+func getFileName(fpath string) string {
+	base := filepath.Base(fpath)
+	fname := strings.TrimSuffix(base, filepath.Ext(base))
+	return fname
 }
