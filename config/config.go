@@ -20,6 +20,16 @@ type Config interface {
 	GetConfigName() string
 }
 
+// ExpandHome 將路徑中的 "~" 或 "~/..." 展開為使用者家目錄。
+// 如果路徑不以 "~" 開頭，則原樣返回。
+func ExpandHome(path string) string {
+	if path == "~" || (len(path) > 2 && path[:2] == "~/") {
+		homeDir, _ := os.UserHomeDir()
+		return filepath.Join(homeDir, path[1:])
+	}
+	return path
+}
+
 // Default 載入預設設定檔。
 //
 // 備註 (Method 1)：應用程式層 (application layer) 可以在呼叫 Default() 之前，
@@ -54,13 +64,7 @@ func Default() {
 // 備註 (Method 2)：應用程式層 (application layer) 可以直接呼叫此函式並傳入自訂目錄，
 // 例如：config.DefaultWithDir("/path/to/config")
 func DefaultWithDir(configDir string) {
-	path := configDir
-	if path == "~" || (len(path) > 2 && path[:2] == "~/") {
-		homeDir, _ := os.UserHomeDir()
-		path = filepath.Join(homeDir, path[1:])
-	}
-	viper.Set("CONFIG_DIR", path)
-
+	viper.Set("CONFIG_DIR", ExpandHome(configDir))
 	Default()
 }
 
