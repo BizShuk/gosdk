@@ -16,6 +16,21 @@ var rootCmd = &cobra.Command{
 	Use:   "versioning",
 	Short: "Version management CLI tool",
 	Long:  `A CLI tool to manage semver version in a version file.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		v, err := ReadVersion()
+		if err != nil {
+			return err
+		}
+		if v.Major == 0 && v.Minor == 0 && v.Patch == 0 {
+			if err := WriteVersion(Version{Major: 0, Minor: 0, Patch: 1}); err != nil {
+				return err
+			}
+			fmt.Println("0.0.1")
+			return nil
+		}
+		fmt.Println(v.String())
+		return nil
+	},
 }
 
 func Execute() {
