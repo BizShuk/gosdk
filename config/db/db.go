@@ -8,6 +8,11 @@ import (
 	"gorm.io/gorm"
 )
 
+type DBConfig struct {
+	Driver string `mapstructure:"driver"`
+	URL    string `mapstructure:"url"` // 這裡通常是完整的 DSN 字串
+}
+
 func NewDBConfig(confKey string) DBConfig {
 	confKey = "db." + confKey
 	dbConfig := DBConfig{}
@@ -16,11 +21,6 @@ func NewDBConfig(confKey string) DBConfig {
 	}
 	log.Infof("Load DBConfig: %+v", dbConfig)
 	return dbConfig
-}
-
-type DBConfig struct {
-	Driver string `mapstructure:"driver"`
-	URL    string `mapstructure:"url"` // 這裡通常是完整的 DSN 字串
 }
 
 func (d DBConfig) Create() (*gorm.DB, error) {

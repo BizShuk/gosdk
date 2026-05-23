@@ -6,11 +6,11 @@ Go 語言通用開發工具包 (Shared SDK)，提供設定管理、HTTP 服務�
 
 ### 設定管理 (Configuration Management)
 
-統一管理應用程式設定來源，支援 `.env`、YAML、JSON 及 `embed.FS` 四種格式，透過 Viper 實現階層式設定合併。根據 `PROFILE` 環境變數自動切換對應的設定檔（`local`/`dev`/`stage`/`prod`），並支援 `APP_` 前綴的環境變數自動綁定。同時提供資料庫連線工廠，透過設定驅動建立 GORM ORM 連線（支援 MySQL、SQLite）。
+統一管理應用程式設定來源，支援 `.env`、YAML、JSON 及 `embed.FS` 四種格式，透過 Viper 實現階層式設定合併。其中 `.env` 與 YAML 會根據 `PROFILE` 環境變數自動切換對應的設定檔（`local`/`dev`/`stage`/`prod`），而 JSON 則是固定載入 `settings.json`；系統並支援 `APP_` 前綴的環境變數自動綁定。同時提供資料庫連線工廠，透過設定驅動建立 GORM ORM 連線（支援 MySQL、SQLite）。
 
 `領域流程 (Domain Flow):`
 
-1. 呼叫 `config.Default()` 啟動設定載入，綁定 `CONFIG_DIR` 與 `PROFILE` 環境變數
+1. 呼叫 `config.Default()` 或 `config.DefaultWithDir("/path")` 啟動設定載入，綁定/指定 `CONFIG_DIR` 與 `PROFILE`
 2. `EnvConfig.Load()` 讀取 `.env` → `.env.<profile>` 並合併至全域 Viper
 3. `YamlConfig.Load()` 讀取 `config.<profile>.yaml` 並合併至全域 Viper
 4. 啟用 `APP_` 前綴環境變數自動綁定（`viper.AutomaticEnv()`）
@@ -124,8 +124,22 @@ Go 語言通用開發工具包 (Shared SDK)，提供設定管理、HTTP 服務�
 ```go
 import "github.com/bizshuk/gosdk/config"
 import "github.com/bizshuk/gosdk/config/db"
+import "github.com/spf13/viper"
 
-config.Default()                      // 載入 .env + YAML 設定
+// `方式 1`：載入預設設定（從當前目錄或 CONFIG_DIR 環境變數載入）
+config.Default()
+
+// `方式 2`：在載入前直接透過 viper.Set 自訂設定檔目錄（無須環境變數）
+viper.Set("CONFIG_DIR", "/custom/path")
+config.Default()
+
+// `方式 3`：直接呼叫帶有自訂路徑的初始化函式
+config.DefaultWithDir("/custom/path")
+
+// `方式 4`：手動載入自訂的 JSON 設定檔（固定讀取 settings.json）
+v := config.NewJsonConfig().Load()
+viper.MergeConfigMap(v.AllSettings())
+
 dbCfg := db.NewDBConfig("default")    // 從 db.default 區段建立資料庫設定
 conn, _ := dbCfg.Create()             // 工廠模式建立 GORM 連線
 ```

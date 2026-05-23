@@ -40,3 +40,4 @@ gosdk
 .env
 .env
 .claude/settings.local.json
+bin/server

@@ -5,14 +5,10 @@ import (
 	"github.com/spf13/viper"
 )
 
-type JsonConfig struct {
-	configName string
-}
+type JsonConfig struct{}
 
-func NewJsonConfig(configName string) Config {
-	return &JsonConfig{
-		configName: configName,
-	}
+func NewJsonConfig() Config {
+	return &JsonConfig{}
 }
 
 // Load reads the yaml config file and returns a viper instance.
@@ -37,10 +33,5 @@ func (c *JsonConfig) Load() *viper.Viper {
 }
 
 func (c *JsonConfig) GetConfigName() string {
-	if c.configName != "" {
-		return c.configName
-	}
-
-	profile := GetProfile()
-	return "config." + profile
+	return "settings"
 }
