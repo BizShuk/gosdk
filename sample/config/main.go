@@ -20,6 +20,7 @@ import (
 
 	"github.com/bizshuk/gosdk/config"
 	"github.com/bizshuk/gosdk/config/db"
+	"github.com/bizshuk/gosdk/log"
 	"github.com/spf13/viper"
 )
 
@@ -65,10 +66,10 @@ func main() {
 	//  or config.DefaultWithDir("./conf")
 
 	// --- 用法 1：直接從全域 viper 讀單一鍵值 ---
-	fmt.Println("config dir       :", config.GetConfigDir())
-	fmt.Println("APP_NAME         :", viper.GetString("APP_NAME")) // APP_NAME in .env
-	fmt.Println("server.host      :", viper.GetString("server.host"))
-	fmt.Println("server.port      :", viper.GetInt("server.port"))
+	log.Infof("config dir       : %s", config.GetConfigDir())
+	log.Infof("APP_NAME         : %s", viper.GetString("APP_NAME")) // APP_NAME in .env
+	log.Infof("server.host      : %s", viper.GetString("server.host"))
+	log.Infof("server.port      : %d", viper.GetInt("server.port"))
 
 	// --- 用法 2：Unmarshal 成自訂強型別結構 ---
 	var appConfig AppConfig
@@ -76,10 +77,8 @@ func main() {
 		fmt.Println("unmarshal config failed:", err)
 		return
 	}
-	fmt.Printf("app (struct)     : name=%s (settings.json), version=%s (settings.json), log_level=%s (.env.local)\n",
-		appConfig.Name, appConfig.Version, appConfig.LogLevel)
-	fmt.Printf("server (struct)   : host=%s (config.local.yaml) , port=%d (config.local.yaml) \n",
-		appConfig.Server.Host, appConfig.Server.Port)
+
+	log.Infof("Load AppConfig	: %+v", appConfig)
 
 	// --- 用法 3：用 UnmarshalKey(".", &dest) 示範部分欄位取值 ---
 	// 只取部分常用欄位，示範如何選擇性取值
@@ -88,8 +87,8 @@ func main() {
 		fmt.Println("unmarshal appSettings failed:", err)
 		return
 	}
-	fmt.Printf("appSettings      : name=%s, version=%s, host=%s, port=%d\n",
-		appSettings.AppName, appSettings.AppVer, appSettings.ServerHost, appSettings.ServerPort)
+
+	log.Infof("Load AppSett	: %+v", appSettings)
 
 	// === 設定載入流程說明 ===
 	// 每次執行 config.Default() 後，日誌會顯示實際載入的設定檔：
@@ -103,34 +102,34 @@ func main() {
 	//   2) config.yaml + config.local.yaml
 	//   3) settings.json + settings.local.json
 	//   4) APP_* 環境變數 (最高優先)
-	fmt.Println("---- config sources (check logs above) ----")
-	fmt.Println("  .env.local      -> loaded, see 'EnvConfig used:' log")
-	fmt.Println("  config.local.yaml -> loaded, see 'YamlConfig used:' log")
-	fmt.Println("  settings.json   ->", viper.ConfigFileUsed())
+	log.Infof("---- config sources (check logs above) ----")
+	log.Infof("  .env.local      -> loaded, see 'EnvConfig used:' log")
+	log.Infof("  config.local.yaml -> loaded, see 'YamlConfig used:' log")
+	log.Infof("  settings.json   -> %s", viper.ConfigFileUsed())
 
 	// --- 用法 5： Unmarshal 特定區塊成強型別 struct ---
-	var srv ServerConfig
-	if err := viper.UnmarshalKey("server", &srv); err != nil {
-		fmt.Println("unmarshal server failed:", err)
+	var serverConfig ServerConfig
+	if err := viper.UnmarshalKey("server", &serverConfig); err != nil {
+		log.Errorf("unmarshal server failed: %v", err)
 		return
 	}
-	fmt.Printf("server (partial)  : %+v\n", srv)
+	log.Infof("server (partial)  : %+", serverConfig)
 
 	// --- 用法 5：透過 db helper 從 viper 取出設定並建立 *gorm.DB ---
 	// NewDBConfig("default") 會讀取 db.default.driver / db.default.url，
 	// 並依 driver 字串委派給 sqlite / mysql 的具體實作。
 	gormDB, err := db.NewDBConfig("default").Create()
 	if err != nil {
-		fmt.Println("db connect failed:", err)
+		log.Errorf("db connect failed: %v", err)
 		return
 	}
 	sqlDB, _ := gormDB.DB()
 	defer sqlDB.Close()
-	fmt.Println("db driver        :", gormDB.Name())
+	log.Infof("db driver        : %s", gormDB.Name())
 
 	// --- 用法 6：印出所有 key/value，方便除錯 ---
-	fmt.Println("---- all settings ----")
+	log.Infof("---- all settings ----")
 	for _, k := range viper.AllKeys() {
-		fmt.Printf("  %-24s = %v\n", k, viper.Get(k))
+		log.Infof("  %-24s = %", k, viper.Get(k))
 	}
 }
