@@ -11,30 +11,31 @@ func NewEnvConfig() Config {
 
 type EnvConfig struct{}
 
-// Add extra config from env, `.env.local` should not commit in git
-// .env.local .env.<idc> .env.<region> .env.<geo> [.env.dev|.env.stage|env.prod] .env
+// Load reads .env and merges .env.local
 func (c EnvConfig) Load() *viper.Viper {
 	v := viper.New()
 	v.AddConfigPath(".")
 	v.AddConfigPath("conf")
 	v.AddConfigPath(GetConfigDir())
 
+	// Step 1: Load base .env
 	v.SetConfigName(".env")
 	v.SetConfigType("dotenv")
 	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			log.Info("Config file not found. Using defaults and env variables.")
-		} else { // 如果是其他讀取錯誤，則終止程式
-			log.Fatalf("Fatal error reading config file: %s", err)
+			log.Info(".env not found. Using defaults and env variables.")
+		} else {
+			log.Fatalf("Fatal error reading .env: %s", err)
 		}
 	}
 
-	v.SetConfigName(c.GetConfigName())
+	// Step 2: Merge .env.local (local overrides)
+	v.SetConfigName(".env.local")
 	if err := v.MergeInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			log.Info("Config file not found. Using defaults and env variables.")
-		} else { // 如果是其他讀取錯誤，則終止程式
-			log.Fatalf("Fatal error reading config file: %s", err)
+			log.Info(".env.local not found. Skipping local overrides.")
+		} else {
+			log.Fatalf("Fatal error reading .env.local: %s", err)
 		}
 	}
 
@@ -42,6 +43,7 @@ func (c EnvConfig) Load() *viper.Viper {
 	return v
 }
 
+// GetConfigName is no longer used but kept for interface compatibility
 func (c EnvConfig) GetConfigName() string {
-	return ".env." + GetProfile()
+	return ""
 }
