@@ -11,20 +11,31 @@ func NewYamlConfig() Config {
 	return &YamlConfig{}
 }
 
-// Load reads the yaml config file and returns a viper instance.
+// Load reads config.yaml and merges config.local.yaml
 func (c *YamlConfig) Load() *viper.Viper {
 	v := viper.New()
 	v.AddConfigPath(".")
 	v.AddConfigPath("conf")
 	v.AddConfigPath(GetConfigDir())
 
-	v.SetConfigName(c.GetConfigName())
+	// Step 1: Load base config.yaml
+	v.SetConfigName("config")
 	v.SetConfigType("yaml")
 	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			log.Info("Yaml Config file not found. Using defaults and env variables.")
-		} else { // 如果是其他讀取錯誤，則終止程式
-			log.Fatalf("Fatal error reading config file: %s", err)
+			log.Info("config.yaml not found. Using defaults and env variables.")
+		} else {
+			log.Fatalf("Fatal error reading config.yaml: %s", err)
+		}
+	}
+
+	// Step 2: Merge config.local.yaml (local overrides)
+	v.SetConfigName("config.local")
+	if err := v.MergeInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			log.Info("config.local.yaml not found. Skipping local overrides.")
+		} else {
+			log.Fatalf("Fatal error reading config.local.yaml: %s", err)
 		}
 	}
 
@@ -32,7 +43,7 @@ func (c *YamlConfig) Load() *viper.Viper {
 	return v
 }
 
+// GetConfigName is no longer used but kept for interface compatibility
 func (c *YamlConfig) GetConfigName() string {
-	profile := GetProfile()
-	return "config." + profile
+	return ""
 }
