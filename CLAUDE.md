@@ -17,7 +17,7 @@ gosdk/
 │   └── stringer/            # 增強版 enum stringer CLI
 │       └── main.go
 ├── config/                  # 設定管理模組
-│   ├── config.go            # Config 介面、Default()、GlobalConfig
+│   ├── config.go            # Config 介面、Default()
 │   ├── config_test.go       # 基本設定載入測試
 │   ├── env.go               # .env dotenv 載入器
 │   ├── yaml.go              # YAML 設定載入器
@@ -93,10 +93,10 @@ gosdk/
 ## 關鍵決策 (Key Decisions)
 
 - 使用 Viper 全域單例管理設定：所有設定來源（.env、YAML、環境變數）合併至單一 `viper` 實例，簡化跨模組存取，但犧牲了可測試性
-- 強型別 `ConfigSchema` 結合 flat key 存取：`config.Default()` 同時維護 `GlobalConfig` struct 與 `viper` key-value，下游模組可選擇任一方式取值
+- 強型別 `ConfigSchema` 結合 flat key 存取：`config.Default()` 載入設定後透過 `viper.Unmarshal()` 或直接 `viper.Get*()` 取值
 - `stringer` 以 `GeneratorEx` 組合模式擴充標準庫 `stringer`：嵌入 `service.Generator`，額外產生 `List()`、`ValueList()`、`Map()`、`ValueMap()` 四個輔助函式
 - 日誌模組在 `init()` 時即初始化：確保任何 import 此套件的模組都能立即使用 `log.Info()` 等函式，`log.Init()` 可在設定載入後再次呼叫以更新等級
-- `PROFILE` 驅動環境切換：統一使用 `PROFILE` 環境變數控制 `.env.<profile>` 與 `config.<profile>.yaml` 的載入，而非分別指定
+- 雙檔案載入模式：各設定格式固定載入 base 檔案 + `.local` 覆寫檔（`.env` + `.env.local`、`config.yaml` + `config.local.yaml`、`settings.json` + `settings.local.json`），不再依賴 `PROFILE` 環境變數切換
 - CSV 處理使用歸檔標記檔（`.archived`）防止重複處理：以簡單的檔案系統機制取代資料庫或 Redis 的已處理紀錄
 - Helmet 中介層採用靜態安全標頭：直接在 response header 注入 `X-Content-Type-Options`、`X-Frame-Options`、`CSP` 等，不依賴外部套件
 
@@ -181,4 +181,4 @@ GitHub Actions workflow 定義於 `.github/workflows/ci.yml`，於 push/PR 至 `
 - Error handling: 使用 `fmt.Errorf("...: %w", err)` 進行 error wrapping；設定載入失敗區分 `ConfigFileNotFoundError`（允許 fallback）與其他錯誤（`log.Fatal` 終止）
 - Logging: 統一使用 `gosdk/log` 封裝的 `zap` 函式（`Info`, `Infof`, `Error`, `Errorf` 等）；部分模組直接使用 `zap.L()` 全域實例
 - Testing: 測試檔案與被測檔案放在同一 package 內（白盒測試）；使用 `testing.T` 標準庫；測試前透過 `viper.Set()` 或 `os.Setenv()` 注入設定
-- Configuration: 環境變數 `PROFILE` 控制 profile 切換；`CONFIG_DIR` 控制設定檔搜尋路徑；`APP_` 前綴環境變數自動覆蓋設定
+- Configuration: `CONFIG_DIR` 控制設定檔搜尋路徑；雙檔案模式（base + `.local`）自動載入；`APP_` 前綴環境變數自動覆蓋設定

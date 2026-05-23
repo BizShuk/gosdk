@@ -18,13 +18,10 @@ type DBConnConfig struct {
 type ConfigSchema struct {
 	Name     string                  `mapstructure:"name"`
 	Version  string                  `mapstructure:"version"`
-	Profile  string                  `mapstructure:"profile"`
 	LogLevel string                  `mapstructure:"log_level"`
 	Server   ServerConfig            `mapstructure:"server"`
 	DB       map[string]DBConnConfig `mapstructure:"db"`
 }
-
-var GlobalConfig ConfigSchema
 
 type Config interface {
 	Load() *viper.Viper
@@ -39,9 +36,7 @@ type Config interface {
 //	viper.Set("CONFIG_DIR", "/path/to/config")
 func Default() {
 	viper.BindEnv("CONFIG_DIR", "CONFIG_DIR")
-	viper.BindEnv("PROFILE", "PROFILE")
 	viper.SetDefault("CONFIG_DIR", ".")
-	viper.SetDefault("PROFILE", "local")
 
 	zap.L().Info("Load Configure...",
 		zap.String("CONFIG_DIR", GetConfigDir()),
@@ -60,11 +55,6 @@ func Default() {
 	viper.SetEnvPrefix("APP")
 	// 啟用環境變數的綁定 環境變數中的底線 '_' 會被視為點號 '.'
 	viper.AutomaticEnv()
-
-	// Unmarshal into strong-typed global configuration schema
-	if err := viper.Unmarshal(&GlobalConfig); err != nil {
-		zap.L().Fatal("Failed to unmarshal configuration", zap.Error(err))
-	}
 }
 
 // DefaultWithDir 允許自訂設定檔目錄，並載入設定。

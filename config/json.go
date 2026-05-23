@@ -11,20 +11,31 @@ func NewJsonConfig() Config {
 	return &JsonConfig{}
 }
 
-// Load reads the yaml config file and returns a viper instance.
+// Load reads settings.json and merges settings.local.json
 func (c *JsonConfig) Load() *viper.Viper {
 	v := viper.New()
 	v.AddConfigPath(".")
 	v.AddConfigPath("conf")
 	v.AddConfigPath(GetConfigDir())
 
-	v.SetConfigName(c.GetConfigName())
+	// Step 1: Load base settings.json
+	v.SetConfigName("settings")
 	v.SetConfigType("json")
 	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			log.Info("Json Config file not found. Using defaults and env variables.")
-		} else { // 如果是其他讀取錯誤，則終止程式
-			log.Fatalf("Fatal error reading config file: %s", err)
+			log.Info("settings.json not found. Using defaults and env variables.")
+		} else {
+			log.Fatalf("Fatal error reading settings.json: %s", err)
+		}
+	}
+
+	// Step 2: Merge settings.local.json (local overrides)
+	v.SetConfigName("settings.local")
+	if err := v.MergeInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			log.Info("settings.local.json not found. Skipping local overrides.")
+		} else {
+			log.Fatalf("Fatal error reading settings.local.json: %s", err)
 		}
 	}
 

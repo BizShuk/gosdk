@@ -9,10 +9,11 @@ import (
 	"github.com/bizshuk/gosdk/mw"
 	"github.com/bizshuk/gosdk/router"
 	"github.com/gin-gonic/gin"
+	"github.com/spf13/viper"
 )
 
 func main() {
-	// 1. Load Configurations
+	// 1. Load Configurations via dual-file loading
 	config.Default()
 
 	// 2. Re-initialize log systems with configuration level
@@ -20,7 +21,8 @@ func main() {
 	log.Info("Configurations loaded successfully.")
 
 	// 3. Connect DB
-	if len(config.GlobalConfig.DB) > 0 {
+	dbConfigs := viper.GetStringMap("db")
+	if len(dbConfigs) > 0 {
 		_, err := db.NewDBConfig("default").Create()
 		if err != nil {
 			log.Errorf("Database connection failed: %v", err)
@@ -42,8 +44,8 @@ func HTTPServer() {
 	router.HealthRouterGroup(s)
 	router.PingRouterGroup(s)
 
-	host := config.GlobalConfig.Server.Host
-	port := config.GlobalConfig.Server.Port
+	host := viper.GetString("server.host")
+	port := viper.GetInt("server.port")
 	if port == 0 {
 		port = 8080
 	}
