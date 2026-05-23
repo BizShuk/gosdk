@@ -157,4 +157,60 @@ func TestFileUtilities(t *testing.T) {
 			t.Errorf("expected 0 rows processed due to archive, got %d", rowsProcessed2)
 		}
 	})
+
+	t.Run("CreateIfNotExist", func(t *testing.T) {
+		fpath := filepath.Join(tmpDir, "config_create_if_not_exist.txt")
+		_ = os.Remove(fpath) // 確保檔案不存在
+
+		// Case 1: 檔案不存在，寫入預設值
+		defaultValue := "default-value"
+		CreateIfNotExist(fpath, defaultValue)
+
+		if !FileExists(fpath) {
+			t.Fatal("expected file to be created")
+		}
+
+		data, err := os.ReadFile(fpath)
+		if err != nil {
+			t.Fatalf("failed to read file: %v", err)
+		}
+		if string(data) != defaultValue {
+			t.Errorf("expected file content %q, got %q", defaultValue, string(data))
+		}
+
+		// Case 2: 檔案已存在，應保持原樣 (忽略新的 defaultValue)
+		anotherValue := "another-value"
+		CreateIfNotExist(fpath, anotherValue)
+
+		data2, err := os.ReadFile(fpath)
+		if err != nil {
+			t.Fatalf("failed to read file again: %v", err)
+		}
+		if string(data2) != defaultValue {
+			t.Errorf("expected file content to remain %q, got %q", defaultValue, string(data2))
+		}
+
+		// Case 3: 測試家目錄波浪號 (~) 展開支援
+		home, err := os.UserHomeDir()
+		if err != nil {
+			t.Fatalf("failed to get home directory: %v", err)
+		}
+		realPath := filepath.Join(home, "config_create_if_not_exist_test.txt")
+		_ = os.Remove(realPath) // 確保家目錄測試檔案原本不存在
+		defer os.Remove(realPath)
+
+		CreateIfNotExist("~/config_create_if_not_exist_test.txt", "home-value")
+
+		if !FileExists(realPath) {
+			t.Fatal("expected file to be created in home directory")
+		}
+
+		homeData, err := os.ReadFile(realPath)
+		if err != nil {
+			t.Fatalf("failed to read file from home directory: %v", err)
+		}
+		if string(homeData) != "home-value" {
+			t.Errorf("expected %q, got %q", "home-value", string(homeData))
+		}
+	})
 }
