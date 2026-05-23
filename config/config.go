@@ -1,14 +1,19 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
+
 	"github.com/bizshuk/gosdk/config/common"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 )
 
-type ServerConfig = common.ServerConfig
-type DBConnConfig = common.DBConnConfig
-type ConfigSchema = common.ConfigSchema
+type (
+	ServerConfig = common.ServerConfig
+	DBConnConfig = common.DBConnConfig
+	ConfigSchema = common.ConfigSchema
+)
 
 type Config interface {
 	Load() *viper.Viper
@@ -49,9 +54,13 @@ func Default() {
 // 備註 (Method 2)：應用程式層 (application layer) 可以直接呼叫此函式並傳入自訂目錄，
 // 例如：config.DefaultWithDir("/path/to/config")
 func DefaultWithDir(configDir string) {
-	if configDir != "" {
-		viper.Set("CONFIG_DIR", configDir)
+	path := configDir
+	if path == "~" || (len(path) > 2 && path[:2] == "~/") {
+		homeDir, _ := os.UserHomeDir()
+		path = filepath.Join(homeDir, path[1:])
 	}
+	viper.Set("CONFIG_DIR", path)
+
 	Default()
 }
 
