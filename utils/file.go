@@ -134,34 +134,32 @@ func NewCSVFilelistCallback(pattern string, rowProcessor sdkcsv.RecordProcessor)
 // CreateIfNotExist checks if a file exists at the given path.
 // If the file does not exist, it creates one with the provided defaultValue.
 // It supports "~" as the home directory.
-// Any error encountered is logged via zap and the function returns early.
-func CreateIfNotExist(path string, defaultValue string) {
+func CreateIfNotExist(path string, defaultValue string) error {
 	if len(path) > 0 && path[0] == '~' {
 		home, err := os.UserHomeDir()
 		if err != nil {
-			zap.L().Warn("failed to get user home directory", zap.Error(err))
-		} else {
-			if len(path) == 1 {
-				path = home
-			} else if path[1] == '/' || path[1] == '\\' {
-				path = filepath.Join(home, path[2:])
-			}
+			return fmt.Errorf("get user home directory: %w", err)
+		}
+		if len(path) == 1 {
+			path = home
+		} else if path[1] == '/' || path[1] == '\\' {
+			path = filepath.Join(home, path[2:])
 		}
 	}
 
 	dir := filepath.Dir(path)
 	if dir != "" {
 		if err := os.MkdirAll(dir, 0755); err != nil {
-			zap.L().Error("failed to create directory", zap.String("dir", dir), zap.Error(err))
-			return
+			return fmt.Errorf("create directory %s: %w", dir, err)
 		}
 	}
 
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		zap.L().Info("Writing default value to", zap.String("path", path))
 		if err := os.WriteFile(path, []byte(defaultValue), 0644); err != nil {
-			zap.L().Error("failed to write default value", zap.String("path", path), zap.Error(err))
-			return
+			return fmt.Errorf("write default value to %s: %w", path, err)
 		}
 	}
+
+	return nil
 }

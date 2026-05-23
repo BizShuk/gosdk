@@ -164,7 +164,9 @@ func TestFileUtilities(t *testing.T) {
 
 		// Case 1: 檔案不存在，寫入預設值
 		defaultValue := "default-value"
-		CreateIfNotExist(fpath, defaultValue)
+		if err := CreateIfNotExist(fpath, defaultValue); err != nil {
+			t.Fatalf("unexpected error creating file: %v", err)
+		}
 
 		if !FileExists(fpath) {
 			t.Fatal("expected file to be created")
@@ -180,7 +182,9 @@ func TestFileUtilities(t *testing.T) {
 
 		// Case 2: 檔案已存在，應保持原樣 (忽略新的 defaultValue)
 		anotherValue := "another-value"
-		CreateIfNotExist(fpath, anotherValue)
+		if err := CreateIfNotExist(fpath, anotherValue); err != nil {
+			t.Fatalf("unexpected error on existing file: %v", err)
+		}
 
 		data2, err := os.ReadFile(fpath)
 		if err != nil {
@@ -199,7 +203,9 @@ func TestFileUtilities(t *testing.T) {
 		_ = os.Remove(realPath) // 確保家目錄測試檔案原本不存在
 		defer os.Remove(realPath)
 
-		CreateIfNotExist("~/config_create_if_not_exist_test.txt", "home-value")
+		if err := CreateIfNotExist("~/config_create_if_not_exist_test.txt", "home-value"); err != nil {
+			t.Fatalf("unexpected error creating file in home dir: %v", err)
+		}
 
 		if !FileExists(realPath) {
 			t.Fatal("expected file to be created in home directory")

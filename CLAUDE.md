@@ -43,6 +43,11 @@ gosdk/
 ├── mw/                      # Gin 中介層
 │   ├── correlationId.go     # X-Correlation-Id 請求追蹤
 │   └── helmet.go            # 安全性標頭（CSP, X-Frame-Options 等）
+├── notify/                  # 通用通知模組
+│   ├── notifier.go          # Notifier 介面與 Multi
+│   ├── stdout.go            # StdoutNotifier 實作
+│   ├── slack.go             # SlackNotifier 實作
+│   └── notifier_test.go     # 通知器測試
 ├── router/                  # HTTP 路由定義
 │   ├── default.go           # /stats 路由註冊
 │   ├── statsHandler.go      # Stats JSON 回應
@@ -110,6 +115,7 @@ gosdk/
 | 程式碼產生 — stringer | `cmd/stringer/`, `service/generator.go` | `cmd/stringer/main.go` |
 | 程式碼產生 — gotmpl   | `cmd/gotmpl/`                           | `cmd/gotmpl/main.go`   |
 | 編碼與資料處理        | `encode/`, `utils/`, `time/`            | 各函式獨立呼叫         |
+| 通用通知              | `notify/`                               | 各通知器獨立建構與呼叫 |
 | 日誌與觀測            | `log/`                                  | `log.Init()`           |
 
 ## 開發指南 (Development Guide)

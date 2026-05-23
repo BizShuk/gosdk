@@ -1,11 +1,12 @@
 module github.com/bizshuk/gosdk
 
-go 1.24.5
+go 1.25
 
 require (
 	github.com/gin-gonic/gin v1.11.0
 	github.com/hairyhenderson/gomplate/v4 v4.3.3
 	github.com/satori/go.uuid v1.2.0
+	github.com/slack-go/slack v0.23.1
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.17.0
 	github.com/tavsec/gin-healthcheck v1.2.2
@@ -105,6 +106,7 @@ require (
 	github.com/google/wire v0.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.6 // indirect
 	github.com/googleapis/gax-go/v2 v2.14.1 // indirect
+	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/gosimple/slug v1.15.0 // indirect
 	github.com/gosimple/unidecode v1.0.1 // indirect
 	github.com/hack-pad/hackpadfs v0.2.4 // indirect
