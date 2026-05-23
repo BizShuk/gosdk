@@ -1,27 +1,14 @@
 package config
 
 import (
+	"github.com/bizshuk/gosdk/config/common"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 )
 
-type ServerConfig struct {
-	Host string `mapstructure:"host"`
-	Port int    `mapstructure:"port"`
-}
-
-type DBConnConfig struct {
-	Driver string `mapstructure:"driver"`
-	URL    string `mapstructure:"url"`
-}
-
-type ConfigSchema struct {
-	Name     string                  `mapstructure:"name"`
-	Version  string                  `mapstructure:"version"`
-	LogLevel string                  `mapstructure:"log_level"`
-	Server   ServerConfig            `mapstructure:"server"`
-	DB       map[string]DBConnConfig `mapstructure:"db"`
-}
+type ServerConfig = common.ServerConfig
+type DBConnConfig = common.DBConnConfig
+type ConfigSchema = common.ConfigSchema
 
 type Config interface {
 	Load() *viper.Viper

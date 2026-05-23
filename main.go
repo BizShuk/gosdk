@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/bizshuk/gosdk/config"
-	"github.com/bizshuk/gosdk/config/db"
+	"github.com/bizshuk/gosdk/config/common"
 	"github.com/bizshuk/gosdk/log"
 	"github.com/bizshuk/gosdk/mw"
 	"github.com/bizshuk/gosdk/router"
@@ -23,7 +23,7 @@ func main() {
 	// 3. Connect DB
 	dbConfigs := viper.GetStringMap("db")
 	if len(dbConfigs) > 0 {
-		_, err := db.NewDBConfig("default").Create()
+		_, err := common.NewDBConfig("default").Create()
 		if err != nil {
 			log.Errorf("Database connection failed: %v", err)
 		} else {

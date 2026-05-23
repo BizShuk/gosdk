@@ -19,7 +19,7 @@ Go 語言通用開發工具包 (Shared SDK)，提供設定管理、HTTP 服務�
 
 `核心實體 (Key Entities):` `Config` 介面, `ConfigSchema`, `EnvConfig`, `YamlConfig`, `JsonConfig`, `FSConfig`, `DBConfig`, `ServerConfig`, `DBConnConfig`
 
-`相關處理器 (Related Handlers):` `config.Default()`, `NewEnvConfig()`, `NewYamlConfig()`, `NewJsonConfig()`, `NewFSConfig()`, `db.NewDBConfig()`, `db.DatabaseFactory()`, `NewMySQL()`, `NewSQLite()`
+`相關處理器 (Related Handlers):` `config.Default()`, `NewEnvConfig()`, `NewYamlConfig()`, `NewJsonConfig()`, `NewFSConfig()`, `common.NewDBConfig()`, `common.DatabaseFactory()`, `NewMySQL()`, `NewSQLite()`
 
 ---
 
@@ -123,7 +123,7 @@ Go 語言通用開發工具包 (Shared SDK)，提供設定管理、HTTP 服務�
 
 ```go
 import "github.com/bizshuk/gosdk/config"
-import "github.com/bizshuk/gosdk/config/db"
+import "github.com/bizshuk/gosdk/config/common"
 import "github.com/spf13/viper"
 
 // `方式 1`：載入預設設定（從當前目錄或 CONFIG_DIR 環境變數載入）
@@ -140,7 +140,7 @@ config.DefaultWithDir("/custom/path")
 v := config.NewJsonConfig().Load()
 viper.MergeConfigMap(v.AllSettings())
 
-dbCfg := db.NewDBConfig("default")    // 從 db.default 區段建立資料庫設定
+dbCfg := common.NewDBConfig("default")    // 從 db.default 區段建立資料庫設定
 conn, _ := dbCfg.Create()             // 工廠模式建立 GORM 連線
 ```
 

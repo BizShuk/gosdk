@@ -23,8 +23,9 @@ gosdk/
 │   ├── yaml.go              # YAML 設定載入器
 │   ├── json.go              # JSON 設定載入器
 │   ├── embedFS.go           # embed.FS 設定載入器
-│   └── db/                  # 資料庫連線工廠
-│       ├── db.go            # DBConfig, DatabaseFactory()
+│   └── common/              # 設定核心結構與資料庫連線工廠
+│       ├── config.go        # ServerConfig, DBConfig, ConfigSchema 定義
+│       ├── db.go            # DBConfig 載入與 DatabaseFactory()
 │       ├── mysql.go         # MySQL GORM 驅動
 │       └── sqlite.go        # SQLite GORM 驅動
 ├── encode/                  # 編碼轉換模組
@@ -104,7 +105,7 @@ gosdk/
 
 | 業務領域 (Domain)     | 套件/模組 (Package/Module)              | 進入點 (Entry Point)   |
 | --------------------- | --------------------------------------- | ---------------------- |
-| 設定管理              | `config/`, `config/db/`                 | `config.Default()`     |
+| 設定管理              | `config/`, `config/common/`             | `config.Default()`     |
 | HTTP 服務             | `router/`, `mw/`, `main.go`             | `HTTPServer()`         |
 | 程式碼產生 — stringer | `cmd/stringer/`, `service/generator.go` | `cmd/stringer/main.go` |
 | 程式碼產生 — gotmpl   | `cmd/gotmpl/`                           | `cmd/gotmpl/main.go`   |

@@ -1,4 +1,4 @@
-package db
+package common
 
 import (
 	"fmt"
@@ -7,11 +7,6 @@ import (
 	"github.com/spf13/viper"
 	"gorm.io/gorm"
 )
-
-type DBConfig struct {
-	Driver string `mapstructure:"driver"`
-	URL    string `mapstructure:"url"` // 這裡通常是完整的 DSN 字串
-}
 
 func NewDBConfig(confKey string) DBConfig {
 	confKey = "db." + confKey

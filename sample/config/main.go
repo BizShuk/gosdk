@@ -19,7 +19,7 @@ import (
 	"fmt"
 
 	"github.com/bizshuk/gosdk/config"
-	"github.com/bizshuk/gosdk/config/db"
+	"github.com/bizshuk/gosdk/config/common"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 )
@@ -27,21 +27,16 @@ import (
 // AppConfig 自訂設定結構，對應 yaml 中的所有設定區塊。
 // 此結構用於示範，可根據實際需求調整欄位。
 type AppConfig struct {
-	Name     string              `mapstructure:"name"`
-	Version  string              `mapstructure:"version"`
-	LogLevel string              `mapstructure:"log_level"`
-	Server   ServerConfig        `mapstructure:"server"`
-	DB       map[string]DBConfig `mapstructure:"db"`
+	Name     string                 `mapstructure:"name"`
+	Version  string                 `mapstructure:"version"`
+	LogLevel string                 `mapstructure:"log_level"`
+	Server   ServerConfig           `mapstructure:"server"`
+	DB       map[string]common.DBConfig `mapstructure:"db"`
 }
 
 type ServerConfig struct {
 	Host string `mapstructure:"host"`
 	Port int    `mapstructure:"port"`
-}
-
-type DBConfig struct {
-	Driver string `mapstructure:"driver"`
-	URL    string `mapstructure:"url"`
 }
 
 // AppSettings 展示用的自訂結構，對應 yaml 中部分常用欄位。
@@ -118,7 +113,7 @@ func main() {
 	// --- 用法 5：透過 db helper 從 viper 取出設定並建立 *gorm.DB ---
 	// NewDBConfig("default") 會讀取 db.default.driver / db.default.url，
 	// 並依 driver 字串委派給 sqlite / mysql 的具體實作。
-	gormDB, err := db.NewDBConfig("default").Create()
+	gormDB, err := common.NewDBConfig("default").Create()
 	if err != nil {
 		zap.L().Error("db connect failed", zap.Error(err))
 		return
