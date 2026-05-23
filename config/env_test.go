@@ -8,16 +8,16 @@ import (
 	"github.com/spf13/viper"
 )
 
-// setupConfigDir 為測試設定 CONFIG_DIR，確保全域 viper 能正確讀到
-func setupConfigDir(t *testing.T, dir string) func() {
+// setupConfigDir 為測試設定 CONFIG_DIR，確保全域 viper 能正確讀到。
+// 使用 t.Setenv 自動還原，避免並行測試 race condition。
+func setupConfigDir(t *testing.T, dir string) {
 	t.Helper()
-	os.Setenv("CONFIG_DIR", dir)
+	t.Setenv("CONFIG_DIR", dir)
 	// 全域 viper 需要 BindEnv 才能讀取環境變數
 	viper.BindEnv("CONFIG_DIR", "CONFIG_DIR")
-	return func() {
-		os.Unsetenv("CONFIG_DIR")
+	t.Cleanup(func() {
 		viper.Reset()
-	}
+	})
 }
 
 func TestEnvConfig_LoadBase(t *testing.T) {
@@ -31,8 +31,7 @@ func TestEnvConfig_LoadBase(t *testing.T) {
 	}
 
 	// 不建立 .env.local，測試僅載入 base
-	cleanup := setupConfigDir(t, dir)
-	defer cleanup()
+	setupConfigDir(t, dir)
 
 	c := EnvConfig{}
 	v := c.Load()
@@ -61,8 +60,7 @@ func TestEnvConfig_LoadLocalOverridesBase(t *testing.T) {
 		t.Fatalf("failed to create .env.local: %v", err)
 	}
 
-	cleanup := setupConfigDir(t, dir)
-	defer cleanup()
+	setupConfigDir(t, dir)
 
 	c := EnvConfig{}
 	v := c.Load()
@@ -85,8 +83,7 @@ func TestEnvConfig_MissingBaseEnvContinues(t *testing.T) {
 	// 建立空目錄（沒有 .env）
 	dir := t.TempDir()
 
-	cleanup := setupConfigDir(t, dir)
-	defer cleanup()
+	setupConfigDir(t, dir)
 
 	c := EnvConfig{}
 	// 應不 panic，正常回傳空 viper instance
@@ -121,12 +118,8 @@ func TestEnvConfig_NoProfileDependency(t *testing.T) {
 	}
 
 	// 即使 PROFILE=staging，仍應載入 .env.local 而非 .env.staging
-	cleanup := setupConfigDir(t, dir)
-	os.Setenv("PROFILE", "staging")
-	defer func() {
-		os.Unsetenv("PROFILE")
-		cleanup()
-	}()
+	setupConfigDir(t, dir)
+	t.Setenv("PROFILE", "staging")
 
 	c := EnvConfig{}
 	v := c.Load()
