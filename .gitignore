@@ -41,3 +41,4 @@ gosdk
 .env
 .claude/settings.local.json
 bin/server
+sample/config/sample.db
