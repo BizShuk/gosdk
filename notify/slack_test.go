@@ -55,3 +55,20 @@ func TestSlackIntegration(t *testing.T) {
 
 	t.Log("測試訊息發送成功 (Test message sent successfully)!")
 }
+
+func TestSlackNotifier_Notify_Unconfigured(t *testing.T) {
+	// Test case where token is empty
+	notifier1 := NewSlackNotifier("", "fake-channel")
+	err := notifier1.Notify(context.Background(), "hello from test")
+	if err != nil {
+		t.Errorf("expected no error when client is nil, got %v", err)
+	}
+
+	// Test case where channelID is empty
+	notifier2 := NewSlackNotifier("fake-token", "")
+	err = notifier2.Notify(context.Background(), "hello from test")
+	if err != nil {
+		t.Errorf("expected no error when channelID is empty, got %v", err)
+	}
+}
+

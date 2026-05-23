@@ -54,6 +54,10 @@ gosdk/
 │   ├── statsHandler_test.go # StatsHandler 單元測試
 │   ├── health.go            # /healthz 端點 (gin-healthcheck)
 │   └── ping.go              # /ping 端點
+├── scheduler/               # 排程管理模組
+│   ├── scheduler.go         # 排程器核心與啟動邏輯
+│   ├── job.go               # 排程任務定義
+│   └── scheduler_test.go    # 排程器單元測試
 ├── service/                 # 核心服務邏輯
 │   ├── default.go           # 空 package 佔位
 │   └── generator.go         # stringer 核心：AST 解析與程式碼產生
@@ -117,6 +121,7 @@ gosdk/
 | 編碼與資料處理        | `encode/`, `utils/`, `time/`            | 各函式獨立呼叫         |
 | 通用通知              | `notify/`                               | 各通知器獨立建構與呼叫 |
 | 日誌與觀測            | `log/`                                  | `log.Init()`           |
+| 排程管理              | `scheduler/`                            | `New()`                |
 
 ## 開發指南 (Development Guide)
 
