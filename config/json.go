@@ -25,7 +25,7 @@ func (c *JsonConfig) Load() *viper.Viper {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			log.Info("settings.json not found. Using defaults and env variables.")
 		} else {
-			log.Fatalf("Fatal error reading settings.json: %s", err)
+			log.Warn("Fatal error reading settings.json: %s", err)
 		}
 	}
 
@@ -35,7 +35,7 @@ func (c *JsonConfig) Load() *viper.Viper {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			log.Info("settings.local.json not found. Skipping local overrides.")
 		} else {
-			log.Fatalf("Fatal error reading settings.local.json: %s", err)
+			log.Warn("Fatal error reading settings.local.json: %s", err)
 		}
 	}
 

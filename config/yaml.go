@@ -25,7 +25,7 @@ func (c *YamlConfig) Load() *viper.Viper {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			log.Info("config.yaml not found. Using defaults and env variables.")
 		} else {
-			log.Fatalf("Fatal error reading config.yaml: %s", err)
+			log.Warn("Warning reading config.yaml: %s", err)
 		}
 	}
 
@@ -35,7 +35,7 @@ func (c *YamlConfig) Load() *viper.Viper {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			log.Info("config.local.yaml not found. Skipping local overrides.")
 		} else {
-			log.Fatalf("Fatal error reading config.local.yaml: %s", err)
+			log.Warn("Warning reading config.local.yaml: %s", err)
 		}
 	}
 

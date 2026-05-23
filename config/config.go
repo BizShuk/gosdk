@@ -68,14 +68,6 @@ func DefaultWithDir(configDir string) {
 	Default()
 }
 
-func GetProfile() string {
-	profile := viper.GetString("PROFILE")
-	if profile != "" {
-		return profile
-	}
-	return "local"
-}
-
 func GetConfigDir() string {
 	return viper.GetString("CONFIG_DIR")
 }

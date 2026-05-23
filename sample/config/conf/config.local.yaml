@@ -1,8 +1,8 @@
 # profile=local 時 viper 會載入這份 yaml。
 # 任何鍵都可被 APP_ 前綴環境變數覆蓋，例如 APP_SERVER_PORT=9999。
 server:
-  host: 0.0.0.0
-  port: 8080
+  host: 0.0.1.0
+  port: 1234
 
 db:
   default:

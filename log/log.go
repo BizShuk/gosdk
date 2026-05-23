@@ -68,3 +68,11 @@ func Debug(args ...interface{}) {
 func Debugf(format string, args ...interface{}) {
 	log.Sugar().Debugf(format, args...)
 }
+
+func Warn(args ...interface{}) {
+	log.Sugar().Warn(args...)
+}
+
+func Warnf(format string, args ...interface{}) {
+	log.Sugar().Warnf(format, args...)
+}

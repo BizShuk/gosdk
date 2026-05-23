@@ -25,7 +25,7 @@ func (c EnvConfig) Load() *viper.Viper {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			log.Info(".env not found. Using defaults and env variables.")
 		} else {
-			log.Fatalf("Fatal error reading .env: %s", err)
+			log.Warn("Fatal error reading .env: %s", err)
 		}
 	}
 
@@ -35,7 +35,7 @@ func (c EnvConfig) Load() *viper.Viper {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			log.Info(".env.local not found. Skipping local overrides.")
 		} else {
-			log.Fatalf("Fatal error reading .env.local: %s", err)
+			log.Warn("Fatal error reading .env.local: %s", err)
 		}
 	}
 
