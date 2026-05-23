@@ -15,14 +15,21 @@ type SlackNotifier struct {
 
 // NewSlackNotifier creates a new SlackNotifier.
 func NewSlackNotifier(token, channelID string) *SlackNotifier {
+	var client *slack.Client
+	if token != "" {
+		client = slack.New(token)
+	}
 	return &SlackNotifier{
-		client:    slack.New(token),
+		client:    client,
 		channelID: channelID,
 	}
 }
 
 // Notify implements Notifier by posting to Slack using context.
 func (s *SlackNotifier) Notify(ctx context.Context, summary string) error {
+	if s.client == nil || s.channelID == "" {
+		return nil
+	}
 	_, _, err := s.client.PostMessageContext(ctx, s.channelID, slack.MsgOptionText(summary, false))
 	if err != nil {
 		return fmt.Errorf("slack post message: %w", err)
