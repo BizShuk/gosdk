@@ -35,14 +35,14 @@ func TestFileUtilities(t *testing.T) {
 		}
 	})
 
-	t.Run("SaveCSV and ParseCSVFile", func(t *testing.T) {
+	t.Run("WriteCSV and ParseCSVFile", func(t *testing.T) {
 		fpath := filepath.Join(tmpDir, "test.csv")
 		rows := [][]string{
 			{"col1", "col2"},
 			{"val1", "val2"},
 		}
 
-		err := SaveCSV(fpath, rows)
+		err := WriteCSV(fpath, rows)
 		if err != nil {
 			t.Fatalf("failed to save csv: %v", err)
 		}
@@ -60,6 +60,33 @@ func TestFileUtilities(t *testing.T) {
 
 		if len(parsedRows) != 2 || parsedRows[1][0] != "val1" {
 			t.Errorf("unexpected rows content: %v", parsedRows)
+		}
+	})
+
+	t.Run("WriteCSV with Struct Slice", func(t *testing.T) {
+		type TestStruct struct {
+			ID   string `csv:"id"`
+			Name string `csv:"name"`
+		}
+		fpath := filepath.Join(tmpDir, "struct_test.csv")
+		data := []TestStruct{
+			{ID: "1", Name: "Alice"},
+			{ID: "2", Name: "Bob"},
+		}
+
+		err := WriteCSV(fpath, data)
+		if err != nil {
+			t.Fatalf("failed to write csv with struct: %v", err)
+		}
+
+		content, err := os.ReadFile(fpath)
+		if err != nil {
+			t.Fatalf("failed to read written file: %v", err)
+		}
+
+		expected := "id,name\n1,Alice\n2,Bob\n"
+		if string(content) != expected {
+			t.Errorf("expected %q, got %q", expected, string(content))
 		}
 	})
 
@@ -83,7 +110,6 @@ func TestFileUtilities(t *testing.T) {
 			visited = append(visited, filepath.Base(p))
 			return nil
 		})
-
 		if err != nil {
 			t.Fatalf("callback failed: %v", err)
 		}
@@ -119,7 +145,7 @@ func TestFileUtilities(t *testing.T) {
 			{"header1", "header2"},
 			{"v1", "v2"},
 		}
-		_ = SaveCSV(fpath, rows)
+		_ = WriteCSV(fpath, rows)
 
 		// 刪除可能存在的歸檔檔
 		_ = os.Remove(fpath + ".archived")
@@ -135,7 +161,6 @@ func TestFileUtilities(t *testing.T) {
 			}
 			return nil
 		})
-
 		if err != nil {
 			t.Fatalf("callback failed: %v", err)
 		}
@@ -173,7 +198,7 @@ func TestFileUtilities(t *testing.T) {
 			{"tilde with subpath", "~/" + filepath.Base(tmpDir), filepath.Join(home, filepath.Base(tmpDir))},
 			{"absolute path", "/absolute/path", "/absolute/path"},
 			{"relative path", "./test", ""}, // Context-dependent, skip exact check
-			{"../ relative", "../test", ""},                          // Context-dependent, skip exact check
+			{"../ relative", "../test", ""}, // Context-dependent, skip exact check
 		}
 
 		for _, tt := range tests {

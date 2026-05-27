@@ -140,7 +140,7 @@ Go 語言通用開發工具包 (Shared SDK)，提供設定管理、HTTP 服務�
 
 `核心實體 (Key Entities):` `Decoder` 介面 (io), `Decoder` 介面 (csv), `RecordProcessor`, `FileCallback`
 
-`相關處理器 (Related Handlers):` `NewGBKDecoder()`, `NewBig5Decoder()`, `DecodeGBKBytes()`, `DecodeBig5Bytes()`, `ProcessCSVFile()`, `NewCSVFilelistCallback()`, `SaveFile()`, `SaveCSV()`, `CreateIfNotExist()`, `ParseROCDate()`, `ParseTimeDuration()`, `ConfigSleep()`, `IsNil()`, `StringPointer()`, `IntPointer()`
+`相關處理器 (Related Handlers):` `NewGBKDecoder()`, `NewBig5Decoder()`, `DecodeGBKBytes()`, `DecodeBig5Bytes()`, `ProcessCSVFile()`, `NewCSVFilelistCallback()`, `SaveFile()`, `WriteCSV()`, `CreateIfNotExist()`, `ParseROCDate()`, `ParseTimeDuration()`, `ConfigSleep()`, `IsNil()`, `StringPointer()`, `IntPointer()`
 
 ---
 

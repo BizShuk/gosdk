@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	sdkcsv "github.com/bizshuk/gosdk/encode/csv"
+	"github.com/gocarina/gocsv"
 	"go.uber.org/zap"
 )
 
@@ -17,13 +18,12 @@ func FileExists(fpath string) bool {
 	_, err = os.Stat(p)
 
 	return err == nil
-
 }
 
 func SaveFile(absPath string, payload io.Reader) error {
 	zap.L().Info("Save File to ", zap.String("file path", absPath))
 	// Create the directory if it doesn't exist
-	if err := os.MkdirAll(filepath.Dir(absPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(absPath), 0o755); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 	// Create the file
@@ -42,10 +42,13 @@ func SaveFile(absPath string, payload io.Reader) error {
 	return nil
 }
 
-func SaveCSV(absPath string, rows [][]string) error {
-	zap.L().Info("Save File to ", zap.String("file path", absPath))
+// WriteCSV writes data (either [][]string or a slice of structs) to a CSV file.
+// If data is [][]string, it writes the raw rows using standard encoding/csv.
+// Otherwise, it marshals the struct slice using gocsv.
+func WriteCSV(absPath string, data any) error {
+	zap.L().Info("Save CSV to ", zap.String("file path", absPath))
 
-	if err := os.MkdirAll(filepath.Dir(absPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(absPath), 0o755); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
@@ -55,16 +58,23 @@ func SaveCSV(absPath string, rows [][]string) error {
 	}
 	defer out.Close()
 
-	writer := csv.NewWriter(out)
-	defer writer.Flush()
+	switch v := data.(type) {
+	case [][]string:
+		writer := csv.NewWriter(out)
+		defer writer.Flush()
 
-	for _, row := range rows {
-		if err := writer.Write(row); err != nil {
-			zap.L().Sugar().Errorf("Warning: could not write row to CSV: %v", err)
+		for _, row := range v {
+			if err := writer.Write(row); err != nil {
+				zap.L().Sugar().Errorf("Warning: could not write row to CSV: %v", err)
+			}
 		}
+		return nil
+	default:
+		if err := gocsv.MarshalFile(v, out); err != nil {
+			return fmt.Errorf("failed to marshal csv: %w", err)
+		}
+		return nil
 	}
-
-	return nil
 }
 
 func ParseCSVFile(fpath string) (*csv.Reader, *os.File, error) {
@@ -179,14 +189,14 @@ func CreateIfNotExist(path string, defaultValue string) error {
 
 	dir := filepath.Dir(path)
 	if dir != "" {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return fmt.Errorf("create directory %s: %w", dir, err)
 		}
 	}
 
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		zap.L().Info("Writing default value to", zap.String("path", path))
-		if err := os.WriteFile(path, []byte(defaultValue), 0644); err != nil {
+		if err := os.WriteFile(path, []byte(defaultValue), 0o644); err != nil {
 			return fmt.Errorf("write default value to %s: %w", path, err)
 		}
 	}

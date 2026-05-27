@@ -3,15 +3,16 @@ module github.com/bizshuk/gosdk
 go 1.25
 
 retract (
-	v1.0.0 // 這些版本已被廢棄
-	v1.0.1 // 這些版本已被廢棄
 	v1.0.2 // 這些版本已被廢棄
 	v1.0.2-0.20260527051456-0ea7b9b2a161 // 這些版本已被廢棄
-) 
+	v1.0.1 // 這些版本已被廢棄
+	v1.0.0 // 這些版本已被廢棄
+)
 
 require (
 	github.com/castai/promwrite v0.6.0
 	github.com/gin-gonic/gin v1.11.0
+	github.com/gocarina/gocsv v0.0.0-20260523204920-c264028e67ea
 	github.com/hairyhenderson/gomplate/v4 v4.3.3
 	github.com/satori/go.uuid v1.2.0
 	github.com/slack-go/slack v0.23.1
