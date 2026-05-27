@@ -93,11 +93,11 @@ func GetAppConfigDir() string {
 	if appName == "" {
 		return ""
 	}
-	userConfigDir, err := os.UserConfigDir()
+	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return ""
 	}
-	return filepath.Join(userConfigDir, appName)
+	return filepath.Join(homeDir, ".config", appName)
 }
 
 func GetAppName() string {
