@@ -132,6 +132,21 @@ func TestDefaultWithAppNameOption(t *testing.T) {
 	if dir != expectedDir {
 		t.Errorf("Expected app config dir %s, got %s", expectedDir, dir)
 	}
+
+	if GetAppName() != appName {
+		t.Errorf("Expected app name %s, got %s", appName, GetAppName())
+	}
+}
+
+func TestSetGetAppName(t *testing.T) {
+	orig := GetAppName()
+	defer SetAppName(orig)
+
+	name := "my-custom-test-app"
+	SetAppName(name)
+	if GetAppName() != name {
+		t.Errorf("Expected app name %s, got %s", name, GetAppName())
+	}
 }
 
 func TestDefaultWithBothConfigDirAndAppName(t *testing.T) {

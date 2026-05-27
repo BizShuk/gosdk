@@ -20,6 +20,8 @@ type Config interface {
 	GetConfigName() string
 }
 
+var appName string
+
 // ExpandHome 將路徑中的 "~" 或 "~/..." 展開為使用者家目錄。
 // 如果路徑不以 "~" 開頭，則原樣返回。
 func ExpandHome(path string) string {
@@ -44,6 +46,10 @@ func Default(opts ...ConfigOption) {
 
 	if o.configPath != "" {
 		viper.Set("CONFIG_DIR", o.configPath)
+	}
+
+	if o.appName != "" {
+		appName = o.appName
 	}
 
 	if o.appConfigDir != "" {
@@ -84,5 +90,20 @@ func GetConfigDir() string {
 }
 
 func GetAppConfigDir() string {
-	return viper.GetString("APP_CONFIG_DIR")
+	if appName == "" {
+		return ""
+	}
+	userConfigDir, err := os.UserConfigDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(userConfigDir, appName)
+}
+
+func GetAppName() string {
+	return appName
+}
+
+func SetAppName(name string) {
+	appName = name
 }
