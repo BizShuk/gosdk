@@ -28,6 +28,7 @@ A unified reference for using the `github.com/bizshuk/gosdk` library. This SDK p
 - Implementing structured, level-based logging using `zap`.
 - Processing CSV files with automatic archiving and row-based callbacks.
 - Dealing with CJK character encoding conversions (GBK, Big5 to UTF-8).
+- Pushing time-series metrics to a Mimir / Prometheus remote-write endpoint.
 
 ## Quick Reference & Common Patterns
 
@@ -132,6 +133,38 @@ log.Error("Error occurred")
 log.Fatalf("Fatal error: %v", err) // Exits application
 ```
 
+### 5. Metrics (Mimir / Prometheus Remote Write)
+
+Push time-series metrics to Mimir via the `metric` package. The endpoint is read from the `MIMIR_URL` viper key (default `http://localhost:9009/api/v1/push`).
+
+```go
+import (
+    "time"
+    "github.com/bizshuk/gosdk/metric"
+)
+
+svc := metric.NewMimirService()
+
+// Single metric
+_ = svc.Send(metric.Metric{
+    Name:      "stock.analysis.latency", // dots are auto-converted to underscores
+    Timestamp: time.Now().Unix(),
+    Value:     12.5,
+    Tags:      map[string]string{"host": "worker-1", "project": "stock"},
+})
+
+// Batch (preferred for throughput — single remote-write request)
+_ = svc.SendMulti([]metric.Metric{ /* ... */ })
+```
+
+Key behaviors:
+
+- `Metric.Name` is sanitized via `strings.ReplaceAll(name, ".", "_")` — Prometheus disallows `.` in metric names.
+- `Tags` map becomes Prometheus labels (`__name__` is reserved and set from `Name`).
+- `Timestamp` is **seconds** since epoch (`int64`), converted internally via `time.Unix(ts, 0)`.
+- Each `SendMulti` call uses a 30s context timeout; the HTTP client reuses idle connections (`MaxIdleConnsPerHost: 100`).
+- `SendTest()` is a debugging helper that emits 7 fake samples spaced 10 minutes apart — handy for verifying the pipeline end-to-end.
+
 ## Common Mistakes
 
 | Mistake                               | Correction                                                                                                                                               |
@@ -141,3 +174,6 @@ log.Fatalf("Fatal error: %v", err) // Exits application
 | Re-implementing security headers      | Use `mw.Helmet()` instead of manually writing headers. It contains up-to-date best practices (e.g., `Permissions-Policy`, `Cross-Origin-Opener-Policy`). |
 | Manual CSV opening and iteration      | Use `csv.ProcessCSVFile` which handles skipping headers, filtering empty rows, and `.archived` marker generation.                                        |
 | Calling `WithDefaultValue` alone      | `WithDefaultValue` only writes if using `WithAppName` to ensure it is written to the correct folder. |
+| Using `.` in Mimir metric names manually escaped | `metric.MimirService` sanitizes `.` → `_` automatically via `sanitizeMetricName`; don't pre-mangle names. |
+| Passing milliseconds to `Metric.Timestamp` | Field expects **seconds** (epoch); use `time.Now().Unix()`, not `UnixMilli()`. |
+| Sending one metric at a time in tight loops | Prefer `SendMulti` to batch samples into a single remote-write request (lower overhead, fewer HTTP round trips). |
