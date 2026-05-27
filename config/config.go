@@ -36,9 +36,15 @@ func ExpandHome(path string) string {
 // 透過設定管理工具 (configuration management tool, Viper) 直接指定設定檔目錄：
 //
 //	viper.Set("CONFIG_DIR", "/path/to/config")
-func Default() {
+func Default(opts ...ConfigOption) {
+	o := applyOptions(opts...)
+
 	viper.BindEnv("CONFIG_DIR", "CONFIG_DIR")
 	viper.SetDefault("CONFIG_DIR", ".")
+
+	if o.configPath != "" {
+		viper.Set("CONFIG_DIR", o.configPath)
+	}
 
 	zap.L().Info("Load Configure...",
 		zap.String("CONFIG_DIR", GetConfigDir()),
