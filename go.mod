@@ -4,6 +4,7 @@ go 1.25
 
 retract v1.0.0
 retract v1.0.1
+retract v1.0.2
 
 
 require (
