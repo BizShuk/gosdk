@@ -33,30 +33,41 @@ A unified reference for using the `github.com/bizshuk/gosdk` library. This SDK p
 
 ### 1. Initialization & Configuration
 
-Configuration is globally managed via `viper` and automatically loads from `.env` and `config.<profile>.yaml` based on the `PROFILE` environment variable (defaults to `local`).
+Configuration is globally managed via `viper` and automatically loads from `.env`, `config.<profile>.yaml`, and `settings.json` based on the configuration path and functional options.
 
 ```go
 import (
- "github.com/bizshuk/gosdk/config"
- "github.com/bizshuk/gosdk/config/db"
- "github.com/bizshuk/gosdk/log"
+    "github.com/bizshuk/gosdk/config"
+    "github.com/bizshuk/gosdk/config/db"
+    "github.com/bizshuk/gosdk/log"
 )
 
 func main() {
- // 1. Load config (merges .env and yaml)
- config.Default()
+    // Standard configuration loading:
+    // Automatically merges configuration files from the active path.
+    config.Default()
 
- // 2. Initialize logger based on config
- log.Init()
- log.Info("Configurations loaded")
+    // Preferred way: Use WithAppName to set user config directory (e.g. os.UserConfigDir()/my-app)
+    // and optionally write default JSON configurations if missing.
+    config.Default(
+        config.WithAppName("my-app"),
+        config.WithDefaultValue(`{"server": {"port": 8080}}`),
+    )
 
- // 3. (Optional) Initialize DB
- if len(config.GlobalConfig.DB) > 0 {
-  gormDB, err := db.NewDBConfig("default").Create()
-  if err != nil {
-   log.Fatalf("DB connect failed: %v", err)
-  }
- }
+    // Discouraged: WithConfigDir should only be used when a fixed custom directory path is strictly required.
+    // config.Default(config.WithConfigDir("/path/to/configs"))
+
+    // 2. Initialize logger based on config
+    log.Init()
+    log.Info("Configurations loaded")
+
+    // 3. (Optional) Initialize DB
+    if len(config.GlobalConfig.DB) > 0 {
+        gormDB, err := db.NewDBConfig("default").Create()
+        if err != nil {
+            log.Fatalf("DB connect failed: %v", err)
+        }
+    }
 }
 ```
 
@@ -129,3 +140,4 @@ log.Fatalf("Fatal error: %v", err) // Exits application
 | Hardcoding `viper` keys for DB        | Use `db.NewDBConfig("connectionName").Create()` which encapsulates the dialect selection and connection string logic.                                    |
 | Re-implementing security headers      | Use `mw.Helmet()` instead of manually writing headers. It contains up-to-date best practices (e.g., `Permissions-Policy`, `Cross-Origin-Opener-Policy`). |
 | Manual CSV opening and iteration      | Use `csv.ProcessCSVFile` which handles skipping headers, filtering empty rows, and `.archived` marker generation.                                        |
+| Calling `WithDefaultValue` alone      | `WithDefaultValue` only writes if using `WithAppName` to ensure it is written to the correct folder. |

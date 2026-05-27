@@ -46,8 +46,13 @@ func Default(opts ...ConfigOption) {
 		viper.Set("CONFIG_DIR", o.configPath)
 	}
 
+	if o.appConfigDir != "" {
+		viper.Set("APP_CONFIG_DIR", o.appConfigDir)
+	}
+
 	zap.L().Info("Load Configure...",
 		zap.String("CONFIG_DIR", GetConfigDir()),
+		zap.String("APP_CONFIG_DIR", GetAppConfigDir()),
 	)
 
 	v1 := NewEnvConfig().Load()
@@ -76,4 +81,8 @@ func DefaultWithDir(configDir string) {
 
 func GetConfigDir() string {
 	return viper.GetString("CONFIG_DIR")
+}
+
+func GetAppConfigDir() string {
+	return viper.GetString("APP_CONFIG_DIR")
 }

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"path/filepath"
 
 	"github.com/bizshuk/gosdk/utils"
@@ -9,13 +10,24 @@ import (
 type configOptions struct {
 	configPath   string
 	defaultValue string
+	appName      string
+	appConfigDir string
 }
 
 // ConfigOption defines the functional option type for config loading.
 type ConfigOption func(*configOptions)
 
 // WithConfigPath sets a custom configuration directory.
+//
+// Deprecated: Use WithConfigDir instead.
 func WithConfigPath(path string) ConfigOption {
+	return func(o *configOptions) {
+		o.configPath = path
+	}
+}
+
+// WithConfigDir sets a custom configuration directory.
+func WithConfigDir(path string) ConfigOption {
 	return func(o *configOptions) {
 		o.configPath = path
 	}
@@ -29,6 +41,13 @@ func WithDefaultValue(defaultValue string) ConfigOption {
 	}
 }
 
+// WithAppName overrides the configuration directory to os.UserConfigDir() + appName.
+func WithAppName(appName string) ConfigOption {
+	return func(o *configOptions) {
+		o.appName = appName
+	}
+}
+
 // applyOptions processes the functional options.
 func applyOptions(opts ...ConfigOption) *configOptions {
 	o := &configOptions{}
@@ -36,14 +55,21 @@ func applyOptions(opts ...ConfigOption) *configOptions {
 		opt(o)
 	}
 
+	// If WithAppName is provided, compute user-specific appConfigDir
+	if o.appName != "" {
+		if userConfigDir, err := os.UserConfigDir(); err == nil {
+			o.appConfigDir = filepath.Join(userConfigDir, o.appName)
+		}
+	}
+
 	// If WithConfigPath option is provided, expand home symbol
 	if o.configPath != "" {
 		o.configPath = ExpandHome(o.configPath)
 	}
 
-	// If both configPath and defaultValue are set, ensure settings.json exists at that path
-	if o.configPath != "" && o.defaultValue != "" {
-		jsonPath := filepath.Join(o.configPath, "settings.json")
+	// Only automatically create settings.json if it is using the appName config directory
+	if o.appConfigDir != "" && o.defaultValue != "" {
+		jsonPath := filepath.Join(o.appConfigDir, "settings.json")
 		_ = utils.CreateIfNotExist(jsonPath, o.defaultValue)
 	}
 
