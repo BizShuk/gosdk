@@ -56,9 +56,10 @@ func applyOptions(opts ...ConfigOption) *configOptions {
 	}
 
 	// If WithAppName is provided, compute user-specific appConfigDir
+	// Use ${HOME}/.config as base (cross-platform consistent path)
 	if o.appName != "" {
-		if userConfigDir, err := os.UserConfigDir(); err == nil {
-			o.appConfigDir = filepath.Join(userConfigDir, o.appName)
+		if homeDir, err := os.UserHomeDir(); err == nil {
+			o.appConfigDir = filepath.Join(homeDir, ".config", o.appName)
 		}
 	}
 
