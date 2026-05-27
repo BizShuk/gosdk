@@ -104,6 +104,16 @@ func GetAppName() string {
 	return appName
 }
 
+// GetAppLogDir returns the application log directory: ~/.config/appName/log
+func GetAppLogDir() string {
+	return filepath.Join(GetAppConfigDir(), "log")
+}
+
+// GetAppDataDir returns the application data directory: ~/.config/appName/data
+func GetAppDataDir() string {
+	return filepath.Join(GetAppConfigDir(), "data")
+}
+
 func SetAppName(name string) {
 	appName = name
 }
