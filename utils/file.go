@@ -83,6 +83,36 @@ func GetFileName(fpath string) string {
 	return fname
 }
 
+// ResolvePath resolves a path that may contain home directory (~),
+// environment variables ($HOME, ${HOME}), relative paths (./, ../),
+// or absolute paths. Returns an absolute, clean path.
+func ResolvePath(path string) (string, error) {
+	// Expand environment variables first ($HOME, ${HOME}, etc.)
+	expanded := os.ExpandEnv(path)
+
+	// Expand ~ to user's home directory
+	if strings.HasPrefix(expanded, "~") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("get user home directory: %w", err)
+		}
+		if len(expanded) == 1 {
+			expanded = home
+		} else if expanded[1] == '/' || expanded[1] == '\\' {
+			expanded = filepath.Join(home, expanded[2:])
+		}
+	}
+
+	// Convert to absolute path and clean
+	absPath, err := filepath.Abs(expanded)
+	if err != nil {
+		return "", fmt.Errorf("convert to absolute path: %w", err)
+	}
+
+	// Clean the path to resolve ./ and ../
+	return filepath.Clean(absPath), nil
+}
+
 type FileCallback func(string) error
 
 func NewFilelistCallback(pattern string, f FileCallback) error {

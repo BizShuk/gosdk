@@ -158,6 +158,74 @@ func TestFileUtilities(t *testing.T) {
 		}
 	})
 
+	t.Run("ResolvePath", func(t *testing.T) {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			t.Fatalf("failed to get home directory: %v", err)
+		}
+
+		tests := []struct {
+			name     string
+			input    string
+			expected string
+		}{
+			{"tilde only", "~", home},
+			{"tilde with subpath", "~/" + filepath.Base(tmpDir), filepath.Join(home, filepath.Base(tmpDir))},
+			{"absolute path", "/absolute/path", "/absolute/path"},
+			{"relative path", "./test", ""}, // Context-dependent, skip exact check
+			{"../ relative", "../test", ""},                          // Context-dependent, skip exact check
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				got, err := ResolvePath(tt.input)
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				if tt.name == "../ relative" || tt.name == "relative path" {
+					// Just verify it doesn't error and returns a clean absolute path
+					if !filepath.IsAbs(got) {
+						t.Errorf("expected absolute path, got %q", got)
+					}
+				} else {
+					// Normalize for comparison
+					expected, _ := filepath.Abs(tt.expected)
+					if got != expected {
+						t.Errorf("expected %q, got %q", expected, got)
+					}
+				}
+			})
+		}
+	})
+
+	t.Run("ResolvePath with env vars", func(t *testing.T) {
+		home := os.Getenv("HOME")
+		if home == "" {
+			t.Skip("HOME env not set")
+		}
+
+		tests := []struct {
+			name  string
+			input string
+		}{
+			{"$HOME env var", "$HOME/test"},
+			{"${HOME} env var", "${HOME}/test"},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				got, err := ResolvePath(tt.input)
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				expected := filepath.Join(home, "test")
+				if got != expected {
+					t.Errorf("expected %q, got %q", expected, got)
+				}
+			})
+		}
+	})
+
 	t.Run("CreateIfNotExist", func(t *testing.T) {
 		fpath := filepath.Join(tmpDir, "config_create_if_not_exist.txt")
 		_ = os.Remove(fpath) // 確保檔案不存在
