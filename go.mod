@@ -2,10 +2,10 @@ module github.com/bizshuk/gosdk
 
 go 1.25
 
-retract v1.0.0
-retract v1.0.1
-retract v1.0.2
 
+retract (
+    [v1.0.0, v1.0.1, v1.0.2, v1.0.2-0.20260527051456-0ea7b9b2a161 ] // 這些版本已被廢棄
+)
 
 require (
 	github.com/castai/promwrite v0.6.0
