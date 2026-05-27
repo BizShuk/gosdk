@@ -55,11 +55,18 @@ gosdk/
 ├── mw/                      # Gin 中介層
 │   ├── correlationId.go     # X-Correlation-Id 請求追蹤
 │   └── helmet.go            # 安全性標頭（CSP, X-Frame-Options 等）
+├── metric/                  # OpenTelemetry 監控模組
+│   ├── otel.go              # Go OpenTelemetry metrics 封裝
+│   ├── otel.py              # Python OpenTelemetry metrics 封裝
+│   ├── mimir.go             # Mimir client for metrics 匯出
+│   └── model.go             # Metric 資料結構
 ├── notify/                  # 通用通知模組
 │   ├── notifier.go          # Notifier 介面定義
 │   ├── multi.go             # Multi 組合通知器
 │   ├── stdout.go            # StdoutNotifier 實作
-│   ├── slack.go             # SlackNotifier 實作
+│   ├── slack.go             # SlackNotifier 實作（Go）
+│   ├── slack.py             # SlackNotifier 實作（Python）
+│   ├── example.py           # 使用範例（Python）
 │   ├── notifier_test.go     # 通知器整合測試
 │   └── slack_test.go        # Slack 通知器單元測試
 ├── router/                  # HTTP 路由定義
@@ -160,6 +167,16 @@ gosdk/
 go mod download
 ```
 
+### Python 依賴（用於 notify/metric.py, notify/slack.py）
+
+```bash
+source /Users/shuk/.venv/bin/activate
+# 或使用專案 venv
+source .venv/bin/activate
+
+pip install opentelemetry-api opentelemetry-sdk slack-sdk
+```
+
 ### 建置 (Build)
 
 ```bash
@@ -209,6 +226,21 @@ GitHub Actions workflow 定義於 `.github/workflows/ci.yml`，於 push/PR 至 `
 ### 部署 (Deploy)
 
 透過 Dockerfile multi-stage build 產生最小化 Alpine 映像，暴露 port 8080。
+
+## 模組對應 (Module Mapping)
+
+| 業務領域 (Domain)     | 套件/模組 (Package/Module)              | 進入點 (Entry Point)        |
+| --------------------- | --------------------------------------- | --------------------------- |
+| 設定管理              | `config/`, `config/common/`             | `config.Default()`          |
+| HTTP 服務             | `router/`, `mw/`, `main.go`             | `HTTPServer()`              |
+| 程式碼產生 — stringer | `cmd/stringer/`, `service/generator.go` | `cmd/stringer/main.go`      |
+| 程式碼產生 — gotmpl   | `cmd/gotmpl/`                           | `cmd/gotmpl/main.go`        |
+| 版本管理              | `cmd/versioning/`                       | `cmd/versioning/main.go`    |
+| 通用通知              | `notify/`                               | 各通知器獨立建構與呼叫      |
+| 排程管理太             | `scheduler/`                            | `scheduler.New()`           |
+| OpenTelemetry 監控    | `metric/`                               | `metric.NewOtelMetrics()`   |
+| 編碼與資料處理        | `encode/`, `utils/`, `time/`            | 各函式獨立呼叫              |
+| 日誌與觀測            | `log/`                                  | `log.Init()`                |
 
 ## 慣例 (Conventions)
 
