@@ -2,6 +2,10 @@ module github.com/bizshuk/gosdk
 
 go 1.25
 
+retract v1.0.0
+retract v1.0.1
+
+
 require (
 	github.com/castai/promwrite v0.6.0
 	github.com/gin-gonic/gin v1.11.0
