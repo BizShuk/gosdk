@@ -23,9 +23,7 @@ func (c EnvConfig) Load() *viper.Viper {
 	v.SetConfigName(".env")
 	v.SetConfigType("dotenv")
 	if err := v.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			log.Info(".env not found. Using defaults and env variables.")
-		} else {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			log.Warn("Fatal error reading .env: %s", err)
 		}
 	}
@@ -33,9 +31,7 @@ func (c EnvConfig) Load() *viper.Viper {
 	// Step 2: Merge .env.local (local overrides)
 	v.SetConfigName(".env.local")
 	if err := v.MergeInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			log.Info(".env.local not found. Skipping local overrides.")
-		} else {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			log.Warn("Fatal error reading .env.local: %s", err)
 		}
 	}

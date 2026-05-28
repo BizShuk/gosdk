@@ -23,9 +23,7 @@ func (c *JsonConfig) Load() *viper.Viper {
 	v.SetConfigName("settings")
 	v.SetConfigType("json")
 	if err := v.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			log.Info("settings.json not found. Using defaults and env variables.")
-		} else {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			log.Warn("Fatal error reading settings.json: %s", err)
 		}
 	}
@@ -33,9 +31,7 @@ func (c *JsonConfig) Load() *viper.Viper {
 	// Step 2: Merge settings.local.json (local overrides)
 	v.SetConfigName("settings.local")
 	if err := v.MergeInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			log.Info("settings.local.json not found. Skipping local overrides.")
-		} else {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			log.Warn("Fatal error reading settings.local.json: %s", err)
 		}
 	}

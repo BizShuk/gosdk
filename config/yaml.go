@@ -23,9 +23,7 @@ func (c *YamlConfig) Load() *viper.Viper {
 	v.SetConfigName("config")
 	v.SetConfigType("yaml")
 	if err := v.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			log.Info("config.yaml not found. Using defaults and env variables.")
-		} else {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			log.Warn("Warning reading config.yaml: %s", err)
 		}
 	}
@@ -33,9 +31,7 @@ func (c *YamlConfig) Load() *viper.Viper {
 	// Step 2: Merge config.local.yaml (local overrides)
 	v.SetConfigName("config.local")
 	if err := v.MergeInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			log.Info("config.local.yaml not found. Skipping local overrides.")
-		} else {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			log.Warn("Warning reading config.local.yaml: %s", err)
 		}
 	}
