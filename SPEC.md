@@ -161,6 +161,7 @@ sum by (queue_name, job_type) (rate(queue_job_execute{status="failure"}[5m]))
 | File              | Description                        |
 | ----------------- | ---------------------------------- |
 | `metric/otel.go`  | Go OpenTelemetry metrics 封裝      |
+| `metric/provider.go`| OTel MeterProvider 初始化與關閉   |
 | `metric/otel.py`  | Python OpenTelemetry metrics 封裝  |
 | `metric/mimir.go` | Mimir client 實作                  |
 | `metric/model.go` | Metric 資料結構                    |
