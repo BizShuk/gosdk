@@ -49,13 +49,13 @@ func TestDefaultWithValueOption(t *testing.T) {
 	viper.Reset()
 	defer viper.Reset()
 
-	userConfigDir, err := os.UserConfigDir()
+	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		t.Fatalf("failed to get user config dir: %v", err)
+		t.Fatalf("failed to get user home dir: %v", err)
 	}
 
 	appName := "test-val-app"
-	expectedDir := filepath.Join(userConfigDir, appName)
+	expectedDir := filepath.Join(homeDir, ".config", appName)
 	defer os.RemoveAll(expectedDir)
 
 	defaultJSON := `{"name": "test-app", "version": "1.2.3"}`
@@ -117,12 +117,12 @@ func TestDefaultWithAppNameOption(t *testing.T) {
 	defer viper.Reset()
 
 	appName := "test-app-name-options"
-	userConfigDir, err := os.UserConfigDir()
+	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		t.Fatalf("failed to get user config dir: %v", err)
+		t.Fatalf("failed to get user home dir: %v", err)
 	}
 
-	expectedDir := filepath.Join(userConfigDir, appName)
+	expectedDir := filepath.Join(homeDir, ".config", appName)
 	// clean up if it already exists or was left over
 	defer os.RemoveAll(expectedDir)
 
@@ -154,11 +154,11 @@ func TestDefaultWithBothConfigDirAndAppName(t *testing.T) {
 	defer viper.Reset()
 
 	appName := "test-both-app"
-	userConfigDir, err := os.UserConfigDir()
+	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		t.Fatalf("failed to get user config dir: %v", err)
+		t.Fatalf("failed to get user home dir: %v", err)
 	}
-	expectedAppDir := filepath.Join(userConfigDir, appName)
+	expectedAppDir := filepath.Join(homeDir, ".config", appName)
 	defer os.RemoveAll(expectedAppDir)
 
 	tempDir, err := os.MkdirTemp("", "config_both_test")

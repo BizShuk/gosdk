@@ -1,4 +1,4 @@
-package sample
+package utils
 
 //go:generate stringer -type=SampleInt -output=stringer_string.go -trimprefix=COUNTER_
 type SampleInt int
@@ -11,7 +11,7 @@ const (
 	COUNTER_D                        // 444444
 )
 
-//go:generate const_gen -type=SampleInt2 -output=stringer_string.go -linecomment -trimprefix=COUNTER1_
+//go:generate stringer -type=SampleInt2 -output=stringer_string.go -linecomment -trimprefix=COUNTER1_
 type SampleInt2 int
 
 const (

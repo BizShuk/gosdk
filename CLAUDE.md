@@ -33,12 +33,13 @@ gosdk/
 │   ├── yaml.go              # YAML 設定載入器（雙檔案模式）
 │   ├── yaml_test.go         # yaml 載入器測試
 │   ├── json.go              # JSON 設定載入器（雙檔案模式）
-│   └── embedFS.go           # embed.FS 設定載入器
-│   └── common/              # 設定核心結構與資料庫連線工廠
-│       ├── config.go        # ServerConfig, DBConfig, ConfigSchema 定義
-│       ├── db.go            # DBConfig 載入與 DatabaseFactory()
-│       ├── mysql.go         # MySQL GORM 驅動
-│       └── sqlite.go        # SQLite GORM 驅動
+│   ├── embedFS.go           # embed.FS 設定載入器
+│   ├── common/              # 設定核心結構與資料庫連線工廠
+│   │   ├── config.go        # ServerConfig, DBConfig, ConfigSchema 定義
+│   │   ├── db.go            # DBConfig 載入與 DatabaseFactory()
+│   │   ├── mysql.go         # MySQL GORM 驅動
+│   │   └── sqlite.go        # SQLite GORM 驅動
+│   └── sample/              # config 套件使用範例 (含 conf/ 設定檔及 SQLite 範例)
 ├── encode/                  # 編碼轉換模組
 │   ├── csv/
 │   │   ├── csv.go           # CSV Decoder 介面
@@ -98,11 +99,8 @@ gosdk/
 │   ├── time.go              # HH:MM:SS 時間解析
 │   ├── time_test.go         # 時間解析測試
 │   ├── type.go              # IsNil() reflect 檢查
-│   └── type_test.go         # IsNil 測試
-├── sample/                  # 使用範例
-│   ├── stringer.go          # stringer go:generate 範例
-│   └── config/
-│       └── main.go          # config 套件完整使用範例
+│   ├── type_test.go         # IsNil 測試
+│   └── stringer.go          # stringer go:generate 範例
 ├── plans/                   # 開發計畫文件
 ├── .github/
 │   └── workflows/

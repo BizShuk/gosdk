@@ -1,18 +1,18 @@
-// sample/config 展示 github.com/bizshuk/gosdk/config 套件的常見用法。
+// config/sample 展示 github.com/bizshuk/gosdk/config 套件的常見用法。
 //
 // 執行方式 (在專案根目錄):
 //
-//	go run ./sample/config
+//	go run ./config/sample
 //
 // 用環境變數覆蓋 yaml 中的值:
 //
-//	APP_SERVER_PORT=9999 go run ./sample/config
+//	APP_SERVER_PORT=9999 go run ./config/sample
 //
 // 用本地設定檔覆蓋共用設定 (建立 config.local.yaml 或 .env.local):
 //
 //	echo "server:" > config.local.yaml
 //	echo "  port: 7777" >> config.local.yaml
-//	go run ./sample/config
+//	go run ./config/sample
 package main
 
 import (
