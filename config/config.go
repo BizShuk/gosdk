@@ -80,9 +80,9 @@ func Default(opts ...ConfigOption) {
 //
 // 備註 (Method 2)：應用程式層 (application layer) 可以直接呼叫此函式並傳入自訂目錄，
 // 例如：config.DefaultWithDir("/path/to/config")
-func DefaultWithDir(configDir string) {
+func DefaultWithDir(configDir string, opts ...ConfigOption) {
 	viper.Set("CONFIG_DIR", ExpandHome(configDir))
-	Default()
+	Default(opts...)
 }
 
 func GetConfigDir() string {

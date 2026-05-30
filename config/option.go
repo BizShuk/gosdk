@@ -35,6 +35,25 @@ func WithConfigDir(path string) ConfigOption {
 
 // WithDefaultValue specifies a default JSON configuration string to write
 // if the config file does not exist. This only applies to jsonConfig (settings.json).
+//
+// How to set up: Provide a valid JSON string literal. Example for a settings.json
+// with "host" and "port" fields:
+//
+//   // file locaation: config/default_settings.json
+//   ```json
+//   {}
+//   ```
+//
+//   //go:embed default_settings.json
+//   var defaultConfigJSON string
+//
+//	 config.DefaultWithDir(
+//		  "/path/to/app/config",
+//		  WithDefaultValue(defaultConfigJSON),
+//	 )
+//
+// When the settings.json file does not exist at appConfigDir, it will be created
+// with this JSON content automatically.
 func WithDefaultValue(defaultValue string) ConfigOption {
 	return func(o *configOptions) {
 		o.defaultValue = defaultValue
