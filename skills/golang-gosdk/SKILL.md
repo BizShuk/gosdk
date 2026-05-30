@@ -151,6 +151,7 @@ log.Fatalf("Fatal error: %v", err) // Exits application
 ### 5. Metrics & Tracing (Mimir vs OpenTelemetry)
 
 The SDK provides two ways to publish metrics. Depending on the complexity and needs of the project:
+
 1. **Option A: Mimir Remote Write** (Lightweight, developer-pushed Prometheus write request).
 2. **Option B: OpenTelemetry OTLP** (Standardized OTel SDK for metrics and distributed tracing).
 
@@ -185,6 +186,7 @@ func main() {
 ```
 
 Key behaviors of `MimirService`:
+
 - Sanitization: `Metric.Name` replaces all `.` with `_` because Prometheus name spec disallows dots.
 - Timestamp: Expects **epoch seconds** (`time.Now().Unix()`), NOT milliseconds.
 - High-Performance: Uses HTTP connection pooling (`MaxIdleConnsPerHost: 100`).
@@ -207,7 +209,11 @@ import (
     otelmetric "go.opentelemetry.io/otel/metric"
 )
 
-func main() {
+// config/metric.go
+var meter metric.Meter
+var latencyGauge Float64Gauge
+
+func InitMetric() {
     ctx := context.Background()
 
     // 1. Initialize global providers
@@ -227,6 +233,7 @@ func main() {
 
     // 2. Register metrics using Meter
     meter := metric.Meter("my_app_sensor")
+
     latencyGauge, err := meter.Float64Gauge(
         "http_request_latency_ms",
         otelmetric.WithDescription("HTTP latency gauge"),
@@ -234,7 +241,18 @@ func main() {
     if err != nil {
         panic(err)
     }
+}
 
+func GetLatencyGauge() otelmetric.Float64Gauge {
+    return latencyGauge
+}
+
+// main.go or other service methods
+func main() {
+    InitMetric()
+    ctx := context.Background()
+
+    latencyGauge := GetLatencyGauge()
     // 3. Record metric values
     latencyGauge.Record(ctx, 23.5, otelmetric.WithAttributes(
         attribute.String("method", "GET"),
@@ -252,6 +270,7 @@ func main() {
 ```
 
 Key behaviors of OTel Integration:
+
 - **Shutdown is Critical**: Always use `defer metric.ShutdownOTel(ctx)` at the application entry point to prevent metrics/traces loss.
 - **Synchronous Gauges**: The default `Float64Gauge` requires you to record values synchronously using `Record(ctx, val, attrs)`.
 
@@ -268,4 +287,4 @@ Key behaviors of OTel Integration:
 | Using `.` in Mimir metric names manually escaped | `metric.MimirService` sanitizes `.` → `_` automatically via `sanitizeMetricName`; don't pre-mangle names.                                                |
 | Passing milliseconds to `Metric.Timestamp`       | Field expects **seconds** (epoch); use `time.Now().Unix()`, not `UnixMilli()`.                                                                           |
 | Sending one metric at a time in tight loops      | Prefer `SendMulti` to batch samples into a single remote-write request (lower overhead, fewer HTTP round trips).                                         |
-| Forgetting to call `ShutdownOTel`                | Always `defer metric.ShutdownOTel(ctx)` at application startup to flush all buffered metrics and trace spans before application exit.                     |
+| Forgetting to call `ShutdownOTel`                | Always `defer metric.ShutdownOTel(ctx)` at application startup to flush all buffered metrics and trace spans before application exit.                    |
