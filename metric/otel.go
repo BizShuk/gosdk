@@ -13,10 +13,10 @@ import (
 
 // OtelMetrics provides process/queue/service metrics with OpenTelemetry.
 type OtelMetrics struct {
-	meter     metric.Meter
-	mimir     *MimirService
-	jobName   string
-	instance  string
+	meter    metric.Meter
+	mimir    *MimirService
+	jobName  string
+	instance string
 }
 
 // MetricAttributes defines tag key-value pairs.
@@ -156,9 +156,9 @@ func (m *OtelMetrics) RecordService(counter metric.Int64Counter, endpoint, metho
 
 // BatchSummary holds the result of a batch process.
 type BatchSummary struct {
-	Total    int
-	Succeed  int
-	Failed   int
+	Total      int
+	Succeed    int
+	Failed     int
 	FailedList []string
 	DurationMs float64
 }
