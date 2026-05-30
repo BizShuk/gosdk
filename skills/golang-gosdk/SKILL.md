@@ -148,9 +148,15 @@ log.Error("Error occurred")
 log.Fatalf("Fatal error: %v", err) // Exits application
 ```
 
-### 5. Metrics (Mimir / Prometheus Remote Write)
+### 5. Metrics & Tracing (Mimir vs OpenTelemetry)
 
-Push time-series metrics to Mimir via the `metric` package. The endpoint is read from the `MIMIR_URL` viper key (default `http://localhost:9009/api/v1/push`).
+The SDK provides two ways to publish metrics. Depending on the complexity and needs of the project:
+1. **Option A: Mimir Remote Write** (Lightweight, developer-pushed Prometheus write request).
+2. **Option B: OpenTelemetry OTLP** (Standardized OTel SDK for metrics and distributed tracing).
+
+#### Option A: Mimir Remote Write (Prometheus Remote-Write)
+
+Push time-series metrics to Mimir using a lightweight HTTP-based writer. This requires no MeterProvider lifecycle management. The endpoint is configured via `MIMIR_URL` (default: `http://localhost:9009/api/v1/push`).
 
 ```go
 import (
@@ -158,27 +164,96 @@ import (
     "github.com/bizshuk/gosdk/metric"
 )
 
-svc := metric.NewMimirService()
+func main() {
+    svc := metric.NewMimirService()
 
-// Single metric
-_ = svc.Send(metric.Metric{
-    Name:      "stock.analysis.latency", // dots are auto-converted to underscores
-    Timestamp: time.Now().Unix(),
-    Value:     12.5,
-    Tags:      map[string]string{"host": "worker-1", "project": "stock"},
-})
+    // 1. Send a single metric
+    _ = svc.Send(metric.Metric{
+        Name:      "app.operation.duration", // "." in name will be sanitized to "_" automatically
+        Timestamp: time.Now().Unix(),        // expects epoch SECONDS (int64)
+        Value:     15.4,
+        Tags:      map[string]string{"env": "prod", "service": "api"},
+    })
 
-// Batch (preferred for throughput — single remote-write request)
-_ = svc.SendMulti([]metric.Metric{ /* ... */ })
+    // 2. Batch send (highly recommended for performance)
+    metrics := []metric.Metric{
+        {Name: "app.cpu.usage", Timestamp: time.Now().Unix(), Value: 42.5, Tags: map[string]string{"host": "srv1"}},
+        {Name: "app.memory.usage", Timestamp: time.Now().Unix(), Value: 80.0, Tags: map[string]string{"host": "srv1"}},
+    }
+    _ = svc.SendMulti(metrics)
+}
 ```
 
-Key behaviors:
+Key behaviors of `MimirService`:
+- Sanitization: `Metric.Name` replaces all `.` with `_` because Prometheus name spec disallows dots.
+- Timestamp: Expects **epoch seconds** (`time.Now().Unix()`), NOT milliseconds.
+- High-Performance: Uses HTTP connection pooling (`MaxIdleConnsPerHost: 100`).
 
-- `Metric.Name` is sanitized via `strings.ReplaceAll(name, ".", "_")` — Prometheus disallows `.` in metric names.
-- `Tags` map becomes Prometheus labels (`__name__` is reserved and set from `Name`).
-- `Timestamp` is **seconds** since epoch (`int64`), converted internally via `time.Unix(ts, 0)`.
-- Each `SendMulti` call uses a 30s context timeout; the HTTP client reuses idle connections (`MaxIdleConnsPerHost: 100`).
-- `SendTest()` is a debugging helper that emits 7 fake samples spaced 10 minutes apart — handy for verifying the pipeline end-to-end.
+---
+
+#### Option B: OpenTelemetry (OTLP Metrics & Tracing)
+
+Use the standard OpenTelemetry SDK to collect metrics and export traces. This requires initializing the Meter and Tracer Providers and ensuring they are shut down when the application terminates.
+By default, the metric endpoint is read from `MIMIR_URL` (default: `http://localhost:9009/otlp/v1/metrics`), and the trace endpoint is read from `TEMPO_URL`.
+
+```go
+import (
+    "context"
+    "fmt"
+    "time"
+
+    "github.com/bizshuk/gosdk/metric"
+    "go.opentelemetry.io/otel/attribute"
+    otelmetric "go.opentelemetry.io/otel/metric"
+)
+
+func main() {
+    ctx := context.Background()
+
+    // 1. Initialize global providers
+    if err := metric.InitMeterProvider(ctx); err != nil {
+        panic(err)
+    }
+    if err := metric.InitTracerProvider(ctx, ""); err != nil { // empty tempoURL falls back to TEMPO_URL env
+        panic(err)
+    }
+
+    // Always defer ShutdownOTel before application exit to flush buffered telemetry
+    defer func() {
+        if err := metric.ShutdownOTel(ctx); err != nil {
+            fmt.Printf("failed to shutdown providers: %v\n", err)
+        }
+    }()
+
+    // 2. Register metrics using Meter
+    meter := metric.Meter("my_app_sensor")
+    latencyGauge, err := meter.Float64Gauge(
+        "http_request_latency_ms",
+        otelmetric.WithDescription("HTTP latency gauge"),
+    )
+    if err != nil {
+        panic(err)
+    }
+
+    // 3. Record metric values
+    latencyGauge.Record(ctx, 23.5, otelmetric.WithAttributes(
+        attribute.String("method", "GET"),
+        attribute.String("path", "/users"),
+    ))
+
+    // 4. Trace spans using Tracer
+    tracer := metric.Tracer("my_app_tracer")
+    tracedCtx, span := tracer.Start(ctx, "database_query")
+    defer span.End()
+
+    span.SetAttributes(attribute.String("db.system", "mysql"))
+    // perform work using tracedCtx ...
+}
+```
+
+Key behaviors of OTel Integration:
+- **Shutdown is Critical**: Always use `defer metric.ShutdownOTel(ctx)` at the application entry point to prevent metrics/traces loss.
+- **Synchronous Gauges**: The default `Float64Gauge` requires you to record values synchronously using `Record(ctx, val, attrs)`.
 
 ## Common Mistakes
 
@@ -193,3 +268,4 @@ Key behaviors:
 | Using `.` in Mimir metric names manually escaped | `metric.MimirService` sanitizes `.` → `_` automatically via `sanitizeMetricName`; don't pre-mangle names.                                                |
 | Passing milliseconds to `Metric.Timestamp`       | Field expects **seconds** (epoch); use `time.Now().Unix()`, not `UnixMilli()`.                                                                           |
 | Sending one metric at a time in tight loops      | Prefer `SendMulti` to batch samples into a single remote-write request (lower overhead, fewer HTTP round trips).                                         |
+| Forgetting to call `ShutdownOTel`                | Always `defer metric.ShutdownOTel(ctx)` at application startup to flush all buffered metrics and trace spans before application exit.                     |
