@@ -1,16 +1,11 @@
-// sample/metric 展示如何在服務/應用層（Service/Application Layer）使用 metric 與 trace SDK。
-//
-// 執行方式 (在專案根目錄):
-//
-//	go run ./sample/metric
-package main
+package metric
 
 import (
 	"context"
 	"fmt"
+	"testing"
 	"time"
 
-	"github.com/bizshuk/gosdk/metric"
 	"go.opentelemetry.io/otel/attribute"
 	otelmetric "go.opentelemetry.io/otel/metric"
 	"go.uber.org/zap"
@@ -33,7 +28,7 @@ var (
 	latencyGauge otelmetric.Float64Gauge
 )
 
-func main() {
+func TestOtelSample(t *testing.T) {
 	// 初始化 zap 結構化日誌
 	logger, _ := zap.NewDevelopment()
 	zap.ReplaceGlobals(logger)
@@ -41,26 +36,21 @@ func main() {
 
 	ctx := context.Background()
 
-	// 1. 初始化 OpenTelemetry MeterProvider & TracerProvider (SDK 部分)
-	// 此處可以傳入真實的 OTel Collector / Mimir OTLP URL (例如 http://localhost:4318)
-	// 若傳入空字串，則使用預設 OTLP HTTP 本地設定 (localhost:4318)
-	mimirURL := ""
-	zap.L().Info("Initializing OpenTelemetry MeterProvider", zap.String("mimir_url", mimirURL))
-	err := metric.InitMeterProvider(ctx, mimirURL)
+	err := InitMeterProvider(ctx)
 	if err != nil {
-		zap.L().Fatal("Failed to initialize MeterProvider", zap.Error(err))
+		t.Fatalf("Failed to initialize MeterProvider: %v", err)
 	}
 
 	tempoURL := ""
 	zap.L().Info("Initializing OpenTelemetry TracerProvider", zap.String("tempo_url", tempoURL))
-	err = metric.InitTracerProvider(ctx, tempoURL)
+	err = InitTracerProvider(ctx, tempoURL)
 	if err != nil {
-		zap.L().Fatal("Failed to initialize TracerProvider", zap.Error(err))
+		t.Fatalf("Failed to initialize TracerProvider: %v", err)
 	}
 
 	defer func() {
 		// 關閉以確保所有緩衝指標與 traces 皆已導出
-		if err := metric.ShutdownOTel(ctx); err != nil {
+		if err := ShutdownOTel(ctx); err != nil {
 			zap.L().Error("Failed to shutdown Meter/Tracer Provider", zap.Error(err))
 		} else {
 			zap.L().Info("Meter/Tracer Provider shutdown successfully")
@@ -69,14 +59,14 @@ func main() {
 
 	// 2. 在服務/應用層註冊自訂指標
 	// 使用 SDK 封裝的 Meter 函數獲取 meter 實例
-	meter := metric.Meter("port_listenor")
+	meter := Meter("port_listenor")
 
 	statusGauge, err = meter.Float64Gauge(
 		"port_check_status",
 		otelmetric.WithDescription("1 = port open, 0 = port closed"),
 	)
 	if err != nil {
-		zap.L().Fatal("Failed to create status gauge", zap.Error(err))
+		t.Fatalf("Failed to create status gauge: %v", err)
 	}
 
 	latencyGauge, err = meter.Float64Gauge(
@@ -84,7 +74,7 @@ func main() {
 		otelmetric.WithDescription("Port check latency in milliseconds"),
 	)
 	if err != nil {
-		zap.L().Fatal("Failed to create latency gauge", zap.Error(err))
+		t.Fatalf("Failed to create latency gauge: %v", err)
 	}
 
 	// 3. 模擬埠口監測並更新狀態
@@ -122,7 +112,7 @@ func main() {
 
 // UpdateStatuses 將埠口檢測狀態記錄到 OpenTelemetry 指標中，並記錄 Trace Spans
 func UpdateStatuses(ctx context.Context, statuses []PortStatus) {
-	tracer := metric.Tracer("port_checker")
+	tracer := Tracer("port_checker")
 	ctx, parentSpan := tracer.Start(ctx, "UpdateStatuses")
 	defer parentSpan.End()
 

@@ -2,192 +2,150 @@ package metric
 
 import (
 	"context"
-	"strconv"
-	"strings"
+	"fmt"
+	"sync"
+	"time"
 
-	"github.com/bizshuk/gosdk/log"
-	"go.opentelemetry.io/otel/attribute"
+	"github.com/spf13/viper"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/metric"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/trace"
 )
 
-// OtelMetrics provides process/queue/service metrics with OpenTelemetry.
-type OtelMetrics struct {
-	meter    metric.Meter
-	mimir    *MimirService
-	jobName  string
-	instance string
+var (
+	metricMu         sync.Mutex
+	providerInstance *sdkmetric.MeterProvider
+
+	traceMu        sync.Mutex
+	tracerInstance *sdktrace.TracerProvider
+)
+
+// Meter returns a Meter from the global MeterProvider.
+func Meter(name string, opts ...metric.MeterOption) metric.Meter {
+	return otel.GetMeterProvider().Meter(name, opts...)
 }
 
-// MetricAttributes defines tag key-value pairs.
-type MetricAttributes map[string]string
-
-// NewOtelMetrics creates a new OtelMetrics instance.
-func NewOtelMetrics(jobName, instance string, mimir *MimirService) (*OtelMetrics, error) {
-	mp := sdkmetric.NewMeterProvider()
-	meter := mp.Meter("gosdk")
-
-	return &OtelMetrics{
-		meter:    meter,
-		mimir:    mimir,
-		jobName:  jobName,
-		instance: instance,
-	}, nil
+// Tracer returns a Tracer from the global TracerProvider.
+func Tracer(name string, opts ...trace.TracerOption) trace.Tracer {
+	return otel.GetTracerProvider().Tracer(name, opts...)
 }
 
-// ProcessCounter creates a counter for batch process operations
-func (m *OtelMetrics) ProcessCounter(name, operation string) (metric.Int64Counter, error) {
-	return m.meter.Int64Counter(
-		"process."+name+"."+operation,
-		metric.WithDescription("Batch process counter"),
-		metric.WithUnit("1"),
-	)
-}
+// InitMeterProvider initializes the SDK MeterProvider, registers it globally, and caches it.
+func InitMeterProvider(ctx context.Context) error {
+	metricMu.Lock()
+	defer metricMu.Unlock()
 
-// ProcessHistogram creates a histogram for batch process duration
-func (m *OtelMetrics) ProcessHistogram(name, operation string) (metric.Float64Histogram, error) {
-	return m.meter.Float64Histogram(
-		"process."+name+"."+operation+".duration",
-		metric.WithDescription("Batch process duration"),
-		metric.WithUnit("ms"),
-	)
-}
-
-// QueueCounter creates a counter for queue/job operations
-func (m *OtelMetrics) QueueCounter(name, operation string) (metric.Int64Counter, error) {
-	return m.meter.Int64Counter(
-		"queue."+name+"."+operation,
-		metric.WithDescription("Queue job counter"),
-		metric.WithUnit("1"),
-	)
-}
-
-// QueueHistogram creates a histogram for queue job duration
-func (m *OtelMetrics) QueueHistogram(name, operation string) (metric.Float64Histogram, error) {
-	return m.meter.Float64Histogram(
-		"queue."+name+"."+operation+".duration",
-		metric.WithDescription("Queue job duration"),
-		metric.WithUnit("ms"),
-	)
-}
-
-// ServiceCounter creates a counter for service/API operations
-func (m *OtelMetrics) ServiceCounter(name, operation string) (metric.Int64Counter, error) {
-	return m.meter.Int64Counter(
-		"service."+name+"."+operation,
-		metric.WithDescription("Service API counter"),
-		metric.WithUnit("1"),
-	)
-}
-
-// ServiceHistogram creates a histogram for service request duration
-func (m *OtelMetrics) ServiceHistogram(name, operation string) (metric.Float64Histogram, error) {
-	return m.meter.Float64Histogram(
-		"service."+name+"."+operation+".duration",
-		metric.WithDescription("Service request duration"),
-		metric.WithUnit("ms"),
-	)
-}
-
-// RecordProcess records a process event with standard tags
-func (m *OtelMetrics) RecordProcess(counter metric.Int64Counter, ticker, status, errorType string) {
-	ctx := context.Background()
-	attrs := []attribute.KeyValue{
-		attribute.String("job_name", m.jobName),
-		attribute.String("instance", m.instance),
-		attribute.String("ticker", ticker),
-		attribute.String("status", status),
-	}
-
-	if errorType != "" {
-		attrs = append(attrs, attribute.String("error_type", errorType))
-	}
-
-	counter.Add(ctx, 1, metric.WithAttributes(attrs...))
-}
-
-// RecordProcessWithDuration records a process event with duration histogram
-func (m *OtelMetrics) RecordProcessWithDuration(counter metric.Int64Counter, histogram metric.Float64Histogram, ticker, status, errorType string, durationMs float64) {
-	ctx := context.Background()
-	attrs := []attribute.KeyValue{
-		attribute.String("job_name", m.jobName),
-		attribute.String("instance", m.instance),
-		attribute.String("ticker", ticker),
-		attribute.String("status", status),
-	}
-
-	if errorType != "" {
-		attrs = append(attrs, attribute.String("error_type", errorType))
-	}
-
-	counter.Add(ctx, 1, metric.WithAttributes(attrs...))
-	histogram.Record(ctx, durationMs, metric.WithAttributes(attrs...))
-}
-
-// RecordQueue records a queue event with standard tags
-func (m *OtelMetrics) RecordQueue(counter metric.Int64Counter, workerID, jobType, queueName, status string) {
-	ctx := context.Background()
-	attrs := []attribute.KeyValue{
-		attribute.String("job_name", m.jobName),
-		attribute.String("instance", m.instance),
-		attribute.String("worker_id", workerID),
-		attribute.String("job_type", jobType),
-		attribute.String("queue_name", queueName),
-		attribute.String("status", status),
-	}
-
-	counter.Add(ctx, 1, metric.WithAttributes(attrs...))
-}
-
-// RecordService records a service event with standard tags
-func (m *OtelMetrics) RecordService(counter metric.Int64Counter, endpoint, method, statusCode, source string) {
-	ctx := context.Background()
-	attrs := []attribute.KeyValue{
-		attribute.String("job_name", m.jobName),
-		attribute.String("instance", m.instance),
-		attribute.String("endpoint", endpoint),
-		attribute.String("method", method),
-		attribute.String("status_code", statusCode),
-		attribute.String("source", source),
-	}
-
-	counter.Add(ctx, 1, metric.WithAttributes(attrs...))
-}
-
-// BatchSummary holds the result of a batch process.
-type BatchSummary struct {
-	Total      int
-	Succeed    int
-	Failed     int
-	FailedList []string
-	DurationMs float64
-}
-
-// NotifySend sends a batch summary to Mimir via Slack notifier.
-func (m *OtelMetrics) NotifySend(ctx context.Context, summary string) error {
-	if m.mimir == nil {
-		log.Warn("Mimir not configured")
+	if providerInstance != nil {
 		return nil
 	}
-	log.Infof("Batch summary: %s", summary)
+
+	mimirURL := viper.GetString("MIMIR_URL")
+	if mimirURL == "" {
+		mimirURL = "http://localhost:9009/otlp/v1/metrics"
+	}
+
+	var opts []otlpmetrichttp.Option
+	opts = append(opts, otlpmetrichttp.WithEndpointURL(mimirURL))
+	// If URL starts with http://, we need to specify WithInsecure option.
+	// We use a simple prefix check.
+	if len(mimirURL) >= 7 && mimirURL[:7] == "http://" {
+		opts = append(opts, otlpmetrichttp.WithInsecure())
+	}
+
+	exporter, err := otlpmetrichttp.New(ctx, opts...)
+	if err != nil {
+		return fmt.Errorf("failed to create OTLP metric exporter: %w", err)
+	}
+
+	res, err := resource.New(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to create resource: %w", err)
+	}
+
+	provider := sdkmetric.NewMeterProvider(
+		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(exporter, sdkmetric.WithInterval(10*time.Second))),
+		sdkmetric.WithResource(res),
+	)
+
+	otel.SetMeterProvider(provider)
+	providerInstance = provider
+
 	return nil
 }
 
-// FormatBatchSummary formats a BatchSummary into a string.
-func FormatBatchSummary(jobName string, s BatchSummary) string {
-	var b strings.Builder
-	b.WriteString(jobName)
-	b.WriteString(" batch complete: ")
-	b.WriteString(strconv.Itoa(s.Total))
-	b.WriteString(" total, ")
-	b.WriteString(strconv.Itoa(s.Succeed))
-	b.WriteString(" succeeded, ")
-	b.WriteString(strconv.Itoa(s.Failed))
-	b.WriteString(" failed")
-	if len(s.FailedList) > 0 {
-		b.WriteString(" [")
-		b.WriteString(strings.Join(s.FailedList, ", "))
-		b.WriteString("]")
+// InitTracerProvider initializes the SDK TracerProvider, registers it globally, and caches it.
+func InitTracerProvider(ctx context.Context, tempoURL string) error {
+	traceMu.Lock()
+	defer traceMu.Unlock()
+
+	if tracerInstance != nil {
+		return nil
 	}
-	return b.String()
+
+	if tempoURL == "" {
+		tempoURL = viper.GetString("TEMPO_URL")
+	}
+
+	var opts []otlptracehttp.Option
+	if tempoURL != "" {
+		opts = append(opts, otlptracehttp.WithEndpointURL(tempoURL))
+		if len(tempoURL) >= 7 && tempoURL[:7] == "http://" {
+			opts = append(opts, otlptracehttp.WithInsecure())
+		}
+	} else {
+		opts = append(opts, otlptracehttp.WithInsecure())
+	}
+
+	exporter, err := otlptracehttp.New(ctx, opts...)
+	if err != nil {
+		return fmt.Errorf("failed to create OTLP trace exporter: %w", err)
+	}
+
+	res, err := resource.New(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to create resource: %w", err)
+	}
+
+	provider := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exporter),
+		sdktrace.WithResource(res),
+	)
+
+	otel.SetTracerProvider(provider)
+	tracerInstance = provider
+
+	return nil
+}
+
+// ShutdownOTel shuts down the global meter and tracer providers.
+func ShutdownOTel(ctx context.Context) error {
+	metricMu.Lock()
+	defer metricMu.Unlock()
+	traceMu.Lock()
+	defer traceMu.Unlock()
+
+	var errs []error
+	if providerInstance != nil {
+		if err := providerInstance.Shutdown(ctx); err != nil {
+			errs = append(errs, fmt.Errorf("failed to shutdown metric provider: %w", err))
+		}
+		providerInstance = nil
+	}
+
+	if tracerInstance != nil {
+		if err := tracerInstance.Shutdown(ctx); err != nil {
+			errs = append(errs, fmt.Errorf("failed to shutdown tracer provider: %w", err))
+		}
+		tracerInstance = nil
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("shutdown errors: %v", errs)
+	}
+	return nil
 }
