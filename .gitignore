@@ -42,3 +42,6 @@ gosdk
 .claude/settings.local.json
 bin/server
 sample/config/sample.db
+plans/implementation_plan.md
+.gitignore
+plans/walkthrough.md

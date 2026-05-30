@@ -34,13 +34,23 @@ A unified reference for using the `github.com/bizshuk/gosdk` library. This SDK p
 
 ### 1. Initialization & Configuration
 
-Configuration is globally managed via `viper` and automatically loads from `.env`, `config.<profile>.yaml`, and `settings.json` based on the configuration path and functional options.
+Configuration is globally managed via `viper`. The SDK uses a **dual-file loading pattern** (base file + `.local` override file) and automatically merges settings from search paths (e.g., `.`, `conf`, or the app config dir):
+
+1. `.env` and `.env.local`
+2. `config.yaml` and `config.local.yaml`
+3. `settings.json` and `settings.local.json`
+
+Environment variables prefixed with `APP_` automatically override configuration values (e.g., `APP_SERVER_PORT` overrides `server.port`, since underscores `_` map to dots `.`).
+
+> [!IMPORTANT]
+> **`GlobalConfig` variable has been completely removed.** You must access configuration values directly using `viper.Get*` functions, or deserialize them using `viper.Unmarshal` / `viper.UnmarshalKey`.
 
 ```go
 import (
     "github.com/bizshuk/gosdk/config"
-    "github.com/bizshuk/gosdk/config/db"
+    "github.com/bizshuk/gosdk/config/common"
     "github.com/bizshuk/gosdk/log"
+    "github.com/spf13/viper"
 )
 
 func main() {
@@ -62,12 +72,17 @@ func main() {
     log.Init()
     log.Info("Configurations loaded")
 
-    // 3. (Optional) Initialize DB
-    if len(config.GlobalConfig.DB) > 0 {
-        gormDB, err := db.NewDBConfig("default").Create()
+    // 3. Access configurations via Viper API (GlobalConfig is removed)
+    port := viper.GetInt("server.port")
+    log.Infof("Server port: %d", port)
+
+    // 4. (Optional) Initialize DB using common package
+    if viper.IsSet("db.default") {
+        gormDB, err := common.NewDBConfig("default").Create()
         if err != nil {
             log.Fatalf("DB connect failed: %v", err)
         }
+        _ = gormDB
     }
 }
 ```
@@ -167,13 +182,14 @@ Key behaviors:
 
 ## Common Mistakes
 
-| Mistake                               | Correction                                                                                                                                               |
-| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Using `fmt.Println` or standard `log` | Always use `github.com/bizshuk/gosdk/log` to ensure JSON formatting in production and consistent log levels.                                             |
-| Hardcoding `viper` keys for DB        | Use `db.NewDBConfig("connectionName").Create()` which encapsulates the dialect selection and connection string logic.                                    |
-| Re-implementing security headers      | Use `mw.Helmet()` instead of manually writing headers. It contains up-to-date best practices (e.g., `Permissions-Policy`, `Cross-Origin-Opener-Policy`). |
-| Manual CSV opening and iteration      | Use `csv.ProcessCSVFile` which handles skipping headers, filtering empty rows, and `.archived` marker generation.                                        |
-| Calling `WithDefaultValue` alone      | `WithDefaultValue` only writes if using `WithAppName` to ensure it is written to the correct folder. |
-| Using `.` in Mimir metric names manually escaped | `metric.MimirService` sanitizes `.` → `_` automatically via `sanitizeMetricName`; don't pre-mangle names. |
-| Passing milliseconds to `Metric.Timestamp` | Field expects **seconds** (epoch); use `time.Now().Unix()`, not `UnixMilli()`. |
-| Sending one metric at a time in tight loops | Prefer `SendMulti` to batch samples into a single remote-write request (lower overhead, fewer HTTP round trips). |
+| Mistake                                          | Correction                                                                                                                                               |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Using `fmt.Println` or standard `log`            | Always use `github.com/bizshuk/gosdk/log` to ensure JSON formatting in production and consistent log levels.                                             |
+| Accessing `config.GlobalConfig`                  | `GlobalConfig` has been removed. Query values directly via `viper.Get*` or deserialize via `viper.UnmarshalKey`.                                         |
+| Hardcoding `viper` keys for DB                   | Use `common.NewDBConfig("connectionName").Create()` which encapsulates the dialect selection and connection string logic.                                |
+| Re-implementing security headers                 | Use `mw.Helmet()` instead of manually writing headers. It contains up-to-date best practices (e.g., `Permissions-Policy`, `Cross-Origin-Opener-Policy`). |
+| Manual CSV opening and iteration                 | Use `csv.ProcessCSVFile` which handles skipping headers, filtering empty rows, and `.archived` marker generation.                                        |
+| Calling `WithDefaultValue` alone                 | `WithDefaultValue` only writes if using `WithAppName` to ensure it is written to the correct folder.                                                     |
+| Using `.` in Mimir metric names manually escaped | `metric.MimirService` sanitizes `.` → `_` automatically via `sanitizeMetricName`; don't pre-mangle names.                                                |
+| Passing milliseconds to `Metric.Timestamp`       | Field expects **seconds** (epoch); use `time.Now().Unix()`, not `UnixMilli()`.                                                                           |
+| Sending one metric at a time in tight loops      | Prefer `SendMulti` to batch samples into a single remote-write request (lower overhead, fewer HTTP round trips).                                         |
