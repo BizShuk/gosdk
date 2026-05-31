@@ -80,16 +80,16 @@ Tailor to the project: if the codebase already uses a documented convention (e.g
 
 Source: [Go blog — "Package names"](https://go.dev/blog/package-names) (Sameer Ajmani). Package identifiers deserve their own pass because a package name is a prefix on _every_ exported symbol it contains; fixing the package name often dissolves a pile of stutter-rule violations at once. Evaluate package names from the _caller's_ point of view — write a line of client code using the package and see if it reads well.
 
-| #   | Rule                                                                                                                                                                                                                                                                                    | Bad                                                              | Good                                                                                |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| P1  | **Short, lowercase, single word.** No `under_scores`, no `mixedCaps`, no plurals. Usually a simple noun.                                                                                                                                                                                | `package httpUtils`, `package string_set`, `package models`      | `package http`, `package stringset`, `package model`                                |
-| P2  | **Abbreviate only when the abbreviation is unambiguous and widely understood.** Mirrors stdlib (`fmt`, `strconv`, `syscall`).                                                                                                                                                           | `package srvmgr`, `package cfgldr`                               | `package server`, `package config` (or a clear abbrev with precedent)               |
-| P3  | **Don't steal good variable names.** If clients will want the bare word as a local variable, give the package a different name.                                                                                                                                                         | `package buf` (clients want `buf := ...`)                        | `package bufio`                                                                     |
-| P4  | **No grab-bag packages.** `util`, `common`, `helpers`, `misc`, `shared`, `base` give zero information, attract unrelated deps, and collide on import. Split by what the code _does_.                                                                                                    | `package util` with `NewStringSet`, `ParseJSON`, `RetryHTTP`     | `package stringset`, `package jsonconfig`, `package httpretry`                      |
+| #   | Rule                                                                                                                                                                                                                                                                                                                                                | Bad                                                              | Good                                                                                         |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| P1  | **Short, lowercase, single word.** No `under_scores`, no `mixedCaps`, no plurals. Usually a simple noun.                                                                                                                                                                                                                                            | `package httpUtils`, `package string_set`, `package models`      | `package http`, `package stringset`, `package model`                                         |
+| P2  | **Abbreviate only when the abbreviation is unambiguous and widely understood.** Mirrors stdlib (`fmt`, `strconv`, `syscall`).                                                                                                                                                                                                                       | `package srvmgr`, `package cfgldr`                               | `package server`, `package config` (or a clear abbrev with precedent)                        |
+| P3  | **Don't steal good variable names.** If clients will want the bare word as a local variable, give the package a different name.                                                                                                                                                                                                                     | `package buf` (clients want `buf := ...`)                        | `package bufio`                                                                              |
+| P4  | **No grab-bag packages.** `util`, `common`, `helpers`, `misc`, `shared`, `base` give zero information, attract unrelated deps, and collide on import. Split by what the code _does_.                                                                                                                                                                | `package util` with `NewStringSet`, `ParseJSON`, `RetryHTTP`     | `package stringset`, `package jsonconfig`, `package httpretry`                               |
 | P5  | **No mega-packages either.** A single `types`, `api`, `interfaces`, or `dto` package that holds everything has the same problems as `util`. Use `model` (singular) as the default package for domain types, unless there are more than 30 models, in which case group types with the code that operates on them, or split into focused subpackages. | `package types` (300 structs)                                    | `package order`, `package payment`, `package inventory`, or `package model` (if <=30 models) |
-| P6  | **Avoid colliding with popular stdlib / well-known package names** unless the domain truly demands it (forces every importer to alias).                                                                                                                                                 | local `package context`, `package http`, `package io`            | `package requestctx`, `package httpx` (only if a distinct name is genuinely needed) |
-| P7  | **The last path element is the package name.** Don't let `import "…/foo/v2bar"` declare `package bar`, and don't repeat the parent dir (`server/serverhttp` → `server/http` declaring `package http`).                                                                                  | dir `stringutil/` declaring `package strutil`                    | dir `stringset/` declaring `package stringset`                                      |
-| P8  | **Package contents don't repeat the package name.** This is the package-side mirror of symbol Rule 1 (no stutter). `New` in package `pkg` should return `pkg.Pkg` / `*pkg.Pkg`; use a typed name (`NewTicker → *time.Ticker`) only when the returned type isn't the package's namesake. | `chain.NewChain()`, `http.HTTPServer`, `stringset.SortStringSet` | `chain.New()`, `http.Server`, `(stringset.Set).Sort()`                              |
+| P6  | **Avoid colliding with popular stdlib / well-known package names** unless the domain truly demands it (forces every importer to alias).                                                                                                                                                                                                             | local `package context`, `package http`, `package io`            | `package requestctx`, `package httpx` (only if a distinct name is genuinely needed)          |
+| P7  | **The last path element is the package name.** Don't let `import "…/foo/v2bar"` declare `package bar`, and don't repeat the parent dir (`server/serverhttp` → `server/http` declaring `package http`).                                                                                                                                              | dir `stringutil/` declaring `package strutil`                    | dir `stringset/` declaring `package stringset`                                               |
+| P8  | **Package contents don't repeat the package name.** This is the package-side mirror of symbol Rule 1 (no stutter). `New` in package `pkg` should return `pkg.Pkg` / `*pkg.Pkg`; use a typed name (`NewTicker → *time.Ticker`) only when the returned type isn't the package's namesake.                                                             | `chain.NewChain()`, `http.HTTPServer`, `stringset.SortStringSet` | `chain.New()`, `http.Server`, `(stringset.Set).Sort()`                                       |
 
 **Worked refactor (from the blog):** a `package util` exposing `util.NewStringSet(...)` / `util.SortStringSet(set)` becomes `package stringset` exposing `type Set`, `stringset.New(...)`, and a `(Set).Sort()` method — shorter call sites, no stutter, a name that says what it is.
 
@@ -124,7 +124,7 @@ First do the **package-naming pass** (rules P1–P8): for each package, write a 
 
 Output a single markdown report in this exact shape:
 
-```
+```markdown
 # golang-naming review — <module path>
 
 Scope: <N> files, <M> packages scanned (excluded: <list>)
@@ -133,38 +133,47 @@ gopls: <version>
 ## Package names (<count>)
 
 ### Renameable (mechanical)
-| # | Package | `package` clause at | New name | Import path now → after | Importers | Notes |
-|---|---------|---------------------|----------|-------------------------|-----------|-------|
-| P1 | `util` | internal/util/util.go:1:9 | `stringset` | `.../internal/util` → `.../internal/stringset` | 12 | also rename the directory |
+
+| #   | Package | `package` clause at       | New name    | Import path now → after                        | Importers | Notes                     |
+| --- | ------- | ------------------------- | ----------- | ---------------------------------------------- | --------- | ------------------------- |
+| P1  | `util`  | internal/util/util.go:1:9 | `stringset` | `.../internal/util` → `.../internal/stringset` | 12        | also rename the directory |
 
 ### Restructure recommended (manual — not automated)
-| Package | Problem (rule) | Suggested split |
-|---------|----------------|-----------------|
+
+| Package | Problem (rule)  | Suggested split                 |
+| ------- | --------------- | ------------------------------- |
 | `types` | P5 mega-package | `order`, `payment`, `inventory` |
 
 ## Proposed renames (<count>)
 
 ### Rule 1 — No stutter
-| # | Symbol | Defined at | New name | References | Notes |
-|---|--------|-----------|----------|------------|-------|
-| 1 | `region.RegionManager` | config/region.go:14:6 | `region.Manager` | 23 | exported |
+
+| #   | Symbol                 | Defined at            | New name         | References | Notes    |
+| --- | ---------------------- | --------------------- | ---------------- | ---------- | -------- |
+| 1   | `region.RegionManager` | config/region.go:14:6 | `region.Manager` | 23         | exported |
+
 ...
 
 ### Rule 2 — Acronym casing
+
 ...
 
 ## BREAKING — manual decision needed (<count>)
+
 Exported symbols or package import paths whose rename would change the public API.
 
 | Symbol / package | Reason | Suggestion |
-|------------------|--------|------------|
+| ---------------- | ------ | ---------- |
 
 ## Skipped
+
 Files excluded (generated/vendored): <count>
 Symbols already conforming: <count>
 
 ---
+
 **Next step**: reply with one of:
+
 - `apply all` — execute every proposed rename
 - `apply 1,3,5-7` — execute selected items (comma list, ranges allowed)
 - `apply rule 2` — execute one rule's batch

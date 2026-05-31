@@ -67,14 +67,14 @@ Go has no inheritance — apply SOLID through **composition**, **small interface
 
 Enforce this layered architecture. **Dependencies flow downward only** — handler → service → model. No upward or sideways imports between siblings.
 
-| Package                | Responsibility                                                                                      | What MUST NOT be there                          |
-| ---------------------- | --------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| Package                | Responsibility                                                                                                                                                                      | What MUST NOT be there                          |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
 | `config/`              | Load configuration. Prefer `config.Default()` from `github.com/bizshuk/gosdk`, falling back to `viper` if not supported. Initialize external clients (DB, Redis, S3, HTTP clients). | Business logic, domain types                    |
-| `handler/`             | Aggregate domain logic. Orchestrate calls to services. **All business rules live here.**            | Direct DB calls, raw HTTP calls, config loading |
-| `service/` (or `svc/`) | Wrap external services. Basic error handling, retries, timeout enforcement. **Thin adapters only.** | Domain logic, business rules                    |
-| `model/`               | Data structures + conversions between them (DTO ↔ domain ↔ persistence).                            | Behavior beyond conversion, I/O                 |
-| `validation/`          | Common validation rules. **Each validator must have an explicit, descriptive name.**                | Business decisions, side effects                |
-| `utils/`               | Non-business, non-functional concerns: metrics emission, callbacks, helper closures.                | Anything domain-specific                        |
+| `handler/`             | Aggregate domain logic. Orchestrate calls to services. **All business rules live here.**                                                                                            | Direct DB calls, raw HTTP calls, config loading |
+| `service/` (or `svc/`) | Wrap external services. Basic error handling, retries, timeout enforcement. **Thin adapters only.**                                                                                 | Domain logic, business rules                    |
+| `model/`               | Data structures + conversions between them (DTO ↔ domain ↔ persistence).                                                                                                            | Behavior beyond conversion, I/O                 |
+| `validation/`          | Common validation rules. **Each validator must have an explicit, descriptive name.**                                                                                                | Business decisions, side effects                |
+| `utils/`               | Non-business, non-functional concerns: metrics emission, callbacks, helper closures.                                                                                                | Anything domain-specific                        |
 
 ### Validation naming rule
 
@@ -233,7 +233,7 @@ When asked to review Go code:
 
 Always structure findings like this:
 
-```
+```text
 🔴 CRITICAL — handler/user.go:42
 Issue: Direct DB query in handler bypasses service layer
 Why: Violates layered architecture — handler should orchestrate, not access storage
