@@ -3,8 +3,8 @@ package common
 import (
 	"fmt"
 
-	"github.com/bizshuk/gosdk/log"
 	"github.com/spf13/viper"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
@@ -12,9 +12,9 @@ func NewDBConfig(confKey string) DBConfig {
 	confKey = "db." + confKey
 	dbConfig := DBConfig{}
 	if err := viper.UnmarshalKey(confKey, &dbConfig); err != nil {
-		log.Fatalf("Unable to unmarshal db key: %v", err)
+		zap.S().Fatalf("Unable to unmarshal db key: %v", err)
 	}
-	log.Infof("Load DBConfig: %+v", dbConfig)
+	zap.S().Infof("Load DBConfig: %+v", dbConfig)
 	return dbConfig
 }
 

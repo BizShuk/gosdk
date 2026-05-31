@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bizshuk/gosdk/log"
+	"go.uber.org/zap"
 )
 
 func (s *MimirService) SendTest() error {
@@ -26,12 +26,12 @@ func (s *MimirService) SendTest() error {
 		})
 	}
 
-	log.Infof("sending %d test metrics to Mimir", len(metrics))
+	zap.S().Infof("sending %d test metrics to Mimir", len(metrics))
 	if err := s.SendMulti(metrics); err != nil {
-		log.Errorf("SendTest failed: %v", err)
+		zap.S().Errorf("SendTest failed: %v", err)
 		return err
 	}
-	log.Infof("SendTest completed successfully")
+	zap.S().Infof("SendTest completed successfully")
 	return nil
 }
 

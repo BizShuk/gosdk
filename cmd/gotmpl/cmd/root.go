@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/bizshuk/gosdk/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"go.uber.org/zap"
 )
 
 var cfgFile string
@@ -30,10 +30,10 @@ to quickly create a Cobra application.`,
 		loader := &TemplateLoader{}
 		err := viper.Unmarshal(loader)
 		if err != nil {
-			log.Fatal("Failed to load config.yaml")
+			zap.S().Fatal("Failed to load config.yaml")
 		}
 
-		log.Info(loader)
+		zap.S().Info(loader)
 		loader.Load()
 
 	},

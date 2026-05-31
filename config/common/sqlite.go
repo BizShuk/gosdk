@@ -3,13 +3,13 @@ package common
 import (
 	"fmt"
 
-	"github.com/bizshuk/gosdk/log"
+	"go.uber.org/zap"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
 func NewSQLite(cfg DBConfig) (*gorm.DB, error) {
-	log.Infof("Construct SQLite Connection:%s", cfg.URL)
+	zap.S().Infof("Construct SQLite Connection:%s", cfg.URL)
 
 	db, err := gorm.Open(sqlite.Open(cfg.URL), &gorm.Config{})
 

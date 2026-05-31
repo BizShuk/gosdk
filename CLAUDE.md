@@ -51,7 +51,7 @@ gosdk/
 │       ├── gbk.go           # GBK 串流解碼器
 │       └── big5.go          # Big5 串流解碼器
 ├── log/                     # 結構化日誌模組
-│   ├── log.go               # zap Logger 初始化與封裝
+│   ├── log.go               # zap Logger 初始化（Init + ReplaceGlobals）
 │   └── level.go             # LOG_LEVEL 環境變數解析
 ├── mw/                      # Gin 中介層
 │   ├── correlationId.go     # X-Correlation-Id 請求追蹤
@@ -131,7 +131,7 @@ gosdk/
 - 雙檔案載入模式：各設定格式固定載入 base 檔案 + `.local` 覆寫檔（`.env` + `.env.local`、`config.yaml` + `config.local.yaml`、`settings.json` + `settings.local.json`），不再依賴 `PROFILE` 環境變數切換
 - 強型別 `ConfigSchema` 結合 flat key 存取：`config.Default()` 載入設定後透過 `viper.Unmarshal()` 或直接 `viper.Get*()` 取值
 - `stringer` 以 `GeneratorEx` 組合模式擴充標準庫 `stringer`：嵌入 `service.Generator`，額外產生 `List()`、`ValueList()`、`Map()`、`ValueMap()` 四個輔助函式
-- 日誌模組在 `init()` 時即初始化：確保任何 import 此套件的模組都能立即使用 `log.Info()` 等函式，`log.Init()` 可在設定載入後再次呼叫以更新等級
+- 日誌模組在 `init()` 時即初始化：確保任何 import 此套件的模組都能立即使用 `zap.L()` / `zap.S()`，`log.Init()` 可在設定載入後再次呼叫以更新等級。Sugar wrapper 函式已移除，消費端直接使用 zap SDK
 - CSV 處理使用歸檔標記檔（`.archived`）防止重複處理：以簡單的檔案系統機制取代資料庫或 Redis 的已處理紀錄
 - Helmet 中介層採用靜態安全標頭：直接在 response header 注入 `X-Content-Type-Options`、`X-Frame-Options`、`CSP` 等，不依賴外部套件
 - 排程器採用極簡設計：`Scheduler` 僅負責按 `Interval` 觸發 `Job.Fn`，錯誤處理、日誌、重試等策略完全由呼叫方透過 `Job.OnError` 自行決定
@@ -259,6 +259,6 @@ GitHub Actions workflow 定義於 `.github/workflows/ci.yml`，於 push/PR 至 `
 
 - Naming: 套件名稱使用小寫單字（`config`, `log`, `mw`, `router`, `notify`, `scheduler`）；檔案名稱使用 camelCase（`correlationId.go`, `statsHandler.go`）；常數使用 `UPPER_SNAKE_CASE`
 - Error handling: 使用 `fmt.Errorf("...: %w", err)` 進行 error wrapping；設定載入失敗區分 `ConfigFileNotFoundError`（允許 fallback）與其他錯誤（`log.Warn` 或 `log.Fatal` 終止）
-- Logging: 統一使用 `gosdk/log` 封裝的 `zap` 函式（`Info`, `Infof`, `Error`, `Errorf` 等）；部分模組直接使用 `zap.L()` 全域實例
+- Logging: `gosdk/log` 僅提供 `Init()` 初始化 zap 全域實例；所有日誌記錄統一使用 `zap.L()`（結構化）或 `zap.S()`（sugar），不使用 wrapper 函式
 - Testing: 測試檔案與被測檔案放在同一 package 內（白盒測試）；使用 `testing.T` 標準庫；測試前透過 `viper.Set()` 或 `os.Setenv()` 注入設定
 - Configuration: `CONFIG_DIR` 控制設定檔搜尋路徑；雙檔案模式（base + `.local`）自動載入；`APP_` 前綴環境變數自動覆蓋設定

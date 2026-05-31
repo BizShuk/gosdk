@@ -1,8 +1,8 @@
 package config
 
 import (
-	"github.com/bizshuk/gosdk/log"
 	"github.com/spf13/viper"
+	"go.uber.org/zap"
 )
 
 type JsonConfig struct{}
@@ -24,7 +24,7 @@ func (c *JsonConfig) Load() *viper.Viper {
 	v.SetConfigType("json")
 	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			log.Warn("Fatal error reading settings.json: %s", err)
+			zap.S().Warnf("Fatal error reading settings.json: %s", err)
 		}
 	}
 
@@ -32,11 +32,11 @@ func (c *JsonConfig) Load() *viper.Viper {
 	v.SetConfigName("settings.local")
 	if err := v.MergeInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			log.Warn("Fatal error reading settings.local.json: %s", err)
+			zap.S().Warnf("Fatal error reading settings.local.json: %s", err)
 		}
 	}
 
-	log.Infof("JsonConfig used: %s", v.ConfigFileUsed())
+	zap.S().Infof("JsonConfig used: %s", v.ConfigFileUsed())
 	return v
 }
 

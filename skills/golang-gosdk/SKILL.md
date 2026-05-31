@@ -34,58 +34,86 @@ A unified reference for using the `github.com/bizshuk/gosdk` library. This SDK p
 
 ### 1. Initialization & Configuration
 
-Configuration is globally managed via `viper`. The SDK uses a **dual-file loading pattern** (base file + `.local` override file) and automatically merges settings from search paths (e.g., `.`, `conf`, or the app config dir):
+Configuration is globally managed via `viper` — no global config struct. The SDK `config.Default()` loads and merges files automatically (dual-file pattern: base + `.local` override):
 
-1. `.env` and `.env.local`
-2. `config.yaml` and `config.local.yaml`
-3. `settings.json` and `settings.local.json`
+1. `.env` / `.env.local`
+2. `config.yaml` / `config.local.yaml`
+3. `settings.json` / `settings.local.json`
 
-Environment variables prefixed with `APP_` automatically override configuration values (e.g., `APP_SERVER_PORT` overrides `server.port`, since underscores `_` map to dots `.`).
+Environment variables prefixed with `APP_` override config values (`APP_SERVER_PORT` → `server.port`).
 
-> [!IMPORTANT]
-> **`GlobalConfig` variable has been completely removed.** You must access configuration values directly using `viper.Get*` functions, or deserialize them using `viper.Unmarshal` / `viper.UnmarshalKey`.
+#### Standard Pattern (Application Config Package)
+
+Create a `config/config.go` in your application. This is the **single source of truth** for configuration initialization:
+
+```go
+// config/config.go
+package config
+
+import (
+    "github.com/bizshuk/gosdk/config"
+    "github.com/spf13/viper"
+)
+
+func Init() {
+    // 1. Load config files from ~/.config/<app_name>/ and working dir
+    config.Default(config.WithAppName("<app_name>"))
+
+    // 2. Set defaults explicitly — acts as fallback when config files omit keys
+    viper.SetDefault("server.port", 8080)
+    viper.SetDefault("db.driver", "sqlite")
+    viper.SetDefault("log.level", "info")
+}
+```
+
+Then in `main.go` or any entry point:
 
 ```go
 import (
-    "github.com/bizshuk/gosdk/config"
-    "github.com/bizshuk/gosdk/config/common"
+    "<module>/config"
     "github.com/bizshuk/gosdk/log"
     "github.com/spf13/viper"
 )
 
 func main() {
-    // Standard configuration loading:
-    // Automatically merges configuration files from the active path.
-    config.Default()
-
-    // Preferred way: Use WithAppName to set user config directory (e.g. os.UserConfigDir()/my-app)
-    // and optionally write default JSON configurations if missing.
-    config.Default(
-        config.WithAppName("my-app"),
-        config.WithDefaultValue(`{"server": {"port": 8080}}`),
-    )
-
-    // Discouraged: WithConfigDir should only be used when a fixed custom directory path is strictly required.
-    // config.Default(config.WithConfigDir("/path/to/configs"))
-
-    // 2. Initialize logger based on config
+    config.Init()
     log.Init()
-    log.Info("Configurations loaded")
 
-    // 3. Access configurations via Viper API (GlobalConfig is removed)
+    // Access values directly via viper — no global struct needed
     port := viper.GetInt("server.port")
-    log.Infof("Server port: %d", port)
-
-    // 4. (Optional) Initialize DB using common package
-    if viper.IsSet("db.default") {
-        gormDB, err := common.NewDBConfig("default").Create()
-        if err != nil {
-            log.Fatalf("DB connect failed: %v", err)
-        }
-        _ = gormDB
-    }
+    host := viper.GetString("server.host")
+    debug := viper.GetBool("app.debug")
 }
 ```
+
+> [!IMPORTANT]
+> **Do NOT create a global config struct.** Use `viper.Get*()` directly where the value is needed. This is configuration dependency injection — each consumer pulls only the keys it requires.
+
+#### Optional: Embed Default JSON
+
+If you want a `settings.json` auto-created in `~/.config/<app_name>/` on first run:
+
+```go
+//go:embed default_settings.json
+var defaultSettingJSON string
+
+func Init() {
+    config.Default(
+        config.WithAppName("<app_name>"),
+        config.WithDefaultValue(defaultSettingJSON),
+    )
+    // viper.SetDefault(...) for additional keys
+}
+```
+
+#### Priority Order (highest → lowest)
+
+| Priority | Source                        |
+| -------- | ----------------------------- |
+| 1        | `APP_*` environment variables |
+| 2        | `.local` override files       |
+| 3        | Base config files             |
+| 4        | `viper.SetDefault()` values   |
 
 ### 2. HTTP Service (Gin)
 
@@ -136,17 +164,29 @@ err := csv.ProcessCSVFile("data/import.csv", true, myRecordProcessor)
 
 ### 4. Logging
 
-Use the unified `log` wrapper instead of the standard library or direct `zap` calls to ensure format consistency.
+The `log` package provides `Init()` to configure `zap` globally (level, format, timestamp). After calling `log.Init()`, use `zap.L()` (structured) or `zap.S()` (sugar) directly — no wrapper functions.
 
 ```go
-import "github.com/bizshuk/gosdk/log"
+import (
+    "github.com/bizshuk/gosdk/log"
+    "go.uber.org/zap"
+)
 
-// Use log package directly
-log.Info("Standard info log")
-log.Infof("Formatted log: %s", value)
-log.Error("Error occurred")
-log.Fatalf("Fatal error: %v", err) // Exits application
+func main() {
+    log.Init() // configures zap globally based on PROFILE and LOG_LEVEL
+
+    // Structured logging (preferred for production — zero-alloc)
+    zap.L().Info("server started", zap.Int("port", 8080))
+    zap.L().Error("connection failed", zap.Error(err))
+
+    // Sugar logging (convenient for quick/format strings)
+    zap.S().Infof("listening on %s", addr)
+    zap.S().Warnf("retry %d/%d", attempt, maxRetries)
+}
 ```
+
+> [!IMPORTANT]
+> **Do NOT use wrapper functions like `log.Info()`, `log.Errorf()`.** These have been removed. Use `zap.L()` or `zap.S()` directly.
 
 ### 5. Metrics & Tracing (Mimir vs OpenTelemetry)
 
@@ -322,20 +362,44 @@ Key behaviors of the `notify` package:
 - **Fan-out error handling**: `Multi.Notify` always calls every registered notifier — it never short-circuits on failure. All errors are joined via `errors.Join`; check the combined error after the call.
 - **Format is caller's responsibility**: The `summary string` is an opaque, pre-formatted message. Serialize your struct/report to a string before calling `Notify`.
 
+### 8. Home Path Expansion
+
+Use `github.com/mitchellh/go-homedir` to expand `~` in paths. Call `homedir.Expand()` directly at point of use — do NOT create a custom expand function.
+
+```go
+import "github.com/mitchellh/go-homedir"
+
+// Standard pattern: expand and fall back silently on error
+dbPath := viper.GetString("state.db_path")  // e.g. "~/.config/myapp/state.db"
+path, err := homedir.Expand(dbPath)
+if err != nil {
+    path = dbPath
+}
+```
+
+Key rules:
+
+- **No wrappers**: call `homedir.Expand()` inline, DO NOT wrap it in `expandPath()` / `expandHome()`
+- **Silent fallback**: on error, use the original path as-is — unless the caller explicitly needs to handle the error
+- **No-op when safe**: if the path has no `~` prefix, `Expand()` returns it unchanged
+
 ## Common Mistakes
 
-| Mistake                                          | Correction                                                                                                                                               |
-| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Using `fmt.Println` or standard `log`            | Always use `github.com/bizshuk/gosdk/log` to ensure JSON formatting in production and consistent log levels.                                             |
-| Accessing `config.GlobalConfig`                  | `GlobalConfig` has been removed. Query values directly via `viper.Get*` or deserialize via `viper.UnmarshalKey`.                                         |
-| Hardcoding `viper` keys for DB                   | Use `common.NewDBConfig("connectionName").Create()` which encapsulates the dialect selection and connection string logic.                                |
-| Re-implementing security headers                 | Use `mw.Helmet()` instead of manually writing headers. It contains up-to-date best practices (e.g., `Permissions-Policy`, `Cross-Origin-Opener-Policy`). |
-| Manual CSV opening and iteration                 | Use `csv.ProcessCSVFile` which handles skipping headers, filtering empty rows, and `.archived` marker generation.                                        |
-| Calling `WithDefaultValue` alone                 | `WithDefaultValue` only writes if using `WithAppName` to ensure it is written to the correct folder.                                                     |
-| Using `.` in Mimir metric names manually escaped | `metric.MimirService` sanitizes `.` → `_` automatically via `sanitizeMetricName`; don't pre-mangle names.                                                |
-| Passing milliseconds to `Metric.Timestamp`       | Field expects **seconds** (epoch); use `time.Now().Unix()`, not `UnixMilli()`.                                                                           |
-| Sending one metric at a time in tight loops      | Prefer `SendMulti` to batch samples into a single remote-write request (lower overhead, fewer HTTP round trips).                                         |
-| Forgetting to call `ShutdownOTel`                | Always `defer metric.ShutdownOTel(ctx)` at application startup to flush all buffered metrics and trace spans before application exit.                    |
-| Passing a struct directly to `Notify`            | `Notifier.Notify` only accepts a `string`. Serialize your payload (e.g., `fmt.Sprintf` or `json.Marshal`) before calling `Notify`.                       |
-| Expecting `Multi` to stop on first error         | `Multi.Notify` calls every notifier regardless of errors. Check the combined `errors.Join` error after the call — it may contain errors from multiple notifiers. |
+| Mistake                                          | Correction                                                                                                                                                        |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Using `fmt.Println` or standard `log`            | Import `gosdk/log` for `Init()`, then use `zap.L()` (structured) or `zap.S()` (sugar) for all logging.                                                            |
+| Using removed `log.Info()` / `log.Errorf()` etc  | Sugar wrappers have been removed. Use `zap.S().Info()` / `zap.S().Errorf()` or `zap.L().Info()` with `zap.String()` fields.                                       |
+| Creating a global config struct                  | Use `viper.Get*()` directly at point of use. No global struct needed — viper IS the global config store.                                                          |
+| Setting defaults before `config.Default()`       | Call `viper.SetDefault()` AFTER `config.Default()` so file-loaded values take precedence over defaults.                                                           |
+| Hardcoding `viper` keys for DB                   | Use `common.NewDBConfig("connectionName").Create()` which encapsulates the dialect selection and connection string logic.                                         |
+| Re-implementing security headers                 | Use `mw.Helmet()` instead of manually writing headers. It contains up-to-date best practices (e.g., `Permissions-Policy`, `Cross-Origin-Opener-Policy`).          |
+| Manual CSV opening and iteration                 | Use `csv.ProcessCSVFile` which handles skipping headers, filtering empty rows, and `.archived` marker generation.                                                 |
+| Calling `WithDefaultValue` alone                 | `WithDefaultValue` only writes if using `WithAppName` to ensure it is written to the correct folder.                                                              |
+| Using `.` in Mimir metric names manually escaped | `metric.MimirService` sanitizes `.` → `_` automatically via `sanitizeMetricName`; don't pre-mangle names.                                                         |
+| Passing milliseconds to `Metric.Timestamp`       | Field expects **seconds** (epoch); use `time.Now().Unix()`, not `UnixMilli()`.                                                                                    |
+| Sending one metric at a time in tight loops      | Prefer `SendMulti` to batch samples into a single remote-write request (lower overhead, fewer HTTP round trips).                                                  |
+| Forgetting to call `ShutdownOTel`                | Always `defer metric.ShutdownOTel(ctx)` at application startup to flush all buffered metrics and trace spans before application exit.                             |
+| Passing a struct directly to `Notify`            | `Notifier.Notify` only accepts a `string`. Serialize your payload (e.g., `fmt.Sprintf` or `json.Marshal`) before calling `Notify`.                                |
+| Expecting `Multi` to stop on first error         | `Multi.Notify` calls every notifier regardless of errors. Check the combined `errors.Join` error after the call — it may contain errors from multiple notifiers.  |
 | Panicking when Slack token is missing            | `NewSlackNotifier("", channelID)` is intentionally a no-op; it logs a warning and returns `nil`. No need to guard the constructor with an `if token != ""` check. |
+| Creating custom `expandPath()` / `expandHome()`  | Use `homedir.Expand()` directly at call site. No wrapper function needed — it handles no-`~` paths as no-op.                                                      |

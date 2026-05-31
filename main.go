@@ -10,6 +10,7 @@ import (
 	"github.com/bizshuk/gosdk/router"
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
+	"go.uber.org/zap"
 )
 
 func main() {
@@ -18,16 +19,16 @@ func main() {
 
 	// 2. Re-initialize log systems with configuration level
 	log.Init()
-	log.Info("Configurations loaded successfully.")
+	zap.S().Info("Configurations loaded successfully.")
 
 	// 3. Connect DB
 	dbConfigs := viper.GetStringMap("db")
 	if len(dbConfigs) > 0 {
 		_, err := common.NewDBConfig("default").Create()
 		if err != nil {
-			log.Errorf("Database connection failed: %v", err)
+			zap.S().Errorf("Database connection failed: %v", err)
 		} else {
-			log.Info("Database connected successfully.")
+			zap.S().Info("Database connected successfully.")
 		}
 	}
 
@@ -51,9 +52,9 @@ func HTTPServer() {
 	}
 	addr := fmt.Sprintf("%s:%d", host, port)
 
-	log.Infof("Server starting on %s", addr)
+	zap.S().Infof("Server starting on %s", addr)
 	err := s.Run(addr)
 	if err != nil {
-		log.Fatalf("Server failed to start: %v", err)
+		zap.S().Fatalf("Server failed to start: %v", err)
 	}
 }

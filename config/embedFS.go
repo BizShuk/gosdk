@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"embed"
 
-	"github.com/bizshuk/gosdk/log"
 	"github.com/spf13/viper"
+	"go.uber.org/zap"
 )
 
 type FSConfig struct {
@@ -23,7 +23,7 @@ func NewFSConfig(fs embed.FS, filename string) Config {
 func (c FSConfig) Load() *viper.Viper {
 	r, err := GetFSReader(c.fs, c.fileName)
 	if err != nil {
-		log.Fatalf("Fatal error reading embed config file: %s", err)
+		zap.S().Fatalf("Fatal error reading embed config file: %s", err)
 	}
 	v := viper.New()
 
@@ -32,13 +32,13 @@ func (c FSConfig) Load() *viper.Viper {
 	if err := v.ReadConfig(r); err != nil {
 		// 如果找不到配置檔 (FileNotFoundError)，通常是可接受的
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			log.Fatal("Config file not found. Using defaults and env variables.")
+			zap.S().Fatal("Config file not found. Using defaults and env variables.")
 		} else { // 如果是其他讀取錯誤，則終止程式
-			log.Fatalf("Fatal error reading config file: %s", err)
+			zap.S().Fatalf("Fatal error reading config file: %s", err)
 		}
 	}
 
-	log.Infof("FSConfig used: %s", c.fileName)
+	zap.S().Infof("FSConfig used: %s", c.fileName)
 	return v
 }
 
