@@ -88,9 +88,7 @@ func InitTracerProvider(ctx context.Context, tempoURL string) error {
 		return nil
 	}
 
-	if tempoURL == "" {
-		tempoURL = viper.GetString("TEMPO_URL")
-	}
+	tempoURL = viper.GetString("TEMPO_URL")
 
 	var opts []otlptracehttp.Option
 	if tempoURL != "" {
