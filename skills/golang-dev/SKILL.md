@@ -256,6 +256,8 @@ func TestGetUserDiscount(t *testing.T) {
 
 ## 5. Test Commands
 
+DO NOT create interface for pure test or coverage
+
 | Task               | Command                                           |
 | ------------------ | ------------------------------------------------- |
 | Run all tests      | `go test ./...`                                   |
