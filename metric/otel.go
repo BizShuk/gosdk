@@ -35,6 +35,10 @@ func Tracer(name string, opts ...trace.TracerOption) trace.Tracer {
 	return otel.GetTracerProvider().Tracer(name, opts...)
 }
 
+func init() {
+	viper.SetDefault("METRIC_URL", "http://localhost:9009/otlp/v1/metrics")
+}
+
 // InitMeterProvider initializes the SDK MeterProvider, registers it globally, and caches it.
 func InitMeterProvider(ctx context.Context) error {
 	metricMu.Lock()
@@ -44,10 +48,7 @@ func InitMeterProvider(ctx context.Context) error {
 		return nil
 	}
 
-	mimirURL := viper.GetString("MIMIR_URL")
-	if mimirURL == "" {
-		mimirURL = "http://localhost:9009/otlp/v1/metrics"
-	}
+	mimirURL := viper.GetString("METRIC_URL")
 
 	var opts []otlpmetrichttp.Option
 	opts = append(opts, otlpmetrichttp.WithEndpointURL(mimirURL))

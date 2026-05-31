@@ -14,11 +14,12 @@ type MimirService struct {
 	client *promwrite.Client
 }
 
+func init() {
+	viper.SetDefault("MIMIR_URL", "http://localhost:9009/api/v1/push")
+}
+
 func NewMimirService() *MimirService {
 	mimirURL := viper.GetString("MIMIR_URL")
-	if mimirURL == "" {
-		mimirURL = "http://localhost:9009/api/v1/push"
-	}
 	httpClient := &http.Client{
 		Timeout: 30 * time.Second,
 		Transport: &http.Transport{

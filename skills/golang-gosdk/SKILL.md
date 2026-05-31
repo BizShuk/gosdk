@@ -274,6 +274,54 @@ Key behaviors of OTel Integration:
 - **Shutdown is Critical**: Always use `defer metric.ShutdownOTel(ctx)` at the application entry point to prevent metrics/traces loss.
 - **Synchronous Gauges**: The default `Float64Gauge` requires you to record values synchronously using `Record(ctx, val, attrs)`.
 
+### 6. Notifications (notify)
+
+Use the `notify` package to send event summaries to one or more destinations. The package is backend-agnostic: all implementations satisfy the `Notifier` interface.
+
+```go
+import (
+    "context"
+    "github.com/bizshuk/gosdk/notify"
+)
+
+// Single destination — stdout
+n := &notify.StdoutNotifier{}
+_ = n.Notify(context.Background(), "job finished: 42 rows processed")
+
+// Slack — token from SLACK_BOT_TOKEN, channel is the Slack channel ID
+slackN := notify.NewSlackNotifier(os.Getenv("SLACK_BOT_TOKEN"), "C0123ABCDEF")
+_ = slackN.Notify(context.Background(), "deployment succeeded")
+
+// Fan-out to multiple destinations simultaneously
+multi := notify.NewMulti(
+    &notify.StdoutNotifier{},
+    notify.NewSlackNotifier(os.Getenv("SLACK_BOT_TOKEN"), "C0123ABCDEF"),
+)
+if err := multi.Notify(ctx, "daily report ready"); err != nil {
+    // errors.Join — contains errors from ALL failed notifiers
+    log.Errorf("notify failed: %v", err)
+}
+```
+
+Custom notifiers: implement the `Notifier` interface and plug into `NewMulti`:
+
+```go
+type EmailNotifier struct{ addr string }
+
+func (e *EmailNotifier) Notify(_ context.Context, summary string) error {
+    // send email …
+    return nil
+}
+
+multi := notify.NewMulti(&notify.StdoutNotifier{}, &EmailNotifier{addr: "ops@example.com"})
+```
+
+Key behaviors of the `notify` package:
+
+- **Graceful no-op**: `NewSlackNotifier` with an empty token creates a nil client; `Notify` logs a warning and returns nil without panicking. Safe to initialize unconditionally; skip-at-runtime if env vars are absent.
+- **Fan-out error handling**: `Multi.Notify` always calls every registered notifier — it never short-circuits on failure. All errors are joined via `errors.Join`; check the combined error after the call.
+- **Format is caller's responsibility**: The `summary string` is an opaque, pre-formatted message. Serialize your struct/report to a string before calling `Notify`.
+
 ## Common Mistakes
 
 | Mistake                                          | Correction                                                                                                                                               |
@@ -288,3 +336,6 @@ Key behaviors of OTel Integration:
 | Passing milliseconds to `Metric.Timestamp`       | Field expects **seconds** (epoch); use `time.Now().Unix()`, not `UnixMilli()`.                                                                           |
 | Sending one metric at a time in tight loops      | Prefer `SendMulti` to batch samples into a single remote-write request (lower overhead, fewer HTTP round trips).                                         |
 | Forgetting to call `ShutdownOTel`                | Always `defer metric.ShutdownOTel(ctx)` at application startup to flush all buffered metrics and trace spans before application exit.                    |
+| Passing a struct directly to `Notify`            | `Notifier.Notify` only accepts a `string`. Serialize your payload (e.g., `fmt.Sprintf` or `json.Marshal`) before calling `Notify`.                       |
+| Expecting `Multi` to stop on first error         | `Multi.Notify` calls every notifier regardless of errors. Check the combined `errors.Join` error after the call — it may contain errors from multiple notifiers. |
+| Panicking when Slack token is missing            | `NewSlackNotifier("", channelID)` is intentionally a no-op; it logs a warning and returns `nil`. No need to guard the constructor with an `if token != ""` check. |
