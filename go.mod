@@ -2,7 +2,7 @@ module github.com/bizshuk/gosdk
 
 go 1.26.0
 
-retract [v1.0.0, v1.0.3] // 這些版本已被廢棄
+retract [v1.0.0, v1.0.4] // 這些版本已被廢棄
 
 require (
 	github.com/castai/promwrite v0.6.0
