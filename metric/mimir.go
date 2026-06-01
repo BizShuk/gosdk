@@ -15,6 +15,8 @@ type MimirService struct {
 	client *promwrite.Client
 }
 
+var globalMimirService *MimirService
+
 func init() {
 	viper.SetDefault("MIMIR_URL", "http://localhost:9009/api/v1/push")
 }
@@ -109,4 +111,31 @@ func (s *MimirService) SendMulti(metrics []Metric) error {
 
 func (s *MimirService) Send(metric Metric) error {
 	return s.SendMulti([]Metric{metric})
+}
+
+// Send sends metrics to Mimir via IMetric interface
+func Send(metrics []IMetric) error {
+	if len(metrics) == 0 {
+		return nil
+	}
+
+	if globalMimirService == nil {
+		globalMimirService = NewMimirService()
+	}
+
+	const batchSize = 50
+	for i := 0; i < len(metrics); i += batchSize {
+		end := min(i+batchSize, len(metrics))
+
+		var toSend []Metric
+		for _, m := range metrics[i:end] {
+			toSend = append(toSend, m.ConvertToMetric())
+		}
+
+		if err := globalMimirService.SendMulti(toSend); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

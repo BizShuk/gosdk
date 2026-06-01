@@ -1,6 +1,7 @@
 package metric
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -43,6 +44,36 @@ func TestMimirService_SendTest(t *testing.T) {
 }
 
 func TestToFloat64(t *testing.T) {
+	toFloat64 := func(v any) (float64, error) {
+		switch val := v.(type) {
+		case float64:
+			return val, nil
+		case float32:
+			return float64(val), nil
+		case int:
+			return float64(val), nil
+		case int64:
+			return float64(val), nil
+		case int32:
+			return float64(val), nil
+		case int16:
+			return float64(val), nil
+		case int8:
+			return float64(val), nil
+		case uint:
+			return float64(val), nil
+		case uint64:
+			return float64(val), nil
+		case uint32:
+			return float64(val), nil
+		case uint16:
+			return float64(val), nil
+		case uint8:
+			return float64(val), nil
+		default:
+			return 0, fmt.Errorf("unsupported metric value type: %T", v)
+		}
+	}
 	tests := []struct {
 		name    string
 		input   any
