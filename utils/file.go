@@ -203,14 +203,14 @@ func CreateIfNotExist(path string, defaultValue string) error {
 }
 
 // LoadCSV 是一個泛型函數，能將 CSV 檔案直接解析為任意指定結構體 (Structure) 的切片 (Slice)
-func LoadCSV[T any](inputPath string) ([]*T, error) {
+func LoadCSV[T any](inputPath string) ([]T, error) {
 	f, err := os.Open(inputPath)
 	if err != nil {
 		return nil, fmt.Errorf("open %s: %w", inputPath, err)
 	}
 	defer f.Close()
 
-	var records []*T
+	var records []T
 	if err := gocsv.UnmarshalFile(f, &records); err != nil {
 		return nil, fmt.Errorf("parse csv: %w", err)
 	}
