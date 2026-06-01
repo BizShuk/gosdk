@@ -312,4 +312,32 @@ func TestFileUtilities(t *testing.T) {
 			t.Errorf("expected %q, got %q", "home-value", string(homeData))
 		}
 	})
+
+	t.Run("LoadCSV", func(t *testing.T) {
+		type TestStruct struct {
+			ID   string `csv:"id"`
+			Name string `csv:"name"`
+		}
+		fpath := filepath.Join(tmpDir, "load_csv_test.csv")
+		content := "id,name\n1,Alice\n2,Bob\n"
+		if err := os.WriteFile(fpath, []byte(content), 0o644); err != nil {
+			t.Fatalf("failed to write mock csv file: %v", err)
+		}
+
+		records, err := LoadCSV[TestStruct](fpath)
+		if err != nil {
+			t.Fatalf("LoadCSV failed: %v", err)
+		}
+
+		if len(records) != 2 {
+			t.Fatalf("expected 2 records, got %d", len(records))
+		}
+
+		if records[0].ID != "1" || records[0].Name != "Alice" {
+			t.Errorf("unexpected record 0: %+v", records[0])
+		}
+		if records[1].ID != "2" || records[1].Name != "Bob" {
+			t.Errorf("unexpected record 1: %+v", records[1])
+		}
+	})
 }

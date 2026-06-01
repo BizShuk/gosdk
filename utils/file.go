@@ -93,9 +93,7 @@ func GetFileName(fpath string) string {
 	return fname
 }
 
-// ResolvePath resolves a path that may contain home directory (~),
-// environment variables ($HOME, ${HOME}), relative paths (./, ../),
-// or absolute paths. Returns an absolute, clean path.
+// Deprecated: use github.com/mitchellh/go-homedir or similar specialized package instead.
 func ResolvePath(path string) (string, error) {
 	// Expand environment variables first ($HOME, ${HOME}, etc.)
 	expanded := os.ExpandEnv(path)
@@ -202,4 +200,19 @@ func CreateIfNotExist(path string, defaultValue string) error {
 	}
 
 	return nil
+}
+
+// LoadCSV 是一個泛型函數，能將 CSV 檔案直接解析為任意指定結構體 (Structure) 的切片 (Slice)
+func LoadCSV[T any](inputPath string) ([]*T, error) {
+	f, err := os.Open(inputPath)
+	if err != nil {
+		return nil, fmt.Errorf("open %s: %w", inputPath, err)
+	}
+	defer f.Close()
+
+	var records []*T
+	if err := gocsv.UnmarshalFile(f, &records); err != nil {
+		return nil, fmt.Errorf("parse csv: %w", err)
+	}
+	return records, nil
 }
