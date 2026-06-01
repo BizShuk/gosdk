@@ -2,6 +2,7 @@ package metric
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -37,6 +38,37 @@ func sanitizeMetricName(name string) string {
 	return strings.ReplaceAll(name, ".", "_")
 }
 
+func toFloat64(v any) (float64, error) {
+	switch val := v.(type) {
+	case float64:
+		return val, nil
+	case float32:
+		return float64(val), nil
+	case int:
+		return float64(val), nil
+	case int64:
+		return float64(val), nil
+	case int32:
+		return float64(val), nil
+	case int16:
+		return float64(val), nil
+	case int8:
+		return float64(val), nil
+	case uint:
+		return float64(val), nil
+	case uint64:
+		return float64(val), nil
+	case uint32:
+		return float64(val), nil
+	case uint16:
+		return float64(val), nil
+	case uint8:
+		return float64(val), nil
+	default:
+		return 0, fmt.Errorf("unsupported metric value type: %T", v)
+	}
+}
+
 func (s *MimirService) SendMulti(metrics []Metric) error {
 	if len(metrics) == 0 {
 		return nil
@@ -44,6 +76,11 @@ func (s *MimirService) SendMulti(metrics []Metric) error {
 
 	var req promwrite.WriteRequest
 	for _, m := range metrics {
+		val, err := toFloat64(m.Value)
+		if err != nil {
+			return err
+		}
+
 		labels := []promwrite.Label{
 			{Name: "__name__", Value: sanitizeMetricName(m.Name)},
 		}
@@ -55,7 +92,7 @@ func (s *MimirService) SendMulti(metrics []Metric) error {
 			Labels: labels,
 			Sample: promwrite.Sample{
 				Time:  time.Unix(m.Timestamp, 0),
-				Value: m.Value,
+				Value: val,
 			},
 		})
 	}
