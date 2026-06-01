@@ -2,7 +2,7 @@ package metric
 
 // IMetric is an interface for types that can be converted to Metric
 type IMetric interface {
-	ConvertToMetric() Metric
+	ConvertToMetric() []Metric
 }
 
 type Metric struct {
