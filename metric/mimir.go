@@ -129,7 +129,7 @@ func Send(metrics []IMetric) error {
 
 		var toSend []Metric
 		for _, m := range metrics[i:end] {
-			toSend = append(toSend, m.ConvertToMetric())
+			toSend = append(toSend, m.ConvertToMetric()...)
 		}
 
 		if err := globalMimirService.SendMulti(toSend); err != nil {
