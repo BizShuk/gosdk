@@ -114,7 +114,7 @@ func (s *MimirService) Send(metric Metric) error {
 }
 
 // Send sends metrics to Mimir via IMetric interface
-func Send(metrics []IMetric) error {
+func Send[T IMetric](metrics []T) error {
 	if len(metrics) == 0 {
 		return nil
 	}
