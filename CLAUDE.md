@@ -5,12 +5,12 @@
 ```tree
 gosdk/
 ├── main.go                  # HTTP 伺服器入口
-├── go.mod                   # Go 1.25, module: github.com/bizshuk/gosdk
+├── go.mod                   # Go 1.26, module: github.com/bizshuk/gosdk
 ├── Makefile                 # build / test / generate / run / clean
 ├── version                  # 版本號檔案（語義版本，如 1.0.1）
 ├── outputgittag.sh          # 輸出 Git tag 格式的版本號腳本
 ├── build/
-│   └── dockerfile           # Multi-stage Docker 建置（golang:1.24-alpine）
+│   └── dockerfile           # Multi-stage Docker 建置（golang:1.26-alpine）
 ├── cmd/
 │   ├── gotmpl/              # Cobra CLI 模板渲染工具
 │   │   ├── main.go
@@ -111,7 +111,7 @@ gosdk/
 
 ## 技術棧 (Tech Stack)
 
-- Language: Go 1.25
+- Language: Go 1.26
 - Framework: `gin-gonic/gin` v1.11.0 (HTTP)
 - Build tool: `Makefile` + `go build`
 - Key dependencies:
@@ -170,7 +170,7 @@ gosdk/
 
 ### 前置需求 (Prerequisites)
 
-- Go 1.25+ 已安裝
+- Go 1.26+ 已安裝
 - CGO 支援（SQLite 驅動需要 `gcc`）
 - Git
 

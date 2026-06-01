@@ -1,6 +1,6 @@
 module github.com/bizshuk/gosdk
 
-go 1.25.0
+go 1.26.0
 
 retract (
 	v1.0.2 // 這些版本已被廢棄

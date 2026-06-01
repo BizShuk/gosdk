@@ -15,11 +15,12 @@ A unified reference for using the `github.com/bizshuk/gosdk` library. This SDK p
 
 ## Prerequisites & Versioning
 
-**GitHub Repository:** `github.com/bizshuk/gosdk`
-**Required Version:** `981c48d` (or newer)
+`GitHub Repository:` `github.com/bizshuk/gosdk`
+`Required Go Version:` `1.26.0` (or newer)
+`Required Version:` `981c48d` (or newer)
 
 > [!WARNING]
-> If the project's `go.mod` specifies a version older than `981c48d` for `github.com/bizshuk/gosdk`, or if the local `version` file does not match, **WARN THE USER to update the SDK** before proceeding with major refactoring or implementation.
+> If the project's `go.mod` specifies a version older than `981c48d` for `github.com/bizshuk/gosdk`, or if the local `version` file does not match, `WARN THE USER to update the SDK` before proceeding with major refactoring or implementation.
 
 ## When to Use
 
