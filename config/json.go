@@ -36,7 +36,6 @@ func (c *JsonConfig) Load() *viper.Viper {
 		}
 	}
 
-	zap.S().Infof("JsonConfig used: %s", v.ConfigFileUsed())
 	return v
 }
 

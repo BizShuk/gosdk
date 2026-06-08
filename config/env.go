@@ -36,7 +36,6 @@ func (c EnvConfig) Load() *viper.Viper {
 		}
 	}
 
-	zap.S().Infof("EnvConfig used: %s", v.ConfigFileUsed())
 	return v
 }
 

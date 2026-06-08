@@ -1,6 +1,8 @@
 package config
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -74,6 +76,20 @@ func Default(opts ...ConfigOption) {
 	viper.SetEnvPrefix("APP")
 	// 啟用環境變數的綁定 環境變數中的底線 '_' 會被視為點號 '.'
 	viper.AutomaticEnv()
+
+	// 步驟 1: 匯出所有設定 (AllSettings)
+	settings := viper.AllSettings()
+
+	// 步驟 2 & 3: 轉換成 Inline JSON 字串
+	jsonBytes, err := json.Marshal(settings)
+	if err != nil {
+		fmt.Printf("轉換 JSON 失敗: %v\n", err)
+		return
+	}
+
+	// 輸出結果
+	inlineJSON := string(jsonBytes)
+	zap.S().Infof("Config Loaded:", inlineJSON)
 }
 
 // DefaultWithDir 允許自訂設定檔目錄，並載入設定。

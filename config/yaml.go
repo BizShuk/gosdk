@@ -36,7 +36,6 @@ func (c *YamlConfig) Load() *viper.Viper {
 		}
 	}
 
-	zap.S().Infof("YamlConfig used: %s", v.ConfigFileUsed())
 	return v
 }
 
