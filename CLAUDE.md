@@ -144,27 +144,27 @@ gosdk/
 
 以下是兩者的詳細對照表：
 
-| 特性 (Feature) | 使用 Mimir 發送 (`gosdk/metric`) | 使用 OpenTelemetry 發送 (`go.opentelemetry.io/otel`) |
-| :--- | :--- | :--- |
-| `傳輸協定 (Protocol)` | Prometheus 遠端寫入 (Prometheus remote-write) | OpenTelemetry 協定 (OTLP) |
-| `依賴大小 (Dependency)` | 極度輕量（僅需 HTTP 協定與 Protobuf 定義） | 較為龐大（需要完整的 OTel SDK 與相關插件） |
-| `生命週期 (Lifecycle)` | 無需特殊管理，隨呼叫發送，不需要 `Shutdown` 釋放資源 | 需要配置 `MeterProvider`、`Exporter` 並於程式結束前進行 `Shutdown` |
-| `批次發送 (Batching)` | 由開發者在程式碼中主動呼叫 `SendMulti` 控制批次邊界 | 由 SDK 的觀測週期 (`PeriodicReader`) 背景自動收集並定期發送 |
-| `指標轉換 (Sanitization)` | `gosdk` 自動將指標名稱中的 `.` 轉換為 `_` 以符合 Prometheus 規範 | 開發者必須手動定義符合 OTel 與 Prometheus 相容的指標名稱與屬性 |
+| 特性 (Feature)            | 使用 Mimir 發送 (`gosdk/metric`)                                 | 使用 OpenTelemetry 發送 (`go.opentelemetry.io/otel`)               |
+| :------------------------ | :--------------------------------------------------------------- | :----------------------------------------------------------------- |
+| `傳輸協定 (Protocol)`     | Prometheus 遠端寫入 (Prometheus remote-write)                    | OpenTelemetry 協定 (OTLP)                                          |
+| `依賴大小 (Dependency)`   | 極度輕量（僅需 HTTP 協定與 Protobuf 定義）                       | 較為龐大（需要完整的 OTel SDK 與相關插件）                         |
+| `生命週期 (Lifecycle)`    | 無需特殊管理，隨呼叫發送，不需要 `Shutdown` 釋放資源             | 需要配置 `MeterProvider`、`Exporter` 並於程式結束前進行 `Shutdown` |
+| `批次發送 (Batching)`     | 由開發者在程式碼中主動呼叫 `SendMulti` 控制批次邊界              | 由 SDK 的觀測週期 (`PeriodicReader`) 背景自動收集並定期發送        |
+| `指標轉換 (Sanitization)` | `gosdk` 自動將指標名稱中的 `.` 轉換為 `_` 以符合 Prometheus 規範 | 開發者必須手動定義符合 OTel 與 Prometheus 相容的指標名稱與屬性     |
 
 ## 模組對應 (Module Mapping)
 
-| 業務領域 (Domain)     | 套件/模組 (Package/Module)              | 進入點 (Entry Point)        |
-| --------------------- | --------------------------------------- | --------------------------- |
-| 設定管理              | `config/`, `config/common/`             | `config.Default()`          |
-| HTTP 服務             | `router/`, `mw/`, `main.go`             | `HTTPServer()`              |
-| 程式碼產生 — stringer | `cmd/stringer/`, `service/generator.go` | `cmd/stringer/main.go`      |
-| 程式碼產生 — gotmpl   | `cmd/gotmpl/`                           | `cmd/gotmpl/main.go`        |
-| 版本管理              | `cmd/versioning/`                       | `cmd/versioning/main.go`    |
-| 通用通知              | `notify/`                               | 各通知器獨立建構與呼叫      |
-| 排程管理              | `scheduler/`                            | `scheduler.New()`           |
-| 編碼與資料處理        | `encode/`, `utils/`, `time/`            | 各函式獨立呼叫              |
-| 日誌與觀測            | `log/`                                  | `log.Init()`                |
+| 業務領域 (Domain)     | 套件/模組 (Package/Module)              | 進入點 (Entry Point)     |
+| --------------------- | --------------------------------------- | ------------------------ |
+| 設定管理              | `config/`, `config/common/`             | `config.Default()`       |
+| HTTP 服務             | `router/`, `mw/`, `main.go`             | `HTTPServer()`           |
+| 程式碼產生 — stringer | `cmd/stringer/`, `service/generator.go` | `cmd/stringer/main.go`   |
+| 程式碼產生 — gotmpl   | `cmd/gotmpl/`                           | `cmd/gotmpl/main.go`     |
+| 版本管理              | `cmd/versioning/`                       | `cmd/versioning/main.go` |
+| 通用通知              | `notify/`                               | 各通知器獨立建構與呼叫   |
+| 排程管理              | `scheduler/`                            | `scheduler.New()`        |
+| 編碼與資料處理        | `encode/`, `utils/`, `time/`            | 各函式獨立呼叫           |
+| 日誌與觀測            | `log/`                                  | `log.Init()`             |
 
 ## 開發指南 (Development Guide)
 
@@ -242,18 +242,18 @@ GitHub Actions workflow 定義於 `.github/workflows/ci.yml`，於 push/PR 至 `
 
 ## 模組對應 (Module Mapping)
 
-| 業務領域 (Domain)     | 套件/模組 (Package/Module)              | 進入點 (Entry Point)        |
-| --------------------- | --------------------------------------- | --------------------------- |
-| 設定管理              | `config/`, `config/common/`             | `config.Default()`          |
-| HTTP 服務             | `router/`, `mw/`, `main.go`             | `HTTPServer()`              |
-| 程式碼產生 — stringer | `cmd/stringer/`, `service/generator.go` | `cmd/stringer/main.go`      |
-| 程式碼產生 — gotmpl   | `cmd/gotmpl/`                           | `cmd/gotmpl/main.go`        |
-| 版本管理              | `cmd/versioning/`                       | `cmd/versioning/main.go`    |
-| 通用通知              | `notify/`                               | 各通知器獨立建構與呼叫      |
-| 排程管理太             | `scheduler/`                            | `scheduler.New()`           |
-| OpenTelemetry 監控    | `metric/`                               | `metric.InitMeterProvider()`|
-| 編碼與資料處理        | `encode/`, `utils/`, `time/`            | 各函式獨立呼叫              |
-| 日誌與觀測            | `log/`                                  | `log.Init()`                |
+| 業務領域 (Domain)     | 套件/模組 (Package/Module)              | 進入點 (Entry Point)         |
+| --------------------- | --------------------------------------- | ---------------------------- |
+| 設定管理              | `config/`, `config/common/`             | `config.Default()`           |
+| HTTP 服務             | `router/`, `mw/`, `main.go`             | `HTTPServer()`               |
+| 程式碼產生 — stringer | `cmd/stringer/`, `service/generator.go` | `cmd/stringer/main.go`       |
+| 程式碼產生 — gotmpl   | `cmd/gotmpl/`                           | `cmd/gotmpl/main.go`         |
+| 版本管理              | `cmd/versioning/`                       | `cmd/versioning/main.go`     |
+| 通用通知              | `notify/`                               | 各通知器獨立建構與呼叫       |
+| 排程管理太            | `scheduler/`                            | `scheduler.New()`            |
+| OpenTelemetry 監控    | `metric/`                               | `metric.InitMeterProvider()` |
+| 編碼與資料處理        | `encode/`, `utils/`, `time/`            | 各函式獨立呼叫               |
+| 日誌與觀測            | `log/`                                  | `log.Init()`                 |
 
 ## 慣例 (Conventions)
 
