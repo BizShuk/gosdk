@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/bizshuk/gosdk/config"
-	"github.com/bizshuk/gosdk/config/common"
+	"github.com/bizshuk/gosdk/db"
 	"github.com/bizshuk/gosdk/log"
 	"github.com/bizshuk/gosdk/mw"
 	"github.com/bizshuk/gosdk/router"
@@ -21,14 +21,26 @@ func main() {
 	log.Init()
 	zap.S().Info("Configurations loaded successfully.")
 
-	// 3. Connect DB
-	dbConfigs := viper.GetStringMap("db")
-	if len(dbConfigs) > 0 {
-		_, err := common.NewDBConfig("default").Create()
-		if err != nil {
-			zap.S().Errorf("Database connection failed: %v", err)
+	// 3. Connect DB(僅在對應 viper key 有設定時才初始化)
+	if viper.IsSet("SQLITE_PATH") {
+		if err := db.InitSQLite(); err != nil {
+			zap.S().Errorf("SQLite connection failed: %v", err)
 		} else {
-			zap.S().Info("Database connected successfully.")
+			zap.S().Info("SQLite connected successfully.")
+		}
+	}
+	if viper.IsSet("MYSQL_DSN") {
+		if err := db.InitMySQL(); err != nil {
+			zap.S().Errorf("MySQL connection failed: %v", err)
+		} else {
+			zap.S().Info("MySQL connected successfully.")
+		}
+	}
+	if viper.IsSet("POSTGRES_DSN") {
+		if err := db.InitPostgres(); err != nil {
+			zap.S().Errorf("PostgreSQL connection failed: %v", err)
+		} else {
+			zap.S().Info("PostgreSQL connected successfully.")
 		}
 	}
 

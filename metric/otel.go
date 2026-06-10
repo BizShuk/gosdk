@@ -36,7 +36,7 @@ func Tracer(name string, opts ...trace.TracerOption) trace.Tracer {
 }
 
 func init() {
-	viper.SetDefault("METRIC_URL", "http://localhost:8428/opentelemetry/v1/metrics")
+	viper.SetDefault("OTLP_METRIC_URL", "http://localhost:8428/opentelemetry/v1/metrics")
 }
 
 // InitMeterProvider initializes the SDK MeterProvider, registers it globally, and caches it.
@@ -48,7 +48,7 @@ func InitMeterProvider(ctx context.Context) error {
 		return nil
 	}
 
-	metricURL := viper.GetString("METRIC_URL")
+	metricURL := viper.GetString("OTLP_METRIC_URL")
 
 	var opts []otlpmetrichttp.Option
 	opts = append(opts, otlpmetrichttp.WithEndpointURL(metricURL))
@@ -80,7 +80,7 @@ func InitMeterProvider(ctx context.Context) error {
 }
 
 // InitTracerProvider initializes the SDK TracerProvider, registers it globally, and caches it.
-// The endpoint is read from the TEMPO_URL config key (empty string disables a custom endpoint).
+// The endpoint is read from the OTLP_TRACE_URL config key (empty string disables a custom endpoint).
 func InitTracerProvider(ctx context.Context) error {
 	traceMu.Lock()
 	defer traceMu.Unlock()
@@ -89,12 +89,12 @@ func InitTracerProvider(ctx context.Context) error {
 		return nil
 	}
 
-	tempoURL := viper.GetString("TEMPO_URL")
+	traceURL := viper.GetString("OTLP_TRACE_URL")
 
 	var opts []otlptracehttp.Option
-	if tempoURL != "" {
-		opts = append(opts, otlptracehttp.WithEndpointURL(tempoURL))
-		if len(tempoURL) >= 7 && tempoURL[:7] == "http://" {
+	if traceURL != "" {
+		opts = append(opts, otlptracehttp.WithEndpointURL(traceURL))
+		if len(traceURL) >= 7 && traceURL[:7] == "http://" {
 			opts = append(opts, otlptracehttp.WithInsecure())
 		}
 	} else {

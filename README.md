@@ -6,7 +6,7 @@ Go 語言通用開發工具包 (Shared SDK)，提供設定管理、HTTP 服務�
 
 ### 設定管理 (Configuration Management)
 
-統一管理應用程式設定來源，支援 `.env`、YAML、JSON 及 `embed.FS` 四種格式，透過 Viper 實現階層式設定合併。各格式採用雙檔案載入模式：固定讀取 base 檔案（`.env`、`config.yaml`、`settings.json`），再合併同名 `.local` 覆寫檔（`.env.local`、`config.local.yaml`、`settings.local.json`），不再依賴 `PROFILE` 環境變數。同時支援 `APP_` 前綴環境變數自動綁定，並提供資料庫連線工廠，透過設定驅動建立 GORM ORM 連線（支援 MySQL、SQLite）。
+統一管理應用程式設定來源，支援 `.env`、YAML、JSON 及 `embed.FS` 四種格式，透過 Viper 實現階層式設定合併。各格式採用雙檔案載入模式：固定讀取 base 檔案（`.env`、`config.yaml`、`settings.json`），再合併同名 `.local` 覆寫檔（`.env.local`、`config.local.yaml`、`settings.local.json`），不再依賴 `PROFILE` 環境變數。同時支援 `APP_` 前綴環境變數自動綁定。DB 連線另由獨立的 `db` 套件負責（見下一節），不在 `config/` 範圍。
 
 `領域流程 (Domain Flow):`
 
@@ -17,9 +17,30 @@ Go 語言通用開發工具包 (Shared SDK)，提供設定管理、HTTP 服務�
 5. 啟用 `APP_` 前綴環境變數自動綁定（`viper.AutomaticEnv()`）
 6. 下游模組透過 `viper.GetString()` 或 `viper.Unmarshal()` 取得設定值
 
-`核心實體 (Key Entities):` `Config` 介面, `ConfigSchema`, `EnvConfig`, `YamlConfig`, `JsonConfig`, `FSConfig`, `DBConfig`, `ServerConfig`, `DBConnConfig`
+`核心實體 (Key Entities):` `Config` 介面, `EnvConfig`, `YamlConfig`, `JsonConfig`, `FSConfig`
 
-`相關處理器 (Related Handlers):` `config.Default()`, `config.DefaultWithDir()`, `NewEnvConfig()`, `NewYamlConfig()`, `NewJsonConfig()`, `NewFSConfig()`, `common.NewDBConfig()`, `common.DatabaseFactory()`, `NewMySQL()`, `NewSQLite()`
+`相關處理器 (Related Handlers):` `config.Default()`, `config.DefaultWithDir()`, `NewEnvConfig()`, `NewYamlConfig()`, `NewJsonConfig()`, `NewFSConfig()`
+
+---
+
+### 資料庫連線 (Database Services)
+
+每種儲存型態是一個獨立的 service:有自己的型別、自己的全域 singleton、自己的扁平 viper key (例如 `SQLITE_PATH`、`MYSQL_DSN`、`POSTGRES_DSN`)。micro-service 概念下,一個 process 內不應該存在兩個同型態的 service;`InitSQLite()` / `InitMySQL()` / `InitPostgres()` 在第二次呼叫時會回傳 error,守護 singleton 不變性。
+
+`領域流程 (Domain Flow):`
+
+1. `config.Default()` 載入設定後,呼叫端用 `viper.IsSet("SQLITE_PATH")` / `viper.IsSet("MYSQL_DSN")` / `viper.IsSet("POSTGRES_DSN")` 判斷是否啟用該儲存
+2. 呼叫 `db.InitSQLite()` / `db.InitMySQL()` / `db.InitPostgres()` 從 viper 讀取設定、開啟連線、設為 singleton
+3. 任何地方透過 `db.DefaultSQLite.DB()` / `db.DefaultMySQL.DB()` / `db.DefaultPostgres.DB()` 取得 `*gorm.DB`
+4. 結束時呼叫 `db.DefaultSQLite.Close()` / `db.DefaultMySQL.Close()` / `db.DefaultPostgres.Close()` 釋放連線
+
+`核心實體 (Key Entities):` `Service` 介面, `SQLite` struct, `MySQL` struct, `Postgres` struct, `DefaultSQLite` / `DefaultMySQL` / `DefaultPostgres` singleton
+
+`相關處理器 (Related Handlers):` `db.InitSQLite()`, `db.InitMySQL()`, `db.InitPostgres()`, `db.DefaultSQLite.DB()`, `db.DefaultSQLite.Close()`, `db.DefaultMySQL.DB()`, `db.DefaultMySQL.Close()`, `db.DefaultPostgres.DB()`, `db.DefaultPostgres.Close()`
+
+---
+
+### HTTP 服務 (HTTP Service)
 
 ---
 
@@ -165,35 +186,41 @@ Go 語言通用開發工具包 (Shared SDK)，提供設定管理、HTTP 服務�
 
 ### 指標監控 (Metrics & Tracing)
 
-提供兩種指標發送方式：(A) 透過 `RemoteWriteService` 以 Prometheus remote-write 協定直接推送至 VictoriaMetrics、Mimir 等後端；(B) 透過 OpenTelemetry SDK（`InitMeterProvider` + `InitTracerProvider`）以 OTLP HTTP 協定發送 metrics 與 traces。兩者後端 URL 皆由 Viper 設定注入。
+提供兩種指標發送方式：(A) 透過 `MetricService` 以 Prometheus remote-write 協定直接推送至 VictoriaMetrics、Mimir 等後端；(B) 透過 OpenTelemetry SDK（`InitMeterProvider` + `InitTracerProvider`）以 OTLP HTTP 協定發送 metrics 與 traces。兩者後端 URL 皆由 Viper 設定注入。
 
 `環境變數 (Config Keys):`
 
 | 變數 | 預設值 | 用途 |
 | --- | --- | --- |
+| `METRIC_URL` | `http://localhost:8428/api/v1/write` | Remote write — 通用後端 |
 | `VICTORIAMETRICS_URL` | `http://localhost:8428/api/v1/write` | Remote write — VictoriaMetrics |
 | `MIMIR_URL` | `http://localhost:9009/api/v1/push` | Remote write — Mimir (compat) |
-| `REMOTE_WRITE_URL` | `http://localhost:8428/api/v1/write` | Remote write — 通用後端 |
-| `METRIC_URL` | `http://localhost:8428/opentelemetry/v1/metrics` | OTLP metrics 端點 |
-| `TEMPO_URL` | `""` (空 = OTLP 預設 `localhost:4318`) | OTLP traces 端點 |
+| `OTLP_METRIC_URL` | `http://localhost:8428/opentelemetry/v1/metrics` | OTLP metrics 端點 |
+| `OTLP_TRACE_URL` | `""` (空 = OTLP 預設 `localhost:4318`) | OTLP traces 端點 |
 
 `領域流程 (Domain Flow) — Remote Write:`
 
-1. 呼叫 `NewVictoriaMetricsService()` / `NewMimirService()` / `NewRemoteWriteService(url)` 建立服務
+1. 呼叫 `NewMetricService(url)`（空字串 = 讀 `METRIC_URL`）/ `NewVictoriaMetricsService()` / `NewMimirService()` 建立服務
 2. 呼叫 `svc.Send(metric)` 或 `svc.SendMulti(metrics)` 批次推送
-3. `RemoteWriteService` 自動將 metric name 中 `.` 轉換為 `_`（Prometheus 規範）
+3. `MetricService` 自動將 metric name 中 `.` 轉換為 `_`（Prometheus 規範）
 4. Timestamp 使用 epoch seconds (`time.Now().Unix()`)
 
 `領域流程 (Domain Flow) — OpenTelemetry:`
 
-1. `metric.InitMeterProvider(ctx)` — 初始化全域 `MeterProvider`，讀取 `METRIC_URL`
-2. `metric.InitTracerProvider(ctx)` — 初始化全域 `TracerProvider`，讀取 `TEMPO_URL`
+1. `metric.InitMeterProvider(ctx)` — 初始化全域 `MeterProvider`，讀取 `OTLP_METRIC_URL`
+2. `metric.InitTracerProvider(ctx)` — 初始化全域 `TracerProvider`，讀取 `OTLP_TRACE_URL`
 3. `metric.Meter(name)` / `metric.Tracer(name)` 取得 meter/tracer 實例
 4. 應用程式結束前呼叫 `metric.ShutdownOTel(ctx)` 排空緩衝資料
 
-`核心實體 (Key Entities):` `RemoteWriteService`, `MimirService` (alias), `Metric`, `IMetric`
+`領域流程 (Domain Flow) — Cobra CLI Hook:`
 
-`相關處理器 (Related Handlers):` `NewVictoriaMetricsService()`, `NewMimirService()`, `NewRemoteWriteService()`, `RemoteWriteService.Send()`, `RemoteWriteService.SendMulti()`, `Send[T]()`, `InitMeterProvider()`, `InitTracerProvider()`, `ShutdownOTel()`, `Meter()`, `Tracer()`
+1. `metric.CobraCMDHook(root)` — 在 root command 掛上 PersistentPreRunE hook
+2. 每次 CLI 執行送出 `command_line_trigger{cmd="root sub leaf", flag="a-b-c"}`（flag 為使用者實際設定的 flags，字母排序以 `-` 串接）
+3. 後端由 `METRIC_URL` 控制（透過 `NewMetricService("")`）
+
+`核心實體 (Key Entities):` `MetricService`, `MimirService` (alias), `Metric`, `IMetric`
+
+`相關處理器 (Related Handlers):` `NewMetricService()`, `NewVictoriaMetricsService()`, `NewMimirService()`, `MetricService.Send()`, `MetricService.SendMulti()`, `Send[T]()`, `CobraCMDHook()`, `InitMeterProvider()`, `InitTracerProvider()`, `ShutdownOTel()`, `Meter()`, `Tracer()`
 
 ---
 
@@ -213,7 +240,6 @@ Go 語言通用開發工具包 (Shared SDK)，提供設定管理、HTTP 服務�
 
 ```go
 import "github.com/bizshuk/gosdk/config"
-import "github.com/bizshuk/gosdk/config/common"
 import "github.com/spf13/viper"
 
 // 方式 1：載入預設設定（從當前目錄或 CONFIG_DIR 環境變數載入）
@@ -225,9 +251,30 @@ config.Default()
 
 // 方式 3：直接呼叫帶有自訂路徑的初始化函式
 config.DefaultWithDir("/custom/path")
+```
 
-dbCfg := common.NewDBConfig("default")    // 從 db.default 區段建立資料庫設定
-conn, _ := dbCfg.Create()                 // 工廠模式建立 GORM 連線
+### 資料庫連線
+
+```go
+import "github.com/bizshuk/gosdk/db"
+import "github.com/spf13/viper"
+
+config.Default()
+
+// 僅在對應 viper key 有設定時才初始化
+if viper.IsSet("SQLITE_PATH") {
+    if err := db.InitSQLite(); err != nil { /* 處理錯誤 */ }
+}
+if viper.IsSet("MYSQL_DSN") {
+    if err := db.InitMySQL(); err != nil { /* 處理錯誤 */ }
+}
+if viper.IsSet("POSTGRES_DSN") {
+    if err := db.InitPostgres(); err != nil { /* 處理錯誤 */ }
+}
+
+// 之後任何地方透過 singleton 取用 *gorm.DB
+gormDB := db.DefaultSQLite.DB()
+defer db.DefaultSQLite.Close()
 ```
 
 ### HTTP 服務
@@ -326,6 +373,6 @@ Based on codebase analysis:
 
 - [ ] 排程器與通知器整合範例：`scheduler` 與 `notify` 兩個套件設計上可以搭配使用（週期任務完成後推送通知），但目前缺少官方範例或整合測試，建議在 `sample/` 目錄補充完整使用範例
 - [ ] `versioning` CLI 缺少 reset 與 set 子命令：目前只能遞增版本號，若需要直接設定特定版本（如 release hotfix 時跳號）無法支援，建議新增 `set <version>` 子命令
-- [ ] `ConfigSchema.DB` 為 `map[string]DBConfig`，但 `common.NewDBConfig()` 需要手動傳入 key 名稱：若設定中只有單一資料庫，呼叫方需知道預設 key 名稱（`"default"`），建議在文件或設定範例中明確定義約定的 key 名稱
 - [ ] 安全性增強：`mw.Helmet()` 中 `X-XSS-Protection` 標頭已被現代瀏覽器棄用，建議改用 `Permissions-Policy` 或 `Cross-Origin-Opener-Policy` 等現代標頭
 - [ ] `notify.SlackNotifier` 缺少重試機制：Slack API 呼叫若因網路問題失敗，目前直接回傳 error，建議加入指數退避重試或將重試邏輯委托給呼叫方約定
+- [ ] `db` 套件目前支援 SQLite、MySQL、PostgreSQL,若需要 Redis 等 key-value 儲存或 MongoDB 等文件資料庫,因 GORM 慣例不適用,需另開套件(`cache/` / `document/`)並定義新 service 介面

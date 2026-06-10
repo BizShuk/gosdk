@@ -6,15 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/bizshuk/gosdk/config/common"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
-)
-
-type (
-	ServerConfig = common.ServerConfig
-	DBConnConfig = common.DBConnConfig
-	ConfigSchema = common.ConfigSchema
 )
 
 type Config interface {

@@ -19,19 +19,21 @@ import (
 	"fmt"
 
 	"github.com/bizshuk/gosdk/config"
-	"github.com/bizshuk/gosdk/config/common"
+	"github.com/bizshuk/gosdk/db"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 )
 
 // AppConfig 自訂設定結構，對應 yaml 中的所有設定區塊。
 // 此結構用於示範，可根據實際需求調整欄位。
+//
+// 註:DB 設定在新設計下不再統一放在 `db:` 巢狀區塊,而是每個儲存型態
+// 各自有扁平 viper key (例如 SQLITE_PATH),由 db.InitSQLite() 自行讀取。
 type AppConfig struct {
-	Name     string                 `mapstructure:"name"`
-	Version  string                 `mapstructure:"version"`
-	LogLevel string                 `mapstructure:"log_level"`
-	Server   ServerConfig           `mapstructure:"server"`
-	DB       map[string]common.DBConfig `mapstructure:"db"`
+	Name     string       `mapstructure:"name"`
+	Version  string       `mapstructure:"version"`
+	LogLevel string       `mapstructure:"log_level"`
+	Server   ServerConfig `mapstructure:"server"`
 }
 
 type ServerConfig struct {
@@ -110,16 +112,14 @@ func main() {
 	}
 	zap.L().Info("unmarshal server", zap.Any("value", serverConfig))
 
-	// --- 用法 5：透過 db helper 從 viper 取出設定並建立 *gorm.DB ---
-	// NewDBConfig("default") 會讀取 db.default.driver / db.default.url，
-	// 並依 driver 字串委派給 sqlite / mysql 的具體實作。
-	gormDB, err := common.NewDBConfig("default").Create()
-	if err != nil {
+	// --- 用法 5：透過 db package 從 viper 取出設定並建立 *gorm.DB ---
+	// InitSQLite() 會讀取 SQLITE_PATH,建立 *SQLite service 並設為 DefaultSQLite singleton。
+	if err := db.InitSQLite(); err != nil {
 		zap.L().Error("db connect failed", zap.Error(err))
 		return
 	}
-	sqlDB, _ := gormDB.DB()
-	defer sqlDB.Close()
+	defer func() { _ = db.DefaultSQLite.Close() }()
+	gormDB := db.DefaultSQLite.DB()
 	zap.L().Info("db driver", zap.String("name", gormDB.Name()))
 
 	// --- 用法 6：印出所有 key/value，方便除錯 ---

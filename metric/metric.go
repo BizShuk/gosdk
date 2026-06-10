@@ -14,8 +14,8 @@ import (
 // MetricService pushes metrics to any Prometheus remote-write compatible
 // backend. Backends differ only in the endpoint URL.
 //
-// Reference endpoints — remote write (this service, REMOTE_WRITE_URL) vs
-// OTLP HTTP (otel.go, METRIC_URL):
+// Reference endpoints — remote write (this service, METRIC_URL) vs
+// OTLP HTTP (otel.go, OTLP_METRIC_URL):
 //
 //	VictoriaMetrics
 //	  remote write: http://localhost:8428/api/v1/write
@@ -33,14 +33,14 @@ type MetricService struct {
 var globalMetricService *MetricService
 
 func init() {
-	viper.SetDefault("REMOTE_WRITE_URL", "http://localhost:8428/api/v1/write")
+	viper.SetDefault("METRIC_URL", "http://localhost:8428/api/v1/write")
 }
 
 // NewMetricService creates a service for the given remote-write endpoint.
-// An empty url falls back to the REMOTE_WRITE_URL config (default: VictoriaMetrics).
+// An empty url falls back to the METRIC_URL config (default: VictoriaMetrics).
 func NewMetricService(url string) *MetricService {
 	if url == "" {
-		url = viper.GetString("REMOTE_WRITE_URL")
+		url = viper.GetString("METRIC_URL")
 	}
 	httpClient := &http.Client{
 		Timeout: 30 * time.Second,
@@ -133,7 +133,7 @@ func (s *MetricService) Send(metric Metric) error {
 }
 
 // Send sends metrics to the remote-write backend configured by
-// REMOTE_WRITE_URL via IMetric interface. Point REMOTE_WRITE_URL at another
+// METRIC_URL via IMetric interface. Point METRIC_URL at another
 // backend (e.g. Mimir's :9009/api/v1/push) to switch targets.
 func Send[T IMetric](metrics []T) error {
 	if len(metrics) == 0 {

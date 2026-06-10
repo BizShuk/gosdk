@@ -4,7 +4,8 @@ server:
   host: 0.0.1.0 from config.local.yaml
   port: 1234
 
-db:
-  default:
-    driver: sqlite
-    url: ./sample.db
+# 新設計:DB 設定採扁平 <TYPE>_<FIELD> viper key(全大寫、底線分隔),
+# 由 db.InitSQLite() / db.InitMySQL() 自行讀取。
+# yaml key 必須與 Go 程式內的 viper.GetString() 字面一致,
+# 對應 env var 為 APP_<TYPE>_<FIELD>(沿用 config.Default() 的 APP_ 前綴慣例)。
+SQLITE_PATH: ./sample.db
