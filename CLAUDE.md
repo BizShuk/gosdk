@@ -153,7 +153,7 @@ gosdk/
 | `批次發送 (Batching)`     | 由開發者在程式碼中主動呼叫 `SendMulti` 控制批次邊界              | 由 SDK 的觀測週期 (`PeriodicReader`) 背景自動收集並定期發送        |
 | `指標轉換 (Sanitization)` | `gosdk` 自動將指標名稱中的 `.` 轉換為 `_` 以符合 Prometheus 規範 | 開發者必須手動定義符合 OTel 與 Prometheus 相容的指標名稱與屬性     |
 
-後端選擇透過 URL 注入：`MetricService` 對 VictoriaMetrics（`REMOTE_WRITE_URL`，預設 `:8428/api/v1/write`）、Mimir（`MIMIR_URL`，`:9009/api/v1/push`）等任何 remote-write 相容後端通用；OTLP 路徑由 `METRIC_URL` 控制（預設 VictoriaMetrics `:8428/opentelemetry/v1/metrics`）。`MimirService` / `NewMimirService()` 是 MetricService 的型別別名，讀 MIMIR_URL 設定。
+後端選擇透過 URL 注入：`RemoteWriteService` 對 VictoriaMetrics（`VICTORIAMETRICS_URL`，預設 `:8428/api/v1/write`）、Mimir（`MIMIR_URL`，`:9009/api/v1/push`）等任何 remote-write 相容後端通用；OTLP metrics 路徑由 `METRIC_URL` 控制（預設 VictoriaMetrics `:8428/opentelemetry/v1/metrics`）；OTLP traces 路徑由 `TEMPO_URL` 控制（空字串 = OTLP 預設 `localhost:4318`）。`MimirService` / `NewMimirService()` 保留為 Deprecated 相容層。
 
 ## 模組對應 (Module Mapping)
 
@@ -168,6 +168,7 @@ gosdk/
 | 排程管理              | `scheduler/`                            | `scheduler.New()`        |
 | 編碼與資料處理        | `encode/`, `utils/`, `time/`            | 各函式獨立呼叫           |
 | 日誌與觀測            | `log/`                                  | `log.Init()`             |
+| 指標監控              | `metric/`                               | 見第二個模組對應表       |
 
 ## 開發指南 (Development Guide)
 
@@ -245,18 +246,20 @@ GitHub Actions workflow 定義於 `.github/workflows/ci.yml`，於 push/PR 至 `
 
 ## 模組對應 (Module Mapping)
 
-| 業務領域 (Domain)     | 套件/模組 (Package/Module)              | 進入點 (Entry Point)         |
-| --------------------- | --------------------------------------- | ---------------------------- |
-| 設定管理              | `config/`, `config/common/`             | `config.Default()`           |
-| HTTP 服務             | `router/`, `mw/`, `main.go`             | `HTTPServer()`               |
-| 程式碼產生 — stringer | `cmd/stringer/`, `service/generator.go` | `cmd/stringer/main.go`       |
-| 程式碼產生 — gotmpl   | `cmd/gotmpl/`                           | `cmd/gotmpl/main.go`         |
-| 版本管理              | `cmd/versioning/`                       | `cmd/versioning/main.go`     |
-| 通用通知              | `notify/`                               | 各通知器獨立建構與呼叫       |
-| 排程管理太            | `scheduler/`                            | `scheduler.New()`            |
-| OpenTelemetry 監控    | `metric/`                               | `metric.InitMeterProvider()` |
-| 編碼與資料處理        | `encode/`, `utils/`, `time/`            | 各函式獨立呼叫               |
-| 日誌與觀測            | `log/`                                  | `log.Init()`                 |
+| 業務領域 (Domain)     | 套件/模組 (Package/Module)              | 進入點 (Entry Point)          |
+| --------------------- | --------------------------------------- | ----------------------------- |
+| 設定管理              | `config/`, `config/common/`             | `config.Default()`            |
+| HTTP 服務             | `router/`, `mw/`, `main.go`             | `HTTPServer()`                |
+| 程式碼產生 — stringer | `cmd/stringer/`, `service/generator.go` | `cmd/stringer/main.go`        |
+| 程式碼產生 — gotmpl   | `cmd/gotmpl/`                           | `cmd/gotmpl/main.go`          |
+| 版本管理              | `cmd/versioning/`                       | `cmd/versioning/main.go`      |
+| 通用通知              | `notify/`                               | 各通知器獨立建構與呼叫        |
+| 排程管理太            | `scheduler/`                            | `scheduler.New()`             |
+| OTel 指標             | `metric/`                               | `metric.InitMeterProvider()`  |
+| OTel Tracer           | `metric/`                               | `metric.InitTracerProvider()` |
+| Remote Write 指標     | `metric/`                               | `NewVictoriaMetricsService()` |
+| 編碼與資料處理        | `encode/`, `utils/`, `time/`            | 各函式獨立呼叫                |
+| 日誌與觀測            | `log/`                                  | `log.Init()`                  |
 
 ## 慣例 (Conventions)
 

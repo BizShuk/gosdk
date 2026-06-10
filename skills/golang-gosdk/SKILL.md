@@ -244,7 +244,7 @@ Key behaviors of `RemoteWriteService`:
 #### Option B: OpenTelemetry (OTLP Metrics & Tracing)
 
 Use the standard OpenTelemetry SDK to collect metrics and export traces. This requires initializing the Meter and Tracer Providers and ensuring they are shut down when the application terminates.
-The metric endpoint is read from `METRIC_URL` (default: `http://localhost:8428/opentelemetry/v1/metrics` — VictoriaMetrics OTLP receiver), and the trace endpoint is read from `TEMPO_URL`. Note: the `tempoURL` parameter of `InitTracerProvider` is currently ignored — the `TEMPO_URL` config always wins; pass `""`.
+The metric endpoint is read from `METRIC_URL` (default: `http://localhost:8428/opentelemetry/v1/metrics` — VictoriaMetrics OTLP receiver). The trace endpoint is read from `TEMPO_URL` config key — if empty, the OTLP default endpoint (`localhost:4318`) is used.
 
 ```go
 import (
@@ -268,7 +268,7 @@ func InitMetric() {
     if err := metric.InitMeterProvider(ctx); err != nil {
         panic(err)
     }
-    if err := metric.InitTracerProvider(ctx, ""); err != nil { // tempoURL param is ignored; TEMPO_URL config is always used
+    if err := metric.InitTracerProvider(ctx); err != nil { // endpoint from TEMPO_URL config; empty = OTLP default (localhost:4318)
         panic(err)
     }
 

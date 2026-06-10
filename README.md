@@ -155,11 +155,45 @@ Go 語言通用開發工具包 (Shared SDK)，提供設定管理、HTTP 服務�
 3. `GetLogLevel()` 從 `LOG_LEVEL` 環境變數解析日誌等級（`debug`/`info`/`warn`/`error`）
 4. 設定 `timestamp` 時間格式為 `time.DateTime`
 5. 建立 Logger 並透過 `zap.ReplaceGlobals()` 設定為全域實例
-6. 下游模組透過 `log.Info()`、`log.Error()` 等封裝函式輸出日誌
+6. 下游模組透過 `zap.L()`（結構化）或 `zap.S()`（sugar）直接輸出日誌
 
 `核心實體 (Key Entities):` `zap.Logger` (全域), `zapcore.Level`
 
-`相關處理器 (Related Handlers):` `log.Init()`, `log.GetLogLevel()`, `log.Info()`, `log.Infof()`, `log.Error()`, `log.Errorf()`, `log.Debug()`, `log.Debugf()`, `log.Fatal()`, `log.Fatalf()`, `log.Panic()`, `log.Panicf()`
+`相關處理器 (Related Handlers):` `log.Init()`, `log.GetLogLevel()`
+
+---
+
+### 指標監控 (Metrics & Tracing)
+
+提供兩種指標發送方式：(A) 透過 `RemoteWriteService` 以 Prometheus remote-write 協定直接推送至 VictoriaMetrics、Mimir 等後端；(B) 透過 OpenTelemetry SDK（`InitMeterProvider` + `InitTracerProvider`）以 OTLP HTTP 協定發送 metrics 與 traces。兩者後端 URL 皆由 Viper 設定注入。
+
+`環境變數 (Config Keys):`
+
+| 變數 | 預設值 | 用途 |
+| --- | --- | --- |
+| `VICTORIAMETRICS_URL` | `http://localhost:8428/api/v1/write` | Remote write — VictoriaMetrics |
+| `MIMIR_URL` | `http://localhost:9009/api/v1/push` | Remote write — Mimir (compat) |
+| `REMOTE_WRITE_URL` | `http://localhost:8428/api/v1/write` | Remote write — 通用後端 |
+| `METRIC_URL` | `http://localhost:8428/opentelemetry/v1/metrics` | OTLP metrics 端點 |
+| `TEMPO_URL` | `""` (空 = OTLP 預設 `localhost:4318`) | OTLP traces 端點 |
+
+`領域流程 (Domain Flow) — Remote Write:`
+
+1. 呼叫 `NewVictoriaMetricsService()` / `NewMimirService()` / `NewRemoteWriteService(url)` 建立服務
+2. 呼叫 `svc.Send(metric)` 或 `svc.SendMulti(metrics)` 批次推送
+3. `RemoteWriteService` 自動將 metric name 中 `.` 轉換為 `_`（Prometheus 規範）
+4. Timestamp 使用 epoch seconds (`time.Now().Unix()`)
+
+`領域流程 (Domain Flow) — OpenTelemetry:`
+
+1. `metric.InitMeterProvider(ctx)` — 初始化全域 `MeterProvider`，讀取 `METRIC_URL`
+2. `metric.InitTracerProvider(ctx)` — 初始化全域 `TracerProvider`，讀取 `TEMPO_URL`
+3. `metric.Meter(name)` / `metric.Tracer(name)` 取得 meter/tracer 實例
+4. 應用程式結束前呼叫 `metric.ShutdownOTel(ctx)` 排空緩衝資料
+
+`核心實體 (Key Entities):` `RemoteWriteService`, `MimirService` (alias), `Metric`, `IMetric`
+
+`相關處理器 (Related Handlers):` `NewVictoriaMetricsService()`, `NewMimirService()`, `NewRemoteWriteService()`, `RemoteWriteService.Send()`, `RemoteWriteService.SendMulti()`, `Send[T]()`, `InitMeterProvider()`, `InitTracerProvider()`, `ShutdownOTel()`, `Meter()`, `Tracer()`
 
 ---
 

@@ -41,9 +41,8 @@ func TestOtelSample(t *testing.T) {
 		t.Fatalf("Failed to initialize MeterProvider: %v", err)
 	}
 
-	tempoURL := ""
-	zap.L().Info("Initializing OpenTelemetry TracerProvider", zap.String("tempo_url", tempoURL))
-	err = InitTracerProvider(ctx, tempoURL)
+	zap.L().Info("Initializing OpenTelemetry TracerProvider")
+	err = InitTracerProvider(ctx)
 	if err != nil {
 		t.Fatalf("Failed to initialize TracerProvider: %v", err)
 	}

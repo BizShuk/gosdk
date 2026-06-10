@@ -80,7 +80,8 @@ func InitMeterProvider(ctx context.Context) error {
 }
 
 // InitTracerProvider initializes the SDK TracerProvider, registers it globally, and caches it.
-func InitTracerProvider(ctx context.Context, tempoURL string) error {
+// The endpoint is read from the TEMPO_URL config key (empty string disables a custom endpoint).
+func InitTracerProvider(ctx context.Context) error {
 	traceMu.Lock()
 	defer traceMu.Unlock()
 
@@ -88,7 +89,7 @@ func InitTracerProvider(ctx context.Context, tempoURL string) error {
 		return nil
 	}
 
-	tempoURL = viper.GetString("TEMPO_URL")
+	tempoURL := viper.GetString("TEMPO_URL")
 
 	var opts []otlptracehttp.Option
 	if tempoURL != "" {
