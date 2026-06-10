@@ -1,9 +1,9 @@
 ---
 name: golang-performance-tuning
-description: Manual-invocation-only Go performance reviewer. Audits *.go source against the goperf.dev common-patterns playbook (15 patterns covering memory, concurrency, I/O, and compiler-level optimization) and produces a prioritized refactor report with concrete code suggestions and expected impact. Read-only — never modifies source. Refuses non-Go files. Invoke only when the user explicitly asks for a golang-performance-tuning review.
-allowed-tools: Bash, Read, Edit, Grep, Glob, AskUserQuest
+description: Use only when the user explicitly asks for a Go performance review. Audits *.go source against the goperf.dev common-patterns playbook (15 patterns - sync.Pool, preallocation, struct alignment, interface boxing, zero-copy, GC tuning, escape analysis, worker pools, atomics, lazy init, buffered I/O, batching, compiler flags). Produces a prioritized read-only refactor report; never modifies source. Refuses non-Go files.
+allowed-tools: Bash, Read, Grep, Glob, AskUserQuestion
 context: fork
-user-invocable: false
+user-invocable: true
 disable-model-invocation: true
 ---
 

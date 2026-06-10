@@ -1,7 +1,7 @@
 ---
 name: golang-code-quality
-description: Golang code quality reviewer focused on simplicity and scalability through SOLID principles, idiomatic package structure, error handling, context propagation, and dependency injection. Use when reviewing Go code, generating new Go code, or refactoring existing Go codebases. Triggers on requests like "review this Go code", "refactor this Go file", "is this Go idiomatic", or any new Go file/package creation.
-allowed-tools: Bash, Read, Edit, Grep, Glob, AskUserQuest
+description: Use when reviewing Go code, generating new Go code, refactoring existing Go codebases, or creating any new Go file/package. Triggers on requests like "review this Go code", "refactor this Go file", "is this Go idiomatic", "apply SOLID". Keywords - simplicity, scalability, SOLID, package structure, error handling, context propagation, dependency injection.
+allowed-tools: Bash, Read, Edit, Grep, Glob, AskUserQuestion
 disable-model-invocation: false
 user-invocable: false
 context: fork

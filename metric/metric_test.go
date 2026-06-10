@@ -8,7 +8,7 @@ import (
 )
 
 // SendTest pushes a small batch of backfilled samples for manual verification.
-func (s *RemoteWriteService) SendTest() error {
+func (s *MetricService) SendTest() error {
 	var metrics []Metric
 	now := time.Now().Unix()
 
@@ -36,8 +36,8 @@ func (s *RemoteWriteService) SendTest() error {
 	return nil
 }
 
-func TestRemoteWriteService_SendTest(t *testing.T) {
-	svc := NewRemoteWriteService("")
+func TestMetricService_SendTest(t *testing.T) {
+	svc := NewMetricService("")
 	if err := svc.SendTest(); err != nil {
 		t.Errorf("SendTest() error = %v", err)
 	}

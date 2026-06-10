@@ -1,7 +1,7 @@
 ---
 name: golang-gosdk
 description: Use when developing, reviewing, or refactoring Go applications that utilize the github.com/bizshuk/gosdk library for configuration management, HTTP routing, logging, or data processing.
-allowed-tools: Bash, Read, Edit, Grep, Glob, AskUserQuest
+allowed-tools: Bash, Read, Edit, Grep, Glob, AskUserQuestion
 user-invocable: true
 disable-model-invocation: true
 context: fork
@@ -17,10 +17,10 @@ A unified reference for using the `github.com/bizshuk/gosdk` library. This SDK p
 
 `GitHub Repository:` `github.com/bizshuk/gosdk`
 `Required Go Version:` `1.26.0` (or newer)
-`Required Version:` `981c48d` (or newer)
+`Required Version:` `d54814c` (or newer — introduces `RemoteWriteService` / `NewVictoriaMetricsService`)
 
 > [!WARNING]
-> If the project's `go.mod` specifies a version older than `981c48d` for `github.com/bizshuk/gosdk`, or if the local `version` file does not match, `WARN THE USER to update the SDK` before proceeding with major refactoring or implementation.
+> If the project's `go.mod` specifies a version older than `d54814c` for `github.com/bizshuk/gosdk`, or if the local `version` file does not match, `WARN THE USER to update the SDK` before proceeding with major refactoring or implementation.
 
 ## When to Use
 
@@ -29,7 +29,7 @@ A unified reference for using the `github.com/bizshuk/gosdk` library. This SDK p
 - Implementing structured, level-based logging using `zap`.
 - Processing CSV files with automatic archiving and row-based callbacks.
 - Dealing with CJK character encoding conversions (GBK, Big5 to UTF-8).
-- Pushing time-series metrics to a Mimir / Prometheus remote-write endpoint.
+- Pushing time-series metrics to a VictoriaMetrics / Mimir / any Prometheus remote-write endpoint.
 
 ## Quick Reference & Common Patterns
 
@@ -189,16 +189,22 @@ func main() {
 > [!IMPORTANT]
 > **Do NOT use wrapper functions like `log.Info()`, `log.Errorf()`.** These have been removed. Use `zap.L()` or `zap.S()` directly.
 
-### 5. Metrics & Tracing (Mimir vs OpenTelemetry)
+### 5. Metrics & Tracing (Remote Write vs OpenTelemetry)
 
 The SDK provides two ways to publish metrics. Depending on the complexity and needs of the project:
 
-1. **Option A: Mimir Remote Write** (Lightweight, developer-pushed Prometheus write request).
+1. **Option A: Prometheus Remote Write** (Lightweight, developer-pushed write request — VictoriaMetrics, Mimir, or any remote-write compatible backend).
 2. **Option B: OpenTelemetry OTLP** (Standardized OTel SDK for metrics and distributed tracing).
 
-#### Option A: Mimir Remote Write (Prometheus Remote-Write)
+#### Option A: Remote Write (`RemoteWriteService`)
 
-Push time-series metrics to Mimir using a lightweight HTTP-based writer. This requires no MeterProvider lifecycle management. The endpoint is configured via `MIMIR_URL` (default: `http://localhost:9009/api/v1/push`).
+Push time-series metrics to any Prometheus remote-write compatible backend using a lightweight HTTP-based writer. This requires no MeterProvider lifecycle management. Backends differ only in the endpoint URL:
+
+| Backend                     | Constructor                          | Config key                            | Default endpoint                     |
+| --------------------------- | ------------------------------------ | ------------------------------------- | ------------------------------------ |
+| VictoriaMetrics (`default`) | `metric.NewVictoriaMetricsService()` | `VICTORIAMETRICS_URL`                 | `http://localhost:8428/api/v1/write` |
+| Mimir (compat alias)        | `metric.NewMimirService()`           | `MIMIR_URL`                           | `http://localhost:9009/api/v1/push`  |
+| Any remote-write backend    | `metric.NewRemoteWriteService(url)`  | `REMOTE_WRITE_URL` (when `url == ""`) | `http://localhost:8428/api/v1/write` |
 
 ```go
 import (
@@ -207,7 +213,7 @@ import (
 )
 
 func main() {
-    svc := metric.NewMimirService()
+    svc := metric.NewVictoriaMetricsService() // or NewRemoteWriteService("") to honor REMOTE_WRITE_URL
 
     // 1. Send a single metric
     _ = svc.Send(metric.Metric{
@@ -226,18 +232,19 @@ func main() {
 }
 ```
 
-Key behaviors of `MimirService`:
+Key behaviors of `RemoteWriteService`:
 
 - Sanitization: `Metric.Name` replaces all `.` with `_` because Prometheus name spec disallows dots.
 - Timestamp: Expects **epoch seconds** (`time.Now().Unix()`), NOT milliseconds.
 - High-Performance: Uses HTTP connection pooling (`MaxIdleConnsPerHost: 100`).
+- Compatibility: `MimirService` is a type alias of `RemoteWriteService`; `NewMimirService()` is kept for backward compatibility — prefer `NewVictoriaMetricsService()` or `NewRemoteWriteService(url)` in new code.
 
 ---
 
 #### Option B: OpenTelemetry (OTLP Metrics & Tracing)
 
 Use the standard OpenTelemetry SDK to collect metrics and export traces. This requires initializing the Meter and Tracer Providers and ensuring they are shut down when the application terminates.
-By default, the metric endpoint is read from `MIMIR_URL` (default: `http://localhost:9009/otlp/v1/metrics`), and the trace endpoint is read from `TEMPO_URL`.
+The metric endpoint is read from `METRIC_URL` (default: `http://localhost:8428/opentelemetry/v1/metrics` — VictoriaMetrics OTLP receiver), and the trace endpoint is read from `TEMPO_URL`. Note: the `tempoURL` parameter of `InitTracerProvider` is currently ignored — the `TEMPO_URL` config always wins; pass `""`.
 
 ```go
 import (
@@ -261,7 +268,7 @@ func InitMetric() {
     if err := metric.InitMeterProvider(ctx); err != nil {
         panic(err)
     }
-    if err := metric.InitTracerProvider(ctx, ""); err != nil { // empty tempoURL falls back to TEMPO_URL env
+    if err := metric.InitTracerProvider(ctx, ""); err != nil { // tempoURL param is ignored; TEMPO_URL config is always used
         panic(err)
     }
 
@@ -363,7 +370,7 @@ Key behaviors of the `notify` package:
 - **Fan-out error handling**: `Multi.Notify` always calls every registered notifier — it never short-circuits on failure. All errors are joined via `errors.Join`; check the combined error after the call.
 - **Format is caller's responsibility**: The `summary string` is an opaque, pre-formatted message. Serialize your struct/report to a string before calling `Notify`.
 
-### 8. Home Path Expansion
+### 7. Home Path Expansion
 
 Use `github.com/mitchellh/go-homedir` to expand `~` in paths. Call `homedir.Expand()` directly at point of use — do NOT create a custom expand function.
 
@@ -396,7 +403,8 @@ Key rules:
 | Re-implementing security headers                 | Use `mw.Helmet()` instead of manually writing headers. It contains up-to-date best practices (e.g., `Permissions-Policy`, `Cross-Origin-Opener-Policy`).          |
 | Manual CSV opening and iteration                 | Use `csv.ProcessCSVFile` which handles skipping headers, filtering empty rows, and `.archived` marker generation.                                                 |
 | Calling `WithDefaultValue` alone                 | `WithDefaultValue` only writes if using `WithAppName` to ensure it is written to the correct folder.                                                              |
-| Using `.` in Mimir metric names manually escaped | `metric.MimirService` sanitizes `.` → `_` automatically via `sanitizeMetricName`; don't pre-mangle names.                                                         |
+| Using `.` in metric names manually escaped       | `metric.RemoteWriteService` sanitizes `.` → `_` automatically via `sanitizeMetricName`; don't pre-mangle names.                                                   |
+| Using `NewMimirService()` in new code            | Deprecated compat alias. Use `NewVictoriaMetricsService()` (default backend) or `NewRemoteWriteService(url)`.                                                     |
 | Passing milliseconds to `Metric.Timestamp`       | Field expects **seconds** (epoch); use `time.Now().Unix()`, not `UnixMilli()`.                                                                                    |
 | Sending one metric at a time in tight loops      | Prefer `SendMulti` to batch samples into a single remote-write request (lower overhead, fewer HTTP round trips).                                                  |
 | Forgetting to call `ShutdownOTel`                | Always `defer metric.ShutdownOTel(ctx)` at application startup to flush all buffered metrics and trace spans before application exit.                             |

@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-// RemoteWriteService pushes metrics to any Prometheus remote-write compatible
+// MetricService pushes metrics to any Prometheus remote-write compatible
 // backend. Backends differ only in the endpoint URL.
 //
 // Reference endpoints — remote write (this service, REMOTE_WRITE_URL) vs
@@ -26,19 +26,19 @@ import (
 //	Prometheus
 //	  remote write: http://localhost:9090/api/v1/write           (--web.enable-remote-write-receiver)
 //	  OTLP:         http://localhost:9090/api/v1/otlp/v1/metrics (--web.enable-otlp-receiver)
-type RemoteWriteService struct {
+type MetricService struct {
 	client *promwrite.Client
 }
 
-var globalRemoteWriteService *RemoteWriteService
+var globalMetricService *MetricService
 
 func init() {
 	viper.SetDefault("REMOTE_WRITE_URL", "http://localhost:8428/api/v1/write")
 }
 
-// NewRemoteWriteService creates a service for the given remote-write endpoint.
+// NewMetricService creates a service for the given remote-write endpoint.
 // An empty url falls back to the REMOTE_WRITE_URL config (default: VictoriaMetrics).
-func NewRemoteWriteService(url string) *RemoteWriteService {
+func NewMetricService(url string) *MetricService {
 	if url == "" {
 		url = viper.GetString("REMOTE_WRITE_URL")
 	}
@@ -50,7 +50,7 @@ func NewRemoteWriteService(url string) *RemoteWriteService {
 			IdleConnTimeout:     90 * time.Second,
 		},
 	}
-	return &RemoteWriteService{
+	return &MetricService{
 		client: promwrite.NewClient(url, promwrite.HttpClient(httpClient)),
 	}
 }
@@ -90,7 +90,7 @@ func toFloat64(v any) (float64, error) {
 	}
 }
 
-func (s *RemoteWriteService) SendMulti(metrics []Metric) error {
+func (s *MetricService) SendMulti(metrics []Metric) error {
 	if len(metrics) == 0 {
 		return nil
 	}
@@ -128,20 +128,20 @@ func (s *RemoteWriteService) SendMulti(metrics []Metric) error {
 	return nil
 }
 
-func (s *RemoteWriteService) Send(metric Metric) error {
+func (s *MetricService) Send(metric Metric) error {
 	return s.SendMulti([]Metric{metric})
 }
 
-// Send sends metrics to the remote-write backend via IMetric interface.
-// An explicitly configured MIMIR_URL takes precedence over REMOTE_WRITE_URL
-// for backward compatibility.
+// Send sends metrics to the remote-write backend configured by
+// REMOTE_WRITE_URL via IMetric interface. Point REMOTE_WRITE_URL at another
+// backend (e.g. Mimir's :9009/api/v1/push) to switch targets.
 func Send[T IMetric](metrics []T) error {
 	if len(metrics) == 0 {
 		return nil
 	}
 
-	if globalRemoteWriteService == nil {
-		globalRemoteWriteService = NewRemoteWriteService(viper.GetString("MIMIR_URL"))
+	if globalMetricService == nil {
+		globalMetricService = NewMetricService("")
 	}
 
 	const batchSize = 50
@@ -153,7 +153,7 @@ func Send[T IMetric](metrics []T) error {
 			toSend = append(toSend, m.ConvertToMetric()...)
 		}
 
-		if err := globalRemoteWriteService.SendMulti(toSend); err != nil {
+		if err := globalMetricService.SendMulti(toSend); err != nil {
 			return err
 		}
 	}

@@ -1,19 +1,17 @@
 ---
 name: golang-naming
 description: >-
-    Go naming convention reviewer and safe renamer. Audits package, function,
-    variable, struct, interface, and method names across the entire Go workspace
-    for Go community naming idioms (acronym casing, stutter, receiver length,
-    grab-bag packages like util/common, etc.). Produces a rename proposal report,
-    and ONLY after the user explicitly approves applies renames safely via
-    `gopls rename` so that every call site (and import path) in the workspace is
-    updated atomically. Read-only until approval. Refuses non-Go files.
-allowed-tools: Bash, Read, Edit, Grep, Glob, AskUserQuest
+    Use when the user asks for a Go naming review or to rename Go symbols —
+    package, function, variable, struct, interface, or method names. Covers
+    acronym casing (userId → userID), package/type stutter, receiver length,
+    grab-bag packages (util/common), error naming, constant casing. Go files
+    only. Report first; renames applied only via gopls after explicit approval.
+allowed-tools: Bash, Read, Grep, Glob, AskUserQuestion
 model: sonnet
 effort: high
 context: fork
 disable-model-invocation: true
-user-invocable: false
+user-invocable: true
 ---
 
 # golang-naming

@@ -1,11 +1,10 @@
 ---
 name: golang-dead-code
-description: Detect and safely remove dead code in Go projects — unused functions/vars/types/consts, unreachable branches.
+description: Use when the user asks to detect or remove dead code in a Go project — unused functions/vars/types/consts, unreachable branches, dead stores, deprecated APIs. Keywords - staticcheck, deadcode, unparam, U1000.
 argument-hint: [path]
-arguments: path
-user-invocable: false
+user-invocable: true
 disable-model-invocation: true
-allowed-tools: Bash, Read, Edit, Grep, Glob, AskUserQuest
+allowed-tools: Bash, Read, Edit, Grep, Glob, AskUserQuestion
 effort: xhigh
 context: fork
 ---
@@ -23,7 +22,7 @@ Handles four categories of dead code:
 | Category               | How it's detected                       | Default action       |
 | ---------------------- | --------------------------------------- | -------------------- |
 | Unused symbols         | `staticcheck -checks U1000,U1001`       | Delete after confirm |
-| Unreachable code       | `go vet` + `staticcheck -checks SA4006` | Delete after confirm |
+| Unreachable code / dead stores | `go vet` (unreachable) + `staticcheck -checks SA4006` (dead stores) | Delete after confirm |
 | Module-level dead code | `golang.org/x/tools/cmd/deadcode`       | Delete after confirm |
 | Deprecated APIs        | grep for `// Deprecated:` comments      | Migrate or delete    |
 

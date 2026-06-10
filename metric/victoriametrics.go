@@ -6,8 +6,8 @@ func init() {
 	viper.SetDefault("VICTORIAMETRICS_URL", "http://localhost:8428/api/v1/write")
 }
 
-// NewVictoriaMetricsService creates a RemoteWriteService targeting
+// NewVictoriaMetricsService creates a MetricService targeting
 // VictoriaMetrics, honoring the VICTORIAMETRICS_URL config if set.
-func NewVictoriaMetricsService() *RemoteWriteService {
-	return NewRemoteWriteService(viper.GetString("VICTORIAMETRICS_URL"))
+func NewVictoriaMetricsService() *MetricService {
+	return NewMetricService(viper.GetString("VICTORIAMETRICS_URL"))
 }
