@@ -115,6 +115,10 @@ func init() {
 - `PersistentFlags()` for flags inherited by all subcommands; `Flags()` for command-specific.
 - Bind flags to viper via `viper.BindPFlag()` in `init()` to unify flag and config access.
 
+### Monitor subcommand
+
+- `monitor` sub command is used to overall monitoring for the command, with `--merge` is one time fetch and merge into pre defined files
+
 ---
 
 ## 2. Configuration (viper)
@@ -351,9 +355,3 @@ go build -gcflags='-m=2' ./... 2>&1 | grep "escapes to heap"
 | Format           | `gofmt -w .` or `goimports -w .`                               |
 | Hot reload       | `air`                                                          |
 | Cross compile    | `GOOS=linux GOARCH=amd64 go build -o bin/app ./cmd/app`        |
-
----
-
-## 8. Command Line
-
-- `monitor` sub command is used to overall monitoring for the command, with `--merge` is one time fetch and merge into pre defined files
