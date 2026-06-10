@@ -1,11 +1,11 @@
 ---
 name: golang-dev
 description: >
-    Use when writing Go code, choosing Go libraries, setting up build/test
-    commands, or investigating memory escape issues. Covers CLI scaffolding
-    with cobra, configuration with viper, common libraries (zap, testify,
-    golangci-lint, air), build flags, test flags including disabling inlining,
-    and escape analysis verification workflow.
+    Use when writing Go code in a gosdk-based project — building a CLI with
+    cobra, configuring apps with viper, adding database connections (SQLite,
+    MySQL, or PostgreSQL via gorm), structured logging with zap, test setup
+    with testify, escape analysis for hot paths, or selecting between stdlib
+    and third-party libraries.
 allowed-tools: Bash, Read, Edit, Grep, Glob, AskUserQuestion
 user-invocable: true
 disable-model-invocation: true
@@ -115,6 +115,28 @@ func init() {
 - `PersistentFlags()` for flags inherited by all subcommands; `Flags()` for command-specific.
 - Bind flags to viper via `viper.BindPFlag()` in `init()` to unify flag and config access.
 
+### CLI usage metrics (gosdk cobra hook)
+
+If `github.com/bizshuk/gosdk` is available, record every CLI invocation by wiring the metric hook into the root command before `Execute()`:
+
+```go
+import "github.com/bizshuk/gosdk/metric"
+
+func init() {
+    metric.CobraCMDHook(rootCmd)
+}
+```
+
+Each execution emits one metric via Prometheus remote-write to the backend configured by the `METRIC_URL` viper key (default: VictoriaMetrics `http://localhost:8428/api/v1/write`; override with `viper.Set("METRIC_URL", ...)`, the `APP_METRIC_URL` env var when using `config.Default()`, or `METRIC_URL` env var with `viper.AutomaticEnv()`):
+
+```text
+command_line_trigger{cmd="myapp sub leaf", flag="env-verbose"} = 1
+```
+
+- `cmd` — full command chain, root → leaf (`cmd.CommandPath()`).
+- `flag` — flags the user actually set, collected across the whole chain, alphabetically sorted, joined with `-`; empty string when no flag was set.
+- The hook wraps (does not replace) an existing `PersistentPreRunE` on root. If any subcommand defines its own `PersistentPreRunE`, set `cobra.EnableTraverseRunHooks = true` (once, in `init()`), otherwise cobra skips the root hook and no metric is emitted for that subcommand.
+
 ### Monitor subcommand
 
 - `monitor` sub command is used to overall monitoring for the command, with `--merge` is one time fetch and merge into pre defined files
@@ -127,6 +149,40 @@ func init() {
 
 IMPORTANT: If `github.com/bizshuk/gosdk` is available, always use its `config.Default()` for configuration loading. Fall back to raw `viper` manual setup only if the SDK is not supported or available.
 
+### Gosdk DB connections (SQLite / MySQL / PostgreSQL)
+
+For database access, use the `db` package. Each storage type is a service with its own global singleton and a flat `<TYPE>_<FIELD>` viper key:
+
+```go
+import "github.com/bizshuk/gosdk/db"
+
+config.Default()
+
+if viper.IsSet("SQLITE_PATH") {
+    if err := db.InitSQLite(); err != nil { /* handle */ }
+}
+if viper.IsSet("MYSQL_DSN") {
+    if err := db.InitMySQL(); err != nil { /* handle */ }
+}
+if viper.IsSet("POSTGRES_DSN") {
+    if err := db.InitPostgres(); err != nil { /* handle */ }
+}
+
+// Anywhere later in the process:
+gormDB := db.DefaultSQLite.DB()
+defer db.DefaultSQLite.Close()
+```
+
+YAML (flat keys, uppercase underscore):
+
+```yaml
+SQLITE_PATH: ./app.db
+```
+
+Env var (with `APP_` prefix from `config.Default()`): `APP_SQLITE_PATH`, `APP_MYSQL_DSN`, `APP_POSTGRES_DSN`.
+
+**Why a singleton per storage type:** micro-service concept forbids two of the same storage type in one process. `Init<Storage>()` refuses double-init and returns an error if called twice. The `*gorm.DB` is cached in the singleton, so any code path that needs it just reads `db.DefaultSQLite.DB()` instead of opening its own connection.
+
 Always use `github.com/spf13/viper`. Loading precedence (highest wins):
 
 1. `Environment variables` (`viper.AutomaticEnv()`)
@@ -136,21 +192,16 @@ Always use `github.com/spf13/viper`. Loading precedence (highest wins):
 
 ### Config struct pattern
 
+For non-DB settings, unmarshal nested config (e.g., `server.*` blocks) into a typed struct. Database access uses the `db` package above; do not include DB fields here.
+
 ```go
 type Config struct {
     Server ServerConfig `mapstructure:"server"`
-    DB     DBConfig     `mapstructure:"db"`
 }
 
 type ServerConfig struct {
     Port         int    `mapstructure:"port"`
     ReadTimeout  int    `mapstructure:"read_timeout"`
-}
-
-type DBConfig struct {
-    Host     string `mapstructure:"host"`
-    Port     int    `mapstructure:"port"`
-    Name     string `mapstructure:"name"`
 }
 
 func LoadConfig() (*Config, error) {
@@ -169,10 +220,6 @@ func LoadConfig() (*Config, error) {
 server:
     port: 8080
     read_timeout: 30
-db:
-    host: localhost
-    port: 5432
-    name: myapp
 ```
 
 ### Common pitfalls
