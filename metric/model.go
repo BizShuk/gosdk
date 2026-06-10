@@ -11,3 +11,7 @@ type Metric struct {
 	Value     any
 	Tags      map[string]string
 }
+
+func (m Metric) ConvertToMetric() []Metric {
+	return []Metric{m}
+}

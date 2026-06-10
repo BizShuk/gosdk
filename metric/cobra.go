@@ -33,30 +33,25 @@ func CobraCMDHook(root *cobra.Command) {
 	existingPre := root.PersistentPreRunE
 
 	root.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
-		emitCommandMetric(cmd) // cobra passes the leaf command here, not root
+		m := Metric{
+			Name:      CobraHookMetricName,
+			Timestamp: time.Now().Unix(),
+			Value:     int64(1),
+			Tags: map[string]string{
+				"cmd":  cmd.CommandPath(),
+				"flag": changedFlags(cmd),
+			},
+		}
 
+		if err := Send([]Metric{m}); err != nil {
+			zap.L().Warn("cobra metric hook send failed",
+				zap.String("cmd", m.Tags["cmd"]),
+				zap.Error(err))
+		}
 		if existingPre != nil {
 			return existingPre(cmd, args)
 		}
 		return nil
-	}
-}
-
-func emitCommandMetric(leaf *cobra.Command) {
-	m := Metric{
-		Name:      CobraHookMetricName,
-		Timestamp: time.Now().Unix(),
-		Value:     int64(1),
-		Tags: map[string]string{
-			"cmd":  leaf.CommandPath(),
-			"flag": changedFlags(leaf),
-		},
-	}
-
-	if err := NewMetricService("").Send(m); err != nil {
-		zap.L().Warn("cobra metric hook send failed",
-			zap.String("cmd", m.Tags["cmd"]),
-			zap.Error(err))
 	}
 }
 
