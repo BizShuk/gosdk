@@ -19,7 +19,7 @@ Go 語言通用開發工具包 (Shared SDK)，提供設定管理、HTTP 服務�
 
 `核心實體 (Key Entities):` `Config` 介面, `EnvConfig`, `YamlConfig`, `JsonConfig`, `FSConfig`
 
-`相關處理器 (Related Handlers):` `config.Default()`, `config.DefaultWithDir()`, `NewEnvConfig()`, `NewYamlConfig()`, `NewJsonConfig()`, `NewFSConfig()`
+`相關處理器 (Related Handlers):` `config.Default()`, `config.DefaultWithDir()`, `WithAppName()`, `WithConfigDir()`, `WithConfigPath()`, `WithDefaultValue()`, `NewEnvConfig()`, `NewYamlConfig()`, `NewJsonConfig()`, `NewFSConfig()`
 
 ---
 
@@ -37,10 +37,6 @@ Go 語言通用開發工具包 (Shared SDK)，提供設定管理、HTTP 服務�
 `核心實體 (Key Entities):` `Service` 介面, `SQLite` struct, `MySQL` struct, `Postgres` struct, `DefaultSQLite` / `DefaultMySQL` / `DefaultPostgres` singleton
 
 `相關處理器 (Related Handlers):` `db.InitSQLite()`, `db.InitMySQL()`, `db.InitPostgres()`, `db.DefaultSQLite.DB()`, `db.DefaultSQLite.Close()`, `db.DefaultMySQL.DB()`, `db.DefaultMySQL.Close()`, `db.DefaultPostgres.DB()`, `db.DefaultPostgres.Close()`
-
----
-
-### HTTP 服務 (HTTP Service)
 
 ---
 
@@ -216,7 +212,7 @@ Go 語言通用開發工具包 (Shared SDK)，提供設定管理、HTTP 服務�
 
 1. `metric.CobraCMDHook(root)` — 在 root command 掛上 PersistentPreRunE hook
 2. 每次 CLI 執行送出 `command_line_trigger{cmd="root sub leaf", flag="a-b-c"}`（flag 為使用者實際設定的 flags，字母排序以 `-` 串接）
-3. 後端由 `METRIC_URL` 控制（透過 `NewMetricService("")`）
+3. 發送走套件層級 `Send()`（全域 `MetricService`），後端由 `METRIC_URL` 控制
 
 `核心實體 (Key Entities):` `MetricService`, `MimirService` (alias), `Metric`, `IMetric`
 
@@ -251,11 +247,19 @@ config.Default()
 
 // 方式 3：直接呼叫帶有自訂路徑的初始化函式
 config.DefaultWithDir("/custom/path")
+
+// 方式 4：以 option 設定 app 名稱與預設值（載入 ~/.config/<app_name>/，
+// settings.json 不存在時以 defaultJSON 建立）
+config.Default(
+    config.WithAppName("myapp"),
+    config.WithDefaultValue(defaultJSON),
+)
 ```
 
 ### 資料庫連線
 
 ```go
+import "github.com/bizshuk/gosdk/config"
 import "github.com/bizshuk/gosdk/db"
 import "github.com/spf13/viper"
 
@@ -338,6 +342,7 @@ multi.Notify(ctx, "任務完成摘要")
 
 ```go
 import "github.com/bizshuk/gosdk/scheduler"
+import "go.uber.org/zap"
 
 s := scheduler.New()
 s.Add(scheduler.Job{
@@ -348,7 +353,7 @@ s.Add(scheduler.Job{
         return nil
     },
     OnError: func(name string, err error) {
-        log.Errorf("job %s failed: %v", name, err)
+        zap.S().Errorf("job %s failed: %v", name, err)
     },
 })
 s.Start(ctx)
@@ -367,12 +372,31 @@ utf8, _ := encode.DecodeGBKBytes(gbkData)            // GBK → UTF-8
 utils.CreateIfNotExist("~/config.yaml", defaultYAML) // 若不存在則建立預設值
 ```
 
+### 指標監控
+
+```go
+import "github.com/bizshuk/gosdk/metric"
+
+// Remote write：推送單筆或批次指標（後端由 METRIC_URL 控制）
+svc := metric.NewMetricService("")
+svc.Send(metric.Metric{
+    Name:      "app.operation.duration", // "." 自動轉為 "_"
+    Timestamp: time.Now().Unix(),        // epoch seconds
+    Value:     15.4,
+    Tags:      map[string]string{"env": "prod"},
+})
+
+// Cobra CLI hook：每次指令執行送出 command_line_trigger{cmd, flag}
+metric.CobraCMDHook(rootCmd)
+```
+
+完整可執行範例見 `cmd/cobrasample/`。
+
 ## 改善建議 (Improvement Suggestions)
 
 Based on codebase analysis:
 
 - [ ] 排程器與通知器整合範例：`scheduler` 與 `notify` 兩個套件設計上可以搭配使用（週期任務完成後推送通知），但目前缺少官方範例或整合測試，建議在 `sample/` 目錄補充完整使用範例
 - [ ] `versioning` CLI 缺少 reset 與 set 子命令：目前只能遞增版本號，若需要直接設定特定版本（如 release hotfix 時跳號）無法支援，建議新增 `set <version>` 子命令
-- [ ] 安全性增強：`mw.Helmet()` 中 `X-XSS-Protection` 標頭已被現代瀏覽器棄用，建議改用 `Permissions-Policy` 或 `Cross-Origin-Opener-Policy` 等現代標頭
 - [ ] `notify.SlackNotifier` 缺少重試機制：Slack API 呼叫若因網路問題失敗，目前直接回傳 error，建議加入指數退避重試或將重試邏輯委托給呼叫方約定
 - [ ] `db` 套件目前支援 SQLite、MySQL、PostgreSQL,若需要 Redis 等 key-value 儲存或 MongoDB 等文件資料庫,因 GORM 慣例不適用,需另開套件(`cache/` / `document/`)並定義新 service 介面

@@ -30,6 +30,8 @@ gosdk/
 ├── config/                  # 設定管理模組
 │   ├── config.go            # Config 介面、Default()、DefaultWithDir()
 │   ├── config_test.go       # 基本設定載入測試
+│   ├── option.go            # ConfigOption：WithAppName / WithConfigDir / WithConfigPath / WithDefaultValue
+│   ├── option_test.go       # option 測試
 │   ├── env.go               # .env dotenv 載入器（雙檔案模式）
 │   ├── env_test.go          # env 載入器測試
 │   ├── yaml.go              # YAML 設定載入器（雙檔案模式）
@@ -63,9 +65,11 @@ gosdk/
 │   └── helmet.go            # 安全性標頭（CSP, X-Frame-Options 等）
 ├── metric/                  # 指標監控模組（remote write + OTel）
 │   ├── metric.go            # 通用 Prometheus remote-write client（MetricService）
+│   ├── metric_test.go       # MetricService 單元測試
 │   ├── victoriametrics.go   # VictoriaMetrics 便利建構子（現行預設後端）
 │   ├── mimir.go             # Mimir 便利建構子（alias → MetricService，MIMIR_URL 預設 :9009/api/v1/push）
 │   ├── otel.go              # Go OpenTelemetry metrics/traces 封裝（OTLP HTTP）
+│   ├── otel_test.go         # OTel provider 單元測試
 │   ├── otel.py              # Python OpenTelemetry metrics 封裝
 │   ├── cobra.go             # spf13/cobra hook：每次 CLI 執行送 command_line_trigger
 │   ├── cobra_test.go        # cobra hook 單元測試
@@ -110,6 +114,11 @@ gosdk/
 │   ├── type_test.go         # IsNil 測試
 │   └── stringer.go          # stringer go:generate 範例
 ├── plans/                   # 開發計畫文件
+├── skills/                  # Agent skills（golang-dev、golang-gosdk、golang-mvc、golang-code-quality 等 8 個）
+├── agents/                  # Agent 定義（golang-refactor.md）
+├── docs/                    # 其他文件（superpowers）
+├── AGENTS.md                # Agent 入口說明
+├── SPEC.md                  # 規格文件
 ├── .github/
 │   └── workflows/
 │       └── ci.yml           # GitHub Actions CI（vet, test, build）
@@ -126,10 +135,12 @@ gosdk/
     - `spf13/viper` v1.17.0 — 階層式設定管理
     - `spf13/cobra` v1.9.1 — CLI 框架（gotmpl、versioning）
     - `go.uber.org/zap` v1.27.1 — 結構化日誌
-    - `gorm.io/gorm` v1.31.1 — ORM（MySQL + SQLite + PostgreSQL）
+    - `gorm.io/gorm` v1.31.1 — ORM（MySQL + SQLite + PostgreSQL，driver 各 v1.6.0）
+    - `castai/promwrite` v0.6.0 — Prometheus remote-write client（MetricService）
+    - `go.opentelemetry.io/otel` v1.44.0 — OpenTelemetry SDK（OTLP HTTP metrics/traces）
     - `slack-go/slack` v0.23.1 — Slack 通知
-    - `golang.org/x/tools` v0.39.0 — Go AST 解析（stringer）
-    - `golang.org/x/text` v0.32.0 — CJK 編碼轉換
+    - `golang.org/x/tools` v0.44.0 — Go AST 解析（stringer）
+    - `golang.org/x/text` v0.37.0 — CJK 編碼轉換
     - `tavsec/gin-healthcheck` v1.2.2 — Health check 端點
     - `hairyhenderson/gomplate` v4.3.3 — 模板渲染函式
 
@@ -146,7 +157,7 @@ gosdk/
 - 排程器採用極簡設計：`Scheduler` 僅負責按 `Interval` 觸發 `Job.Fn`，錯誤處理、日誌、重試等策略完全由呼叫方透過 `Job.OnError` 自行決定
 - `Notifier` 介面保持單一方法（`Notify`）：不綁定特定訊息格式，呼叫方自行序列化 summary 字串，使通知器可輕易替換或組合
 - `versioning` CLI 使用純文字 `version` 檔案：避免依賴 git tags 或外部服務，檔案格式為 `major.minor.patch`，可直接納入版本控制
-- Cobra hook 採極簡設計（無 option、同步送出）：`CobraCMDHook(root)` 在 PreRun 送出 `command_line_trigger{cmd, flag}`（PreRun 而非 PostRun：永遠會送，即使 RunE 失敗）；`cmd` 為完整指令鏈（`cmd.CommandPath()`，root → leaf）；`flag` 收集使用者實際設定的 flags（走訪整條 chain、`seen` map 去重 persistent flag），字母排序後以 `-` 串接；後端固定走 `NewMetricService("")`，由 `METRIC_URL` 注入（測試以 `viper.Set` 覆寫）
+- Cobra hook 採極簡設計（無 option、同步送出）：`CobraCMDHook(root)` 在 PreRun 送出 `command_line_trigger{cmd, flag}`（PreRun 而非 PostRun：永遠會送，即使 RunE 失敗）；`cmd` 為完整指令鏈（`cmd.CommandPath()`，root → leaf）；`flag` 收集使用者實際設定的 flags（走訪整條 chain、`seen` map 去重 persistent flag），字母排序後以 `-` 串接；發送走套件層級 `Send()`（全域 `MetricService`，首次使用時以 `METRIC_URL` 建立；測試以 `viper.Set` 覆寫）
 
 ### Remote Write 與 OpenTelemetry 指標發送差異 (Remote Write vs OpenTelemetry Metrics)
 
@@ -179,7 +190,10 @@ gosdk/
 | 排程管理              | `scheduler/`                            | `scheduler.New()`        |
 | 編碼與資料處理        | `encode/`, `utils/`, `time/`            | 各函式獨立呼叫           |
 | 日誌與觀測            | `log/`                                  | `log.Init()`             |
-| 指標監控              | `metric/`                               | 見第二個模組對應表       |
+| Remote Write 指標     | `metric/`                               | `NewMetricService()` / `NewVictoriaMetricsService()` |
+| Cobra CLI Hook 指標   | `metric/`                               | `metric.CobraCMDHook()`  |
+| OTel 指標             | `metric/`                               | `metric.InitMeterProvider()` |
+| OTel Tracer           | `metric/`                               | `metric.InitTracerProvider()` |
 
 ## 開發指南 (Development Guide)
 
@@ -195,7 +209,7 @@ gosdk/
 go mod download
 ```
 
-### Python 依賴（用於 notify/metric.py, notify/slack.py）
+### Python 依賴（用於 metric/otel.py, notify/slack.py）
 
 ```bash
 source /Users/shuk/.venv/bin/activate
@@ -254,25 +268,6 @@ GitHub Actions workflow 定義於 `.github/workflows/ci.yml`，於 push/PR 至 `
 ### 部署 (Deploy)
 
 透過 Dockerfile multi-stage build 產生最小化 Alpine 映像，暴露 port 8080。
-
-## 模組對應 (Module Mapping)
-
-| 業務領域 (Domain)     | 套件/模組 (Package/Module)              | 進入點 (Entry Point)          |
-| --------------------- | --------------------------------------- | ----------------------------- |
-| 設定管理              | `config/`                               | `config.Default()`            |
-| 資料庫連線            | `db/`                                   | `db.InitSQLite()` / `db.InitMySQL()` / `db.InitPostgres()` |
-| HTTP 服務             | `router/`, `mw/`, `main.go`             | `HTTPServer()`                |
-| 程式碼產生 — stringer | `cmd/stringer/`, `service/generator.go` | `cmd/stringer/main.go`        |
-| 程式碼產生 — gotmpl   | `cmd/gotmpl/`                           | `cmd/gotmpl/main.go`          |
-| 版本管理              | `cmd/versioning/`                       | `cmd/versioning/main.go`      |
-| 通用通知              | `notify/`                               | 各通知器獨立建構與呼叫        |
-| 排程管理太            | `scheduler/`                            | `scheduler.New()`             |
-| OTel 指標             | `metric/`                               | `metric.InitMeterProvider()`  |
-| OTel Tracer           | `metric/`                               | `metric.InitTracerProvider()` |
-| Remote Write 指標     | `metric/`                               | `NewVictoriaMetricsService()` |
-| Cobra CLI Hook 指標   | `metric/`                               | `metric.CobraCMDHook()`       |
-| 編碼與資料處理        | `encode/`, `utils/`, `time/`            | 各函式獨立呼叫                |
-| 日誌與觀測            | `log/`                                  | `log.Init()`                  |
 
 ## 慣例 (Conventions)
 
