@@ -56,11 +56,12 @@ gosdk/
 ├── mw/                      # Gin 中介層
 │   ├── correlationId.go     # X-Correlation-Id 請求追蹤
 │   └── helmet.go            # 安全性標頭（CSP, X-Frame-Options 等）
-├── metric/                  # OpenTelemetry 監控模組
-│   ├── otel.go              # Go OpenTelemetry metrics 封裝
-│   ├── provider.go          # OTel MeterProvider 初始化與關閉
+├── metric/                  # 指標監控模組（remote write + OTel）
+│   ├── metric.go            # 通用 Prometheus remote-write client（RemoteWriteService）
+│   ├── victoriametrics.go   # VictoriaMetrics 便利建構子（現行預設後端）
+│   ├── mimir.go             # Mimir 相容層（Deprecated alias → RemoteWriteService）
+│   ├── otel.go              # Go OpenTelemetry metrics/traces 封裝（OTLP HTTP）
 │   ├── otel.py              # Python OpenTelemetry metrics 封裝
-│   ├── mimir.go             # Mimir client for metrics 匯出
 │   └── model.go             # Metric 資料結構
 ├── notify/                  # 通用通知模組
 │   ├── notifier.go          # Notifier 介面定義
@@ -138,19 +139,21 @@ gosdk/
 - `Notifier` 介面保持單一方法（`Notify`）：不綁定特定訊息格式，呼叫方自行序列化 summary 字串，使通知器可輕易替換或組合
 - `versioning` CLI 使用純文字 `version` 檔案：避免依賴 git tags 或外部服務，檔案格式為 `major.minor.patch`，可直接納入版本控制
 
-### Mimir 與 OpenTelemetry 指標發送差異 (Mimir vs OpenTelemetry Metrics)
+### Remote Write 與 OpenTelemetry 指標發送差異 (Remote Write vs OpenTelemetry Metrics)
 
-使用 `mimir`（透過 `gosdk/metric`）與使用 `otel`（OpenTelemetry）發送指標的主要差異在於 `系統複雜度` 與 `傳輸協定`。
+使用 `RemoteWriteService`（透過 `gosdk/metric`）與使用 `otel`（OpenTelemetry）發送指標的主要差異在於 `系統複雜度` 與 `傳輸協定`。
 
 以下是兩者的詳細對照表：
 
-| 特性 (Feature)            | 使用 Mimir 發送 (`gosdk/metric`)                                 | 使用 OpenTelemetry 發送 (`go.opentelemetry.io/otel`)               |
+| 特性 (Feature)            | 使用 Remote Write 發送 (`gosdk/metric`)                          | 使用 OpenTelemetry 發送 (`go.opentelemetry.io/otel`)               |
 | :------------------------ | :--------------------------------------------------------------- | :----------------------------------------------------------------- |
 | `傳輸協定 (Protocol)`     | Prometheus 遠端寫入 (Prometheus remote-write)                    | OpenTelemetry 協定 (OTLP)                                          |
 | `依賴大小 (Dependency)`   | 極度輕量（僅需 HTTP 協定與 Protobuf 定義）                       | 較為龐大（需要完整的 OTel SDK 與相關插件）                         |
 | `生命週期 (Lifecycle)`    | 無需特殊管理，隨呼叫發送，不需要 `Shutdown` 釋放資源             | 需要配置 `MeterProvider`、`Exporter` 並於程式結束前進行 `Shutdown` |
 | `批次發送 (Batching)`     | 由開發者在程式碼中主動呼叫 `SendMulti` 控制批次邊界              | 由 SDK 的觀測週期 (`PeriodicReader`) 背景自動收集並定期發送        |
 | `指標轉換 (Sanitization)` | `gosdk` 自動將指標名稱中的 `.` 轉換為 `_` 以符合 Prometheus 規範 | 開發者必須手動定義符合 OTel 與 Prometheus 相容的指標名稱與屬性     |
+
+後端選擇透過 URL 注入：`RemoteWriteService` 對 VictoriaMetrics（`REMOTE_WRITE_URL`，預設 `:8428/api/v1/write`）、Mimir（`MIMIR_URL`，`:9009/api/v1/push`）等任何 remote-write 相容後端通用；OTLP 路徑由 `METRIC_URL` 控制（預設 VictoriaMetrics `:8428/opentelemetry/v1/metrics`）。`MimirService` / `NewMimirService()` 保留為 Deprecated 相容層。
 
 ## 模組對應 (Module Mapping)
 

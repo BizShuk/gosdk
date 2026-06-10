@@ -1,141 +1,25 @@
 package metric
 
-import (
-	"context"
-	"fmt"
-	"net/http"
-	"strings"
-	"time"
+import "github.com/spf13/viper"
 
-	"github.com/castai/promwrite"
-	"github.com/spf13/viper"
-)
+// mimirDefaultURL is Mimir's remote-write endpoint; the path (/api/v1/push)
+// is the only difference from other Prometheus remote-write backends.
+const mimirDefaultURL = "http://localhost:9009/api/v1/push"
 
-type MimirService struct {
-	client *promwrite.Client
-}
+// MimirService is kept for backward compatibility. Mimir is just one of the
+// Prometheus remote-write backends supported by RemoteWriteService.
+//
+// Deprecated: use RemoteWriteService instead.
+type MimirService = RemoteWriteService
 
-var globalMimirService *MimirService
-
-func init() {
-	viper.SetDefault("MIMIR_URL", "http://localhost:9009/api/v1/push")
-}
-
+// NewMimirService creates a RemoteWriteService targeting Mimir, honoring the
+// MIMIR_URL config if set.
+//
+// Deprecated: use NewRemoteWriteService instead.
 func NewMimirService() *MimirService {
-	mimirURL := viper.GetString("MIMIR_URL")
-	httpClient := &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			MaxIdleConns:        100,
-			MaxIdleConnsPerHost: 100,
-			IdleConnTimeout:     90 * time.Second,
-		},
+	url := viper.GetString("MIMIR_URL")
+	if url == "" {
+		url = mimirDefaultURL
 	}
-	return &MimirService{
-		client: promwrite.NewClient(mimirURL, promwrite.HttpClient(httpClient)),
-	}
-}
-
-func sanitizeMetricName(name string) string {
-	return strings.ReplaceAll(name, ".", "_")
-}
-
-func toFloat64(v any) (float64, error) {
-	switch val := v.(type) {
-	case float64:
-		return val, nil
-	case float32:
-		return float64(val), nil
-	case int:
-		return float64(val), nil
-	case int64:
-		return float64(val), nil
-	case int32:
-		return float64(val), nil
-	case int16:
-		return float64(val), nil
-	case int8:
-		return float64(val), nil
-	case uint:
-		return float64(val), nil
-	case uint64:
-		return float64(val), nil
-	case uint32:
-		return float64(val), nil
-	case uint16:
-		return float64(val), nil
-	case uint8:
-		return float64(val), nil
-	default:
-		return 0, fmt.Errorf("unsupported metric value type: %T", v)
-	}
-}
-
-func (s *MimirService) SendMulti(metrics []Metric) error {
-	if len(metrics) == 0 {
-		return nil
-	}
-
-	var req promwrite.WriteRequest
-	for _, m := range metrics {
-		val, err := toFloat64(m.Value)
-		if err != nil {
-			return err
-		}
-
-		labels := []promwrite.Label{
-			{Name: "__name__", Value: sanitizeMetricName(m.Name)},
-		}
-		for k, v := range m.Tags {
-			labels = append(labels, promwrite.Label{Name: k, Value: v})
-		}
-
-		req.TimeSeries = append(req.TimeSeries, promwrite.TimeSeries{
-			Labels: labels,
-			Sample: promwrite.Sample{
-				Time:  time.Unix(m.Timestamp, 0),
-				Value: val,
-			},
-		})
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	if _, err := s.client.Write(ctx, &req); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (s *MimirService) Send(metric Metric) error {
-	return s.SendMulti([]Metric{metric})
-}
-
-// Send sends metrics to Mimir via IMetric interface
-func Send[T IMetric](metrics []T) error {
-	if len(metrics) == 0 {
-		return nil
-	}
-
-	if globalMimirService == nil {
-		globalMimirService = NewMimirService()
-	}
-
-	const batchSize = 50
-	for i := 0; i < len(metrics); i += batchSize {
-		end := min(i+batchSize, len(metrics))
-
-		var toSend []Metric
-		for _, m := range metrics[i:end] {
-			toSend = append(toSend, m.ConvertToMetric()...)
-		}
-
-		if err := globalMimirService.SendMulti(toSend); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return NewRemoteWriteService(url)
 }

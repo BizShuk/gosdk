@@ -1,14 +1,14 @@
 package metric
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
 	"go.uber.org/zap"
 )
 
-func (s *MimirService) SendTest() error {
+// SendTest pushes a small batch of backfilled samples for manual verification.
+func (s *RemoteWriteService) SendTest() error {
 	var metrics []Metric
 	now := time.Now().Unix()
 
@@ -27,7 +27,7 @@ func (s *MimirService) SendTest() error {
 		})
 	}
 
-	zap.S().Infof("sending %d test metrics to Mimir", len(metrics))
+	zap.S().Infof("sending %d test metrics to remote-write backend", len(metrics))
 	if err := s.SendMulti(metrics); err != nil {
 		zap.S().Errorf("SendTest failed: %v", err)
 		return err
@@ -36,44 +36,14 @@ func (s *MimirService) SendTest() error {
 	return nil
 }
 
-func TestMimirService_SendTest(t *testing.T) {
-	svc := NewMimirService()
+func TestRemoteWriteService_SendTest(t *testing.T) {
+	svc := NewRemoteWriteService("")
 	if err := svc.SendTest(); err != nil {
 		t.Errorf("SendTest() error = %v", err)
 	}
 }
 
 func TestToFloat64(t *testing.T) {
-	toFloat64 := func(v any) (float64, error) {
-		switch val := v.(type) {
-		case float64:
-			return val, nil
-		case float32:
-			return float64(val), nil
-		case int:
-			return float64(val), nil
-		case int64:
-			return float64(val), nil
-		case int32:
-			return float64(val), nil
-		case int16:
-			return float64(val), nil
-		case int8:
-			return float64(val), nil
-		case uint:
-			return float64(val), nil
-		case uint64:
-			return float64(val), nil
-		case uint32:
-			return float64(val), nil
-		case uint16:
-			return float64(val), nil
-		case uint8:
-			return float64(val), nil
-		default:
-			return 0, fmt.Errorf("unsupported metric value type: %T", v)
-		}
-	}
 	tests := []struct {
 		name    string
 		input   any

@@ -36,7 +36,7 @@ func Tracer(name string, opts ...trace.TracerOption) trace.Tracer {
 }
 
 func init() {
-	viper.SetDefault("METRIC_URL", "http://localhost:9009/otlp/v1/metrics")
+	viper.SetDefault("METRIC_URL", "http://localhost:8428/opentelemetry/v1/metrics")
 }
 
 // InitMeterProvider initializes the SDK MeterProvider, registers it globally, and caches it.
@@ -48,13 +48,13 @@ func InitMeterProvider(ctx context.Context) error {
 		return nil
 	}
 
-	mimirURL := viper.GetString("METRIC_URL")
+	metricURL := viper.GetString("METRIC_URL")
 
 	var opts []otlpmetrichttp.Option
-	opts = append(opts, otlpmetrichttp.WithEndpointURL(mimirURL))
+	opts = append(opts, otlpmetrichttp.WithEndpointURL(metricURL))
 	// If URL starts with http://, we need to specify WithInsecure option.
 	// We use a simple prefix check.
-	if len(mimirURL) >= 7 && mimirURL[:7] == "http://" {
+	if len(metricURL) >= 7 && metricURL[:7] == "http://" {
 		opts = append(opts, otlpmetrichttp.WithInsecure())
 	}
 
