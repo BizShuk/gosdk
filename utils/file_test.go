@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -420,5 +421,58 @@ func TestFileUtilities(t *testing.T) {
 			t.Errorf("Expected recursive backup content %q, got %q", content2, string(bakBakData))
 		}
 	})
+
+	t.Run("OpenFileAndWriteFileWithWriterOption", func(t *testing.T) {
+		fpath := filepath.Join(tmpDir, "writer_option_test.txt")
+		_ = os.Remove(fpath)
+
+		var w io.Writer
+
+		// 1. 檔案不存在且未指定 WithCreate()，OpenFile 應失敗且 w 應為 nil
+		_, err := OpenFile(fpath, WithReturnWriter(&w))
+		if err == nil {
+			t.Error("expected error when file does not exist")
+		}
+		if w != nil {
+			t.Errorf("expected w to be nil, got %v", w)
+		}
+
+		// 2. 檔案不存在，指定 WithCreate()，OpenFile 應成功，w 應被設為開啟的 *os.File
+		file, err := OpenFile(fpath, WithCreate(), WithReturnWriter(&w))
+		if err != nil {
+			t.Fatalf("failed to open file: %v", err)
+		}
+		defer file.Close()
+
+		if w == nil {
+			t.Fatal("expected w to be set")
+		}
+		osFile, ok := w.(*os.File)
+		if !ok {
+			t.Fatalf("expected w to be *os.File, got %T", w)
+		}
+		if osFile.Name() != fpath {
+			t.Errorf("expected file path %q, got %q", fpath, osFile.Name())
+		}
+
+		// 3. 測試 WriteFile 搭配 WithReturnWriter 成功寫入
+		fpath2 := filepath.Join(tmpDir, "writer_option_write_test.txt")
+		var w2 io.Writer
+		err = WriteFile(fpath2, bytes.NewBufferString("hello"), WithCreate(), WithReturnWriter(&w2))
+		if err != nil {
+			t.Fatalf("WriteFile failed: %v", err)
+		}
+		if w2 == nil {
+			t.Fatal("expected w2 to be set")
+		}
+		osFile2, ok := w2.(*os.File)
+		if !ok {
+			t.Fatalf("expected w2 to be *os.File, got %T", w2)
+		}
+		if osFile2.Name() != fpath2 {
+			t.Errorf("expected file path %q, got %q", fpath2, osFile2.Name())
+		}
+	})
 }
+
 

@@ -200,40 +200,66 @@ func LoadCSV[T any](inputPath string) ([]T, error) {
 	return records, nil
 }
 
-// WriteFile writes payload to absPath according to provided options.
-// Default behavior is to fail if file doesn't exist, and override if it does.
-func WriteFile(absPath string, payload io.Reader, opts ...FileOption) error {
-	var config createOpts
+// OpenFile opens or creates a file at absPath according to provided options.
+func OpenFile(absPath string, opts ...FileOptionFunc) (*os.File, error) {
+	var config FileOptions
 	for _, opt := range opts {
 		opt(&config)
+	}
+
+	if config.writer != nil {
+		*config.writer = nil
 	}
 
 	exists := FileExists(absPath)
 	if !exists {
 		if !config.create {
-			return fmt.Errorf("file %s does not exist and WithCreate was not specified: %w", absPath, os.ErrNotExist)
+			return nil, fmt.Errorf("file %s does not exist and WithCreate was not specified: %w", absPath, os.ErrNotExist)
 		}
 	} else {
 		if config.backup {
 			if err := backupAndRemoveIfExists(absPath); err != nil {
-				return fmt.Errorf("failed to backup existing file: %w", err)
+				return nil, fmt.Errorf("failed to backup existing file: %w", err)
 			}
 		}
 	}
 
 	// 確保目錄存在
 	if err := os.MkdirAll(filepath.Dir(absPath), 0o755); err != nil {
-		return fmt.Errorf("failed to create directory: %w", err)
+		return nil, fmt.Errorf("failed to create directory: %w", err)
 	}
 
 	// 建立或開啟檔案進行寫入（直接 truncate 覆寫）
 	out, err := os.Create(absPath)
 	if err != nil {
-		return fmt.Errorf("failed to create file %s: %w", absPath, err)
+		return nil, fmt.Errorf("failed to create file %s: %w", absPath, err)
+	}
+
+	if config.writer != nil {
+		*config.writer = out
+	}
+
+	return out, nil
+}
+
+// WriteFile writes payload to absPath according to provided options.
+// Default behavior is to fail if file doesn't exist, and override if it does.
+func WriteFile(absPath string, payload io.Reader, opts ...FileOptionFunc) error {
+	var config FileOptions
+	for _, opt := range opts {
+		opt(&config)
+	}
+
+	out, err := OpenFile(absPath, opts...)
+	if err != nil {
+		return err
 	}
 	defer out.Close()
 
 	if _, err = io.Copy(out, payload); err != nil {
+		if config.writer != nil {
+			*config.writer = nil
+		}
 		return fmt.Errorf("failed to save file %s: %w", absPath, err)
 	}
 
@@ -241,7 +267,7 @@ func WriteFile(absPath string, payload io.Reader, opts ...FileOption) error {
 }
 
 // CreateFile is an alias for WriteFile.
-func CreateFile(absPath string, payload io.Reader, opts ...FileOption) error {
+func CreateFile(absPath string, payload io.Reader, opts ...FileOptionFunc) error {
 	return WriteFile(absPath, payload, opts...)
 }
 
