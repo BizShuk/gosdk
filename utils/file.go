@@ -20,26 +20,9 @@ func FileExists(fpath string) bool {
 	return err == nil
 }
 
+// Deprecated: use WriteFile instead.
 func SaveFile(absPath string, payload io.Reader) error {
-	zap.L().Info("Save File to ", zap.String("file path", absPath))
-	// Create the directory if it doesn't exist
-	if err := os.MkdirAll(filepath.Dir(absPath), 0o755); err != nil {
-		return fmt.Errorf("failed to create directory: %w", err)
-	}
-	// Create the file
-	out, err := os.Create(absPath)
-	if err != nil {
-		return fmt.Errorf("failed to create file %s: %w", absPath, err)
-	}
-	defer out.Close()
-
-	// Write the body to file
-	_, err = io.Copy(out, payload)
-	if err != nil {
-		return fmt.Errorf("failed to save file %s: %w", absPath, err)
-	}
-
-	return nil
+	return WriteFile(absPath, payload, WithCreate())
 }
 
 // WriteCSV writes data (either [][]string or a slice of structs) to a CSV file.
@@ -215,4 +198,99 @@ func LoadCSV[T any](inputPath string) ([]T, error) {
 		return nil, fmt.Errorf("parse csv: %w", err)
 	}
 	return records, nil
+}
+
+// WriteFile writes payload to absPath according to provided options.
+// Default behavior is to fail if file doesn't exist, and override if it does.
+func WriteFile(absPath string, payload io.Reader, opts ...FileOption) error {
+	var config createOpts
+	for _, opt := range opts {
+		opt(&config)
+	}
+
+	exists := FileExists(absPath)
+	if !exists {
+		if !config.create {
+			return fmt.Errorf("file %s does not exist and WithCreate was not specified: %w", absPath, os.ErrNotExist)
+		}
+	} else {
+		if config.backup {
+			if err := backupAndRemoveIfExists(absPath); err != nil {
+				return fmt.Errorf("failed to backup existing file: %w", err)
+			}
+		}
+	}
+
+	// 確保目錄存在
+	if err := os.MkdirAll(filepath.Dir(absPath), 0o755); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+
+	// 建立或開啟檔案進行寫入（直接 truncate 覆寫）
+	out, err := os.Create(absPath)
+	if err != nil {
+		return fmt.Errorf("failed to create file %s: %w", absPath, err)
+	}
+	defer out.Close()
+
+	if _, err = io.Copy(out, payload); err != nil {
+		return fmt.Errorf("failed to save file %s: %w", absPath, err)
+	}
+
+	return nil
+}
+
+// CreateFile is an alias for WriteFile.
+func CreateFile(absPath string, payload io.Reader, opts ...FileOption) error {
+	return WriteFile(absPath, payload, opts...)
+}
+
+// backupAndRemoveIfExists checks if path exists. If it does, recursively backups to path.bak.
+func backupAndRemoveIfExists(path string) error {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return nil
+	}
+
+	backupPath := path + ".bak"
+	if _, err := os.Stat(backupPath); err == nil {
+		if err := backupAndRemoveIfExists(backupPath); err != nil {
+			return err
+		}
+	}
+
+	if err := os.Rename(path, backupPath); err != nil {
+		if err := copyAndRemove(path, backupPath); err != nil {
+			return fmt.Errorf("rename/copy backup failed: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// copyAndRemove copies src to dst and then removes src.
+func copyAndRemove(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return err
+	}
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	if _, err = io.Copy(out, in); err != nil {
+		return err
+	}
+
+	in.Close()
+	out.Close()
+
+	return os.Remove(src)
 }

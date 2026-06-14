@@ -340,4 +340,85 @@ func TestFileUtilities(t *testing.T) {
 			t.Errorf("unexpected record 1: %+v", records[1])
 		}
 	})
+
+	t.Run("CreateFileWithOptions", func(t *testing.T) {
+		fpath := filepath.Join(tmpDir, "option_test.txt")
+
+		// 1. 檔案不存在，且未指定 WithCreate() -> 應報錯且不建立檔案
+		err := CreateFile(fpath, bytes.NewBufferString("no-create")) // 傳入空 option
+		if err == nil {
+			t.Error("Expected error when file does not exist and WithCreate() is not specified")
+		}
+
+		// 2. 檔案不存在，指定 WithCreate() -> 建立檔案
+		content1 := "version 1"
+		err = CreateFile(fpath, bytes.NewBufferString(content1), WithCreate())
+		if err != nil {
+			t.Fatalf("Failed to create file: %v", err)
+		}
+		data, _ := os.ReadFile(fpath)
+		if string(data) != content1 {
+			t.Errorf("Expected content %q, got %q", content1, string(data))
+		}
+
+		// 3. 檔案已存在，未指定 WithBackup() -> 應直接覆寫 (Override)，不備份
+		content2 := "version 2"
+		err = CreateFile(fpath, bytes.NewBufferString(content2), WithCreate()) // 未指定 WithBackup
+		if err != nil {
+			t.Fatalf("Failed to override file: %v", err)
+		}
+		data, _ = os.ReadFile(fpath)
+		if string(data) != content2 {
+			t.Errorf("Expected content %q, got %q", content2, string(data))
+		}
+		if FileExists(fpath + ".bak") {
+			t.Error("Expected backup file NOT to exist")
+		}
+
+		// 4. 檔案已存在，指定 WithBackup() -> 備份舊檔並寫入新檔
+		content3 := "version 3"
+		err = CreateFile(fpath, bytes.NewBufferString(content3), WithCreate(), WithBackup())
+		if err != nil {
+			t.Fatalf("Failed to create with backup: %v", err)
+		}
+		data, _ = os.ReadFile(fpath)
+		if string(data) != content3 {
+			t.Errorf("Expected content %q, got %q", content3, string(data))
+		}
+		bakPath := fpath + ".bak"
+		if !FileExists(bakPath) {
+			t.Error("Expected backup file to exist")
+		}
+		bakData, _ := os.ReadFile(bakPath)
+		if string(bakData) != content2 {
+			t.Errorf("Expected backup content %q, got %q", content2, string(bakData))
+		}
+
+		// 5. 再次寫入，且指定 WithBackup() -> 遞迴備份
+		content4 := "version 4"
+		err = CreateFile(fpath, bytes.NewBufferString(content4), WithCreate(), WithBackup())
+		if err != nil {
+			t.Fatalf("Failed to create with recursive backup: %v", err)
+		}
+		data, _ = os.ReadFile(fpath)
+		if string(data) != content4 {
+			t.Errorf("Expected content %q, got %q", content4, string(data))
+		}
+		if !FileExists(bakPath) {
+			t.Error("Expected backup file to exist")
+		}
+		bakData, _ = os.ReadFile(bakPath)
+		if string(bakData) != content3 {
+			t.Errorf("Expected backup content %q, got %q", content3, string(bakData))
+		}
+		bakBakPath := bakPath + ".bak"
+		if !FileExists(bakBakPath) {
+			t.Error("Expected recursive backup file to exist")
+		}
+		bakBakData, _ := os.ReadFile(bakBakPath)
+		if string(bakBakData) != content2 {
+			t.Errorf("Expected recursive backup content %q, got %q", content2, string(bakBakData))
+		}
+	})
 }
+
