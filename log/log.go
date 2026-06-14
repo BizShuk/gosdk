@@ -15,8 +15,8 @@ func init() {
 func Init() {
 	config := zap.NewProductionConfig()
 	profile := viper.GetString("PROFILE")
-	if profile != "prod" {
-		config = zap.NewDevelopmentConfig()
+	if profile == "prod" {
+		config = zap.NewProductionConfig()
 	}
 
 	config.Level = zap.NewAtomicLevelAt(GetLogLevel())

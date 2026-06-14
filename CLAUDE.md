@@ -59,6 +59,7 @@ gosdk/
 │       └── big5.go          # Big5 串流解碼器
 ├── log/                     # 結構化日誌模組
 │   ├── log.go               # zap Logger 初始化（Init + ReplaceGlobals）
+│   ├── log_test.go          # 日誌與日誌等級單元測試
 │   └── level.go             # LOG_LEVEL 環境變數解析
 ├── mw/                      # Gin 中介層
 │   ├── correlationId.go     # X-Correlation-Id 請求追蹤
