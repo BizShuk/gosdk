@@ -178,23 +178,23 @@ gosdk/
 
 ## 模組對應 (Module Mapping)
 
-| 業務領域 (Domain)     | 套件/模組 (Package/Module)              | 進入點 (Entry Point)     |
-| --------------------- | --------------------------------------- | ------------------------ |
-| 設定管理              | `config/`                               | `config.Default()`       |
+| 業務領域 (Domain)     | 套件/模組 (Package/Module)              | 進入點 (Entry Point)                                       |
+| --------------------- | --------------------------------------- | ---------------------------------------------------------- |
+| 設定管理              | `config/`                               | `config.Default()`                                         |
 | 資料庫連線            | `db/`                                   | `db.InitSQLite()` / `db.InitMySQL()` / `db.InitPostgres()` |
-| HTTP 服務             | `router/`, `mw/`, `main.go`             | `HTTPServer()`           |
-| 程式碼產生 — stringer | `cmd/stringer/`, `service/generator.go` | `cmd/stringer/main.go`   |
-| 程式碼產生 — gotmpl   | `cmd/gotmpl/`                           | `cmd/gotmpl/main.go`     |
-| 版本管理              | `cmd/versioning/`                       | `cmd/versioning/main.go` |
-| Cobra Hook 範例       | `cmd/cobrasample/`                      | `cmd/cobrasample/main.go` |
-| 通用通知              | `notify/`                               | 各通知器獨立建構與呼叫   |
-| 排程管理              | `scheduler/`                            | `scheduler.New()`        |
-| 編碼與資料處理        | `encode/`, `utils/`, `time/`            | 各函式獨立呼叫           |
-| 日誌與觀測            | `log/`                                  | `log.Init()`             |
-| Remote Write 指標     | `metric/`                               | `NewMetricService()` / `NewVictoriaMetricsService()` |
-| Cobra CLI Hook 指標   | `metric/`                               | `metric.CobraCMDHook()`  |
-| OTel 指標             | `metric/`                               | `metric.InitMeterProvider()` |
-| OTel Tracer           | `metric/`                               | `metric.InitTracerProvider()` |
+| HTTP 服務             | `router/`, `mw/`, `main.go`             | `HTTPServer()`                                             |
+| 程式碼產生 — stringer | `cmd/stringer/`, `service/generator.go` | `cmd/stringer/main.go`                                     |
+| 程式碼產生 — gotmpl   | `cmd/gotmpl/`                           | `cmd/gotmpl/main.go`                                       |
+| 版本管理              | `cmd/versioning/`                       | `cmd/versioning/main.go`                                   |
+| Cobra Hook 範例       | `cmd/cobrasample/`                      | `cmd/cobrasample/main.go`                                  |
+| 通用通知              | `notify/`                               | 各通知器獨立建構與呼叫                                     |
+| 排程管理              | `scheduler/`                            | `scheduler.New()`                                          |
+| 編碼與資料處理        | `encode/`, `utils/`, `time/`            | 各函式獨立呼叫                                             |
+| 日誌與觀測            | `log/`                                  | `log.Init()`                                               |
+| Remote Write 指標     | `metric/`                               | `NewMetricService()` / `NewVictoriaMetricsService()`       |
+| Cobra CLI Hook 指標   | `metric/`                               | `metric.CobraCMDHook()`                                    |
+| OTel 指標             | `metric/`                               | `metric.InitMeterProvider()`                               |
+| OTel Tracer           | `metric/`                               | `metric.InitTracerProvider()`                              |
 
 ## 開發指南 (Development Guide)
 
