@@ -2,6 +2,8 @@
 
 Go 語言通用開發工具包 (Shared SDK)，提供設定管理、HTTP 服務骨架、程式碼產生器、版本管理、通用通知、編碼轉換等可重用模組，作為 Go 專案的基礎函式庫使用。
 
+本 repo 同時是 `Claude Code plugin`：除了作為 Go 函式庫被 `import`，也可安裝為 Claude Code plugin 取得 9 個 Go 專用 skills 與 `golang-refactor` agent。安裝方式見最下方 [Claude Code Plugin](#claude-code-plugin-安裝).
+
 ## 業務領域 (Business Domains)
 
 ### 設定管理 (Configuration Management)
@@ -391,6 +393,31 @@ metric.CobraCMDHook(rootCmd)
 ```
 
 完整可執行範例見 `cmd/cobrasample/`。
+
+## Claude Code Plugin 安裝
+
+本 repo 已附 `.claude-plugin/plugin.json`，可直接作為 Claude Code plugin 載入，提供下列元件：
+
+- `Skills (9)`：`golang-dev`、`golang-gosdk`、`golang-mvc`、`golang-code-quality`、`golang-dead-code`、`golang-naming`、`golang-network`、`golang-performance-tuning`、`migrate-zap-to-slog`
+- `Agents (1)`：`golang-refactor`
+
+`安裝方式 (Installation):`
+
+```bash
+# 方式 1：本地開發載入（指向 clone 出來的目錄）
+claude --plugin-dir /path/to/gosdk
+
+# 方式 2：透過 git source 從遠端安裝（需先建立 marketplace 或直接以 plugin URL）
+claude --plugin-url https://github.com/bizshuk/gosdk
+
+# 安裝後 skill 透過 plugin 名稱 namespace 觸發
+/gosdk:golang-dev
+/gosdk:migrate-zap-to-slog
+```
+
+`版本管理 (Versioning):` plugin `version` 欄位對齊 repo 根目錄的 `version` 檔（目前 `1.0.3`），可透過 `cmd/versioning` CLI 同步遞增。
+
+---
 
 ## 改善建議 (Improvement Suggestions)
 

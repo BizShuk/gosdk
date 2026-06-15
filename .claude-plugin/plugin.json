@@ -1,0 +1,38 @@
+{
+  "name": "gosdk",
+  "description": "Go development toolkit for projects built on github.com/bizshuk/gosdk — bundles 9 Go-focused skills (idiomatic review, MVC layering, performance/network audits, dead-code detection, naming, zap→slog migration, gosdk usage) and the golang-refactor agent.",
+  "version": "1.0.3",
+  "author": {
+    "name": "shuk",
+    "url": "https://github.com/bizshuk"
+  },
+  "homepage": "https://github.com/bizshuk/gosdk",
+  "repository": "https://github.com/bizshuk/gosdk",
+  "license": "MIT",
+  "keywords": [
+    "golang",
+    "go",
+    "gosdk",
+    "cobra",
+    "viper",
+    "gin",
+    "gorm",
+    "slog",
+    "refactor",
+    "code-review"
+  ],
+  "skills": [
+    "./skills/golang-code-quality",
+    "./skills/golang-dead-code",
+    "./skills/golang-dev",
+    "./skills/golang-gosdk",
+    "./skills/golang-mvc",
+    "./skills/golang-naming",
+    "./skills/golang-network",
+    "./skills/golang-performance-tuning",
+    "./skills/migrate-zap-to-slog"
+  ],
+  "agents": [
+    "./agents/golang-refactor.md"
+  ]
+}

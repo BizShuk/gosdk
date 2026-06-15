@@ -114,8 +114,10 @@ gosdk/
 │   ├── type.go              # IsNil() reflect 檢查
 │   ├── type_test.go         # IsNil 測試
 │   └── stringer.go          # stringer go:generate 範例
+├── .claude-plugin/          # Claude Code plugin manifest
+│   └── plugin.json          # plugin metadata（name=gosdk、version 對齊 version 檔）
 ├── plans/                   # 開發計畫文件
-├── skills/                  # Agent skills（golang-dev、golang-gosdk、golang-mvc、golang-code-quality 等 8 個）
+├── skills/                  # Agent skills（9 個：golang-dev、golang-gosdk、golang-mvc、golang-code-quality、golang-dead-code、golang-naming、golang-network、golang-performance-tuning、migrate-zap-to-slog）
 ├── agents/                  # Agent 定義（golang-refactor.md）
 ├── docs/                    # 其他文件（superpowers）
 ├── AGENTS.md                # Agent 入口說明
