@@ -2,9 +2,9 @@ package db
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/spf13/viper"
-	"go.uber.org/zap"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
@@ -59,7 +59,7 @@ func InitMySQL() error {
 		return fmt.Errorf("db.MySQL: MYSQL_DSN not set")
 	}
 
-	zap.S().Infof("db.MySQL: connecting")
+	slog.Debug("db.MySQL: connecting")
 	gormDB, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
 		return fmt.Errorf("db.MySQL: open: %w", err)

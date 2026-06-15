@@ -1,8 +1,9 @@
 package config
 
 import (
+	"log/slog"
+
 	"github.com/spf13/viper"
-	"go.uber.org/zap"
 )
 
 func NewEnvConfig() Config {
@@ -24,7 +25,7 @@ func (c EnvConfig) Load() *viper.Viper {
 	v.SetConfigType("dotenv")
 	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			zap.S().Warnf("Fatal error reading .env: %s", err)
+			slog.Debug("Fatal error reading .env", "err", err)
 		}
 	}
 
@@ -32,7 +33,7 @@ func (c EnvConfig) Load() *viper.Viper {
 	v.SetConfigName(".env.local")
 	if err := v.MergeInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			zap.S().Warnf("Fatal error reading .env.local: %s", err)
+			slog.Debug("Fatal error reading .env.local", "err", err)
 		}
 	}
 

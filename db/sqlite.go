@@ -2,9 +2,9 @@ package db
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/spf13/viper"
-	"go.uber.org/zap"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -62,7 +62,7 @@ func InitSQLite() error {
 		return fmt.Errorf("db.SQLite: SQLITE_PATH not set")
 	}
 
-	zap.S().Infof("db.SQLite: opening %s", path)
+	slog.Debug("db.SQLite: opening", "path", path)
 	gormDB, err := gorm.Open(sqlite.Open(path), &gorm.Config{})
 	if err != nil {
 		return fmt.Errorf("db.SQLite: open %s: %w", path, err)

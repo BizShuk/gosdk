@@ -4,13 +4,13 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 
 	sdkcsv "github.com/bizshuk/gosdk/encode/csv"
 	"github.com/gocarina/gocsv"
-	"go.uber.org/zap"
 )
 
 func FileExists(fpath string) bool {
@@ -29,7 +29,7 @@ func SaveFile(absPath string, payload io.Reader) error {
 // If data is [][]string, it writes the raw rows using standard encoding/csv.
 // Otherwise, it marshals the struct slice using gocsv.
 func WriteCSV(absPath string, data any) error {
-	zap.L().Info("Save CSV to ", zap.String("file path", absPath))
+	slog.Debug("Save CSV to", "file_path", absPath)
 
 	if err := os.MkdirAll(filepath.Dir(absPath), 0o755); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
@@ -48,7 +48,7 @@ func WriteCSV(absPath string, data any) error {
 
 		for _, row := range v {
 			if err := writer.Write(row); err != nil {
-				zap.L().Sugar().Errorf("Warning: could not write row to CSV: %v", err)
+				slog.Debug("Warning: could not write row to CSV", "err", err)
 			}
 		}
 		return nil
@@ -63,7 +63,7 @@ func WriteCSV(absPath string, data any) error {
 func ParseCSVFile(fpath string) (*csv.Reader, *os.File, error) {
 	f, err := os.Open(fpath)
 	if err != nil {
-		zap.L().Sugar().Errorf("error opening file: %v", err)
+		slog.Debug("error opening file", "err", err)
 		return nil, f, err
 	}
 
@@ -109,7 +109,7 @@ type FileCallback func(string) error
 func NewFilelistCallback(pattern string, f FileCallback) error {
 	fileList, err := filepath.Glob(pattern)
 	if err != nil {
-		zap.L().Error("failed to get file list", zap.Any("pattern", pattern), zap.Error(err))
+		slog.Error("failed to get file list", "pattern", pattern, "err", err)
 		return err
 	}
 
@@ -124,7 +124,7 @@ func NewFilelistCallback(pattern string, f FileCallback) error {
 func NewFileOpenCallback(fpath string, fn func(f *os.File) error) error {
 	f, err := os.Open(fpath)
 	if err != nil {
-		zap.L().Error("failed to open file", zap.Any("file", fpath), zap.Error(err))
+		slog.Error("failed to open file", "file", fpath, "err", err)
 		return err
 	}
 	defer f.Close()
@@ -139,7 +139,7 @@ func NewFileOpenCallback(fpath string, fn func(f *os.File) error) error {
 func NewCSVFilelistCallback(pattern string, rowProcessor sdkcsv.RecordProcessor) error {
 	fileList, err := filepath.Glob(pattern)
 	if err != nil {
-		zap.L().Error("file glob failed", zap.Any("pattern", pattern), zap.Error(err))
+		slog.Error("file glob failed", "pattern", pattern, "err", err)
 		return err
 	}
 
@@ -176,7 +176,7 @@ func CreateIfNotExist(path string, defaultValue string) error {
 	}
 
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		zap.L().Info("Writing default value to", zap.String("path", path))
+		slog.Debug("Writing default value to", "path", path)
 		if err := os.WriteFile(path, []byte(defaultValue), 0o644); err != nil {
 			return fmt.Errorf("write default value to %s: %w", path, err)
 		}

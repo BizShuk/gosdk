@@ -17,11 +17,11 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/bizshuk/gosdk/config"
 	"github.com/bizshuk/gosdk/db"
 	"github.com/spf13/viper"
-	"go.uber.org/zap"
 )
 
 // AppConfig 自訂設定結構，對應 yaml 中的所有設定區塊。
@@ -63,10 +63,10 @@ func main() {
 	// or config.DefaultWithDir("./conf")
 
 	// --- 用法 1：直接從全域 viper 讀單一鍵值 ---
-	zap.L().Info("config dir", zap.String("value", config.GetConfigDir()))
-	zap.L().Info("APP_NAME", zap.String("value", viper.GetString("APP_NAME")))
-	zap.L().Info("server.host", zap.String("value", viper.GetString("server.host")))
-	zap.L().Info("server.port", zap.Int("value", viper.GetInt("server.port")))
+	slog.Debug("config dir", "value", config.GetConfigDir())
+	slog.Debug("APP_NAME", "value", viper.GetString("APP_NAME"))
+	slog.Debug("server.host", "value", viper.GetString("server.host"))
+	slog.Debug("server.port", "value", viper.GetInt("server.port"))
 
 	// --- 用法 2：Unmarshal 成自訂強型別結構 ---
 	var appConfig AppConfig
@@ -75,7 +75,7 @@ func main() {
 		return
 	}
 
-	zap.L().Info("unmarshal appConfig", zap.Any("value", appConfig))
+	slog.Debug("unmarshal appConfig", "value", appConfig)
 
 	// --- 用法 3：用 UnmarshalKey(".", &dest) 示範部分欄位取值 ---
 	// 只取部分常用欄位，示範如何選擇性取值
@@ -85,7 +85,7 @@ func main() {
 		return
 	}
 
-	zap.L().Info("unmarshal appSettings", zap.Any("value", appSettings))
+	slog.Debug("unmarshal appSettings", "value", appSettings)
 
 	// === 設定載入流程說明 ===
 	// 每次執行 config.Default() 後，日誌會顯示實際載入的設定檔：
@@ -99,32 +99,32 @@ func main() {
 	//   2) config.yaml + config.local.yaml
 	//   3) settings.json + settings.local.json
 	//   4) APP_* 環境變數 (最高優先)
-	// zap.L().Info("---- config sources ----")
-	// zap.L().Info(".env.local", zap.String("note", "see 'EnvConfig used:' log"))
-	// zap.L().Info("config.local.yaml", zap.String("note", "see 'YamlConfig used:' log"))
-	// zap.L().Info("settings.json", zap.String("file", viper.ConfigFileUsed()))
+	// slog.Debug("---- config sources ----")
+	// slog.Debug(".env.local", "note", "see 'EnvConfig used:' log")
+	// slog.Debug("config.local.yaml", "note", "see 'YamlConfig used:' log")
+	// slog.Debug("settings.json", "file", viper.ConfigFileUsed())
 
 	// --- 用法 5： Unmarshal 特定區塊成強型別 struct ---
 	var serverConfig ServerConfig
 	if err := viper.UnmarshalKey("server", &serverConfig); err != nil {
-		zap.L().Error("unmarshal server failed", zap.Error(err))
+		slog.Error("unmarshal server failed", "err", err)
 		return
 	}
-	zap.L().Info("unmarshal server", zap.Any("value", serverConfig))
+	slog.Debug("unmarshal server", "value", serverConfig)
 
 	// --- 用法 5：透過 db package 從 viper 取出設定並建立 *gorm.DB ---
 	// InitSQLite() 會讀取 SQLITE_PATH,建立 *SQLite service 並設為 DefaultSQLite singleton。
 	if err := db.InitSQLite(); err != nil {
-		zap.L().Error("db connect failed", zap.Error(err))
+		slog.Error("db connect failed", "err", err)
 		return
 	}
 	defer func() { _ = db.DefaultSQLite.Close() }()
 	gormDB := db.DefaultSQLite.DB()
-	zap.L().Info("db driver", zap.String("name", gormDB.Name()))
+	slog.Debug("db driver", "name", gormDB.Name())
 
 	// --- 用法 6：印出所有 key/value，方便除錯 ---
-	zap.L().Info("---- all settings ----")
+	slog.Debug("---- all settings ----")
 	for _, k := range viper.AllKeys() {
-		zap.L().Info("config", zap.String("key", k), zap.Any("value", viper.Get(k)))
+		slog.Debug("config", "key", k, "value", viper.Get(k))
 	}
 }

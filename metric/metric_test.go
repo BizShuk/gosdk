@@ -1,10 +1,9 @@
 package metric
 
 import (
+	"log/slog"
 	"testing"
 	"time"
-
-	"go.uber.org/zap"
 )
 
 // SendTest pushes a small batch of backfilled samples for manual verification.
@@ -27,12 +26,12 @@ func (s *MetricService) SendTest() error {
 		})
 	}
 
-	zap.S().Infof("sending %d test metrics to remote-write backend", len(metrics))
+	slog.Debug("sending test metrics to remote-write backend", "count", len(metrics))
 	if err := s.SendMulti(metrics); err != nil {
-		zap.S().Errorf("SendTest failed: %v", err)
+		slog.Error("SendTest failed", "err", err)
 		return err
 	}
-	zap.S().Infof("SendTest completed successfully")
+	slog.Debug("SendTest completed successfully")
 	return nil
 }
 

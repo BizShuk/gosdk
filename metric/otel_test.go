@@ -3,12 +3,13 @@ package metric
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"os"
 	"testing"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
 	otelmetric "go.opentelemetry.io/otel/metric"
-	"go.uber.org/zap"
 )
 
 // PortStatus 代表應用層監測的埠口狀態
@@ -29,10 +30,9 @@ var (
 )
 
 func TestOtelSample(t *testing.T) {
-	// 初始化 zap 結構化日誌
-	logger, _ := zap.NewDevelopment()
-	zap.ReplaceGlobals(logger)
-	defer logger.Sync()
+	// 初始化 slog 結構化日誌（測試環境使用 debug level + text handler）
+	handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})
+	slog.SetDefault(slog.New(handler))
 
 	ctx := context.Background()
 
@@ -41,7 +41,7 @@ func TestOtelSample(t *testing.T) {
 		t.Fatalf("Failed to initialize MeterProvider: %v", err)
 	}
 
-	zap.L().Info("Initializing OpenTelemetry TracerProvider")
+	slog.Debug("Initializing OpenTelemetry TracerProvider")
 	err = InitTracerProvider(ctx)
 	if err != nil {
 		t.Fatalf("Failed to initialize TracerProvider: %v", err)
@@ -50,9 +50,9 @@ func TestOtelSample(t *testing.T) {
 	defer func() {
 		// 關閉以確保所有緩衝指標與 traces 皆已導出
 		if err := ShutdownOTel(ctx); err != nil {
-			zap.L().Error("Failed to shutdown Meter/Tracer Provider", zap.Error(err))
+			slog.Error("Failed to shutdown Meter/Tracer Provider", "err", err)
 		} else {
-			zap.L().Info("Meter/Tracer Provider shutdown successfully")
+			slog.Debug("Meter/Tracer Provider shutdown successfully")
 		}
 	}()
 
@@ -100,13 +100,13 @@ func TestOtelSample(t *testing.T) {
 		},
 	}
 
-	zap.L().Info("Recording port statuses to OpenTelemetry and Tracing...")
+	slog.Debug("Recording port statuses to OpenTelemetry and Tracing...")
 	UpdateStatuses(ctx, mockStatuses)
 
-	zap.L().Info("Simulate waiting for telemetry export interval...")
+	slog.Debug("Simulate waiting for telemetry export interval...")
 	time.Sleep(2 * time.Second)
 
-	zap.L().Info("Sample execution finished.")
+	slog.Debug("Sample execution finished.")
 }
 
 // UpdateStatuses 將埠口檢測狀態記錄到 OpenTelemetry 指標中，並記錄 Trace Spans
@@ -136,11 +136,11 @@ func UpdateStatuses(ctx context.Context, statuses []PortStatus) {
 			procName = "unknown"
 		}
 
-		zap.L().Info("Recording status",
-			zap.String("service", s.Service),
-			zap.Int("port", s.Port),
-			zap.Float64("value", val),
-			zap.Float64("latency_ms", s.LatencyMs),
+		slog.Debug("Recording status",
+			"service", s.Service,
+			"port", s.Port,
+			"value", val,
+			"latency_ms", s.LatencyMs,
 		)
 
 		statusGauge.Record(ctx, val, otelmetric.WithAttributes(

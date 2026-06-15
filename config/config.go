@@ -3,11 +3,11 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
 	"github.com/spf13/viper"
-	"go.uber.org/zap"
 )
 
 type Config interface {
@@ -51,9 +51,9 @@ func Default(opts ...ConfigOption) {
 		viper.Set("APP_CONFIG_DIR", o.appConfigDir)
 	}
 
-	zap.L().Info("Load Configure...",
-		zap.String("CONFIG_DIR", GetConfigDir()),
-		zap.String("APP_CONFIG_DIR", GetAppConfigDir()),
+	slog.Debug("Load Configure...",
+		"CONFIG_DIR", GetConfigDir(),
+		"APP_CONFIG_DIR", GetAppConfigDir(),
 	)
 
 	v1 := NewEnvConfig().Load()
@@ -82,7 +82,7 @@ func Default(opts ...ConfigOption) {
 
 	// 輸出結果
 	inlineJSON := string(jsonBytes)
-	zap.S().Infof("Config Loaded:", inlineJSON)
+	slog.Debug("Config Loaded", "settings", inlineJSON)
 }
 
 // DefaultWithDir 允許自訂設定檔目錄，並載入設定。

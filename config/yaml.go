@@ -1,8 +1,9 @@
 package config
 
 import (
+	"log/slog"
+
 	"github.com/spf13/viper"
-	"go.uber.org/zap"
 )
 
 type YamlConfig struct{}
@@ -24,7 +25,7 @@ func (c *YamlConfig) Load() *viper.Viper {
 	v.SetConfigType("yaml")
 	if err := v.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			zap.S().Warnf("Warning reading config.yaml: %s", err)
+			slog.Debug("Warning reading config.yaml", "err", err)
 		}
 	}
 
@@ -32,7 +33,7 @@ func (c *YamlConfig) Load() *viper.Viper {
 	v.SetConfigName("config.local")
 	if err := v.MergeInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			zap.S().Warnf("Warning reading config.local.yaml: %s", err)
+			slog.Debug("Warning reading config.local.yaml", "err", err)
 		}
 	}
 

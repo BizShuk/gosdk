@@ -2,9 +2,9 @@ package db
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/spf13/viper"
-	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -63,7 +63,7 @@ func InitPostgres() error {
 		return fmt.Errorf("db.Postgres: POSTGRES_DSN not set")
 	}
 
-	zap.S().Infof("db.Postgres: connecting")
+	slog.Debug("db.Postgres: connecting")
 	gormDB, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		return fmt.Errorf("db.Postgres: open: %w", err)

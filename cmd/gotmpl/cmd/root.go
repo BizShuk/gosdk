@@ -5,11 +5,11 @@ package cmd
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"go.uber.org/zap"
 )
 
 var cfgFile string
@@ -30,10 +30,11 @@ to quickly create a Cobra application.`,
 		loader := &TemplateLoader{}
 		err := viper.Unmarshal(loader)
 		if err != nil {
-			zap.S().Fatal("Failed to load config.yaml")
+			slog.Error("Failed to load config.yaml", "err", err)
+			os.Exit(1)
 		}
 
-		zap.S().Info(loader)
+		slog.Debug("loaded config", "loader", loader)
 		loader.Load()
 
 	},

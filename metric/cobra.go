@@ -1,13 +1,13 @@
 package metric
 
 import (
+	"log/slog"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"go.uber.org/zap"
 )
 
 // CobraHookMetricName is the metric name emitted by CobraCMDHook.
@@ -44,9 +44,9 @@ func CobraCMDHook(root *cobra.Command) {
 		}
 
 		if err := Send([]Metric{m}); err != nil {
-			zap.L().Warn("cobra metric hook send failed",
-				zap.String("cmd", m.Tags["cmd"]),
-				zap.Error(err))
+			slog.Debug("cobra metric hook send failed",
+				"cmd", m.Tags["cmd"],
+				"err", err)
 		}
 		if existingPre != nil {
 			return existingPre(cmd, args)

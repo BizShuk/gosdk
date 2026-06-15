@@ -3,11 +3,10 @@ package csv
 import (
 	"encoding/csv"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
-
-	"go.uber.org/zap"
 )
 
 // RecordProcessor is a callback function for processing a single CSV row.
@@ -26,14 +25,14 @@ func ProcessCSVFile(fpath string, archive bool, processor RecordProcessor) error
 	defer func() {
 		if archive {
 			if _, err := os.Create(fpath + ".archived"); err != nil {
-				zap.L().Error("failed to create archived file", zap.Any("file", fpath))
+				slog.Error("failed to create archived file", "file", fpath)
 			}
 		}
 	}()
 
 	f, err := os.Open(fpath)
 	if err != nil {
-		zap.L().Error("failed to open file", zap.Any("file", fpath), zap.Error(err))
+		slog.Error("failed to open file", "file", fpath, "err", err)
 		return err
 	}
 	defer f.Close()
@@ -53,7 +52,7 @@ func ProcessCSVFile(fpath string, archive bool, processor RecordProcessor) error
 			continue
 		}
 		if err := processor(fname, row); err != nil {
-			zap.L().Error("process row failed", zap.Error(err))
+			slog.Error("process row failed", "err", err)
 			continue
 		}
 	}
