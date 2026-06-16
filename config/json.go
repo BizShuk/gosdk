@@ -18,7 +18,6 @@ func (c JsonConfig) Load() *viper.Viper {
 	v.AddConfigPath(".")
 	v.AddConfigPath("conf")
 	v.AddConfigPath(GetAppConfigDir())
-	v.AddConfigPath(GetConfigDir())
 
 	// Step 1: Load base settings.json
 	v.SetConfigName("settings")

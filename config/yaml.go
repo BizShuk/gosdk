@@ -18,7 +18,6 @@ func (c *YamlConfig) Load() *viper.Viper {
 	v.AddConfigPath(".")
 	v.AddConfigPath("conf")
 	v.AddConfigPath(GetAppConfigDir())
-	v.AddConfigPath(GetConfigDir())
 
 	// Step 1: Load base config.yaml
 	v.SetConfigName("config")

@@ -18,7 +18,6 @@ func (c EnvConfig) Load() *viper.Viper {
 	v.AddConfigPath(".")
 	v.AddConfigPath("conf")
 	v.AddConfigPath(GetAppConfigDir())
-	v.AddConfigPath(GetConfigDir())
 
 	// Step 1: Load base .env
 	v.SetConfigName(".env")
