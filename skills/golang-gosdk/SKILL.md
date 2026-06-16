@@ -26,7 +26,7 @@ A unified reference for using the `github.com/bizshuk/gosdk` library. This SDK p
 
 - Initializing a new Go service that requires configuration loading (`.env`, `yaml`, `embed.FS`).
 - Setting up a Gin HTTP server with standardized middlewares (correlation IDs, security headers, health checks).
-- Implementing structured, level-based logging using `zap`.
+- Implementing structured, level-based logging using stdlib `log/slog`.
 - Processing CSV files with automatic archiving and row-based callbacks.
 - Dealing with CJK character encoding conversions (GBK, Big5 to UTF-8).
 - Pushing time-series metrics to a VictoriaMetrics / Mimir / any Prometheus remote-write endpoint.
@@ -35,7 +35,10 @@ A unified reference for using the `github.com/bizshuk/gosdk` library. This SDK p
 
 ### 1. Initialization & Configuration
 
-Configuration is globally managed via `viper` — no global config struct. The SDK `config.Default()` loads and merges files automatically (dual-file pattern: base + `.local` override):
+This is Default way to load the configuration.
+Create a `config/config.go` in your application. This is the **single source of truth** for configuration initialization
+
+Configuration is globally managed via `viper` — no global config struct. The SDK `config.Default(opts ...ConfigOption)` loads and merges files automatically (dual-file pattern: base + `.local` override):
 
 1. `.env` / `.env.local`
 2. `config.yaml` / `config.local.yaml`
@@ -43,52 +46,46 @@ Configuration is globally managed via `viper` — no global config struct. The S
 
 Environment variables prefixed with `APP_` override config values (`APP_SERVER_PORT` → `server.port`).
 
-#### Standard Pattern (Application Config Package)
+#### `config.Default()` Options
 
-Create a `config/config.go` in your application. This is the **single source of truth** for configuration initialization:
+`Default()` takes functional options. Without any option it loads only from the working dir (`CONFIG_DIR` defaults to `.`).
 
-```go
-// config/config.go
-package config
+| Option                      | Effect                                                                                                                                              |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `WithAppName("myapp")`      | Sets the app name and enables the user config dir `~/.config/myapp` (`GetAppConfigDir()`). Required for `WithDefaultValue` and the app dir helpers. |
+| `WithConfigDir("~/x")`      | Sets the `CONFIG_DIR` search dir (the `~` is expanded). Added to the search path (lowest-priority dir).                                             |
+| `WithConfigPath("~/x")`     | Deprecated alias of `WithConfigDir`. Prefer `WithConfigDir`.                                                                                        |
+| `WithDefaultValue(jsonStr)` | Auto-creates `settings.json` in `GetAppConfigDir()` on first run if it does not exist. **No-op unless `WithAppName` is also set.**                  |
 
-import (
-    "github.com/bizshuk/gosdk/config"
-    "github.com/spf13/viper"
-)
+Alternative to `WithConfigDir` for setting the search dir:
 
-func Init() {
-    // 1. Load config files from ~/.config/<app_name>/ and working dir
-    config.Default(config.WithAppName("<app_name>"))
+- `viper.Set("CONFIG_DIR", "/path")` (or the `CONFIG_DIR` env var) **before** `config.Default()` — same effect as `WithConfigDir`.
 
-    // 2. Set defaults explicitly — acts as fallback when config files omit keys
-    viper.SetDefault("server.port", 8080)
-    viper.SetDefault("db.driver", "sqlite")
-    viper.SetDefault("log.level", "info")
-}
+#### Where `config.Default()` Loads From
+
+Every format loader (`.env`, `config.yaml`, `settings.json`) searches the **same four directories, in this fixed order** — viper uses the _first_ directory in which the named file exists:
+
+```tree
+1. .                       # current working dir
+2. ./conf                  # conf/ subdir of cwd
+3. ~/.config/<appName>     # GetAppConfigDir() — EMPTY unless WithAppName is set
+4. <CONFIG_DIR>            # from WithConfigDir option or CONFIG_DIR viper key/env (default ".")
 ```
 
-Then in `main.go` or any entry point:
+So a `settings.json` in the working dir shadows one in `~/.config/<appName>`. The app's installed/home config lives in dir 3; project-local overrides live in dirs 1–2.
 
-```go
-import (
-    "<module>/config"
-    "github.com/bizshuk/gosdk/log"
-    "github.com/spf13/viper"
-)
+**Common config in `GetAppConfigDir()` → `settings.json`.** When you ship an app with `WithAppName`, the canonical user-level config file in `~/.config/<appName>/` is `settings.json`, because `WithDefaultValue` bootstraps exactly that file there on first run. `.env` is also searched in the same dir but, by convention, `.env` is the working-dir/dev mechanism (secrets, local overrides) rather than the installed app config.
 
-func main() {
-    config.Init()
-    log.Init()
+Sibling app dirs derived from `GetAppConfigDir()` (all require `WithAppName`):
 
-    // Access values directly via viper — no global struct needed
-    port := viper.GetInt("server.port")
-    host := viper.GetString("server.host")
-    debug := viper.GetBool("app.debug")
-}
-```
+| Helper              | Path                       | Purpose        |
+| ------------------- | -------------------------- | -------------- |
+| `GetAppConfigDir()` | `~/.config/<appName>`      | config files   |
+| `GetAppLogDir()`    | `~/.config/<appName>/log`  | log output     |
+| `GetAppDataDir()`   | `~/.config/<appName>/data` | data (e.g. DB) |
 
 > [!IMPORTANT]
-> **Do NOT create a global config struct.** Use `viper.Get*()` directly where the value is needed. This is configuration dependency injection — each consumer pulls only the keys it requires.
+> These dirs are a fixed convention — do NOT add options to redirect config into the data dir or vice versa.
 
 #### Optional: Embed Default JSON
 
@@ -109,12 +106,52 @@ func Init() {
 
 #### Priority Order (highest → lowest)
 
-| Priority | Source                        |
-| -------- | ----------------------------- |
-| 1        | `APP_*` environment variables |
-| 2        | `.local` override files       |
-| 3        | Base config files             |
-| 4        | `viper.SetDefault()` values   |
+Across formats, `Default()` merges env → yaml → json with whole-map override, so JSON wins over YAML wins over dotenv; within each format `.local` wins over its base.
+
+| Priority | Source                                                 |
+| -------- | ------------------------------------------------------ |
+| 1        | `APP_*` environment variables (`viper.AutomaticEnv()`) |
+| 2        | `settings.local.json` → `settings.json`                |
+| 3        | `config.local.yaml` → `config.yaml`                    |
+| 4        | `.env.local` → `.env`                                  |
+| 5        | `viper.SetDefault()` values                            |
+
+#### Setting a Default and Overriding It
+
+There are two distinct "defaults" — don't confuse them:
+
+| Mechanism                     | What it is                                      | Where it sits in priority        |
+| ----------------------------- | ----------------------------------------------- | -------------------------------- |
+| `viper.SetDefault(key, val)`  | In-code fallback value for a single key         | Lowest (priority 5 above)        |
+| `config.WithDefaultValue(js)` | Bootstraps a whole `settings.json` file on disk | A file source (priority 2 above) |
+
+`Set the default`, then let any higher-priority source override it. Always call `viper.SetDefault()` **after** `config.Default()` so file/env values take precedence:
+
+```go
+func Init() {
+    config.Default(config.WithAppName("myapp"))
+
+    // Default — used only when no file/env supplies the key
+    viper.SetDefault("server.port", 8080)
+}
+```
+
+The override then happens automatically by priority, no extra code:
+
+```text
+viper.SetDefault("server.port", 8080)   // 1) fallback = 8080
+# settings.json: { "server": { "port": 9000 } }   → viper.GetInt("server.port") == 9000  (file overrides default)
+# APP_SERVER_PORT=9100 (env)                       → viper.GetInt("server.port") == 9100  (env overrides file)
+```
+
+`Force an override in code` (highest priority of all — beats env and files) with `viper.Set()`; use this for computed/test values, not for normal config:
+
+```go
+viper.Set("server.port", 0) // explicit Set wins over every other source until unset
+```
+
+> [!IMPORTANT]
+> Order matters: `viper.SetDefault()` BEFORE `config.Default()` would be clobbered only if a file/env provides the key — but calling it AFTER is the safe convention so the default never accidentally shadows a freshly loaded value. Reserve `viper.Set()` for deliberate hard overrides (tests, derived values); it outranks user config.
 
 ### 2. HTTP Service (Gin)
 
@@ -163,31 +200,87 @@ err := utils.NewCSVFilelistCallback("data/*.csv", func(fname string, row []strin
 err := csv.ProcessCSVFile("data/import.csv", true, myRecordProcessor)
 ```
 
-### 4. Logging
+#### File Write & Open with Options
 
-The `log` package provides `Init()` to configure `zap` globally (level, format, timestamp). After calling `log.Init()`, use `zap.L()` (structured) or `zap.S()` (sugar) directly — no wrapper functions.
+`utils.WriteFile` (write a payload) and `utils.OpenFile` (get an `*os.File` to write yourself) share the same functional options. `WriteFile` opens via `OpenFile`, `io.Copy`s the payload, and closes for you; `OpenFile` hands back the file (you `Close()` it). `utils.CreateFile` is an alias of `WriteFile`.
+
+| Option                 | Effect                                                                                           | Default if omitted                           |
+| ---------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------- |
+| `WithCreate()`         | Create the file (and parent dirs) if it does not exist.                                          | Returns `os.ErrNotExist` when file is absent |
+| `WithBackup()`         | Before overwriting an existing file, rename it to `<file>.bak` (chains to `.bak.bak` if needed). | Existing file is truncated/overwritten       |
+| `WithReturnWriter(&w)` | Capture the underlying `*os.File` into your `io.Writer` for further writes.                      | No handle exposed                            |
 
 ```go
 import (
+    "io"
+    "strings"
+
+    "github.com/bizshuk/gosdk/utils"
+)
+
+// Write, creating the file if missing
+err := utils.WriteFile("out/report.txt", strings.NewReader("hello"), utils.WithCreate())
+
+// Overwrite but keep a .bak of the previous version
+err = utils.WriteFile("out/report.txt", payload, utils.WithCreate(), utils.WithBackup())
+
+// OpenFile: write incrementally yourself (remember to Close)
+f, err := utils.OpenFile("out/data.bin", utils.WithCreate())
+if err != nil {
+    return err
+}
+defer f.Close()
+// f.Write(...)
+
+// Capture the writer for downstream use
+var w io.Writer
+err = utils.WriteFile("out/log.txt", payload, utils.WithCreate(), utils.WithReturnWriter(&w))
+// w now refers to the opened file; reset to nil on any write error
+```
+
+Key behaviors:
+
+- **Fails closed by default**: without `WithCreate()`, a missing target returns `os.ErrNotExist` — pass `WithCreate()` for create-or-overwrite semantics.
+- **Always truncates**: an existing file is overwritten (`os.Create` semantics); combine with `WithBackup()` if you must preserve the prior content.
+- **`SaveFile` is deprecated**: it just calls `WriteFile(..., WithCreate())` — use `WriteFile` directly.
+
+### 4. Logging
+
+The `log` package provides `Init()` to configure the stdlib `log/slog` global default (level + format). It reads two viper keys and calls `slog.SetDefault()`. After `log.Init()`, use the package-level `slog.*` functions directly — there is no logger object to thread around and no wrapper functions.
+
+| Viper key    | Values (case-insensitive)           | Default |
+| ------------ | ----------------------------------- | ------- |
+| `LOG_LEVEL`  | `debug` / `info` / `warn` / `error` | `info`  |
+| `LOG_FORMAT` | `text` / `json`                     | `text`  |
+
+```go
+import (
+    "log/slog"
+
+    "github.com/bizshuk/gosdk/config"
     "github.com/bizshuk/gosdk/log"
-    "go.uber.org/zap"
 )
 
 func main() {
-    log.Init() // configures zap globally based on PROFILE and LOG_LEVEL
+    config.Default() // load viper settings first (LOG_LEVEL / LOG_FORMAT)
+    log.Init()       // reads LOG_LEVEL + LOG_FORMAT, calls slog.SetDefault()
 
-    // Structured logging (preferred for production — zero-alloc)
-    zap.L().Info("server started", zap.Int("port", 8080))
-    zap.L().Error("connection failed", zap.Error(err))
+    // Structured logging — pass attributes as key/value pairs
+    slog.Info("server started", "port", 8080)
+    slog.Error("connection failed", "err", err)
+    slog.Warn("retry", "attempt", attempt, "max", maxRetries)
 
-    // Sugar logging (convenient for quick/format strings)
-    zap.S().Infof("listening on %s", addr)
-    zap.S().Warnf("retry %d/%d", attempt, maxRetries)
+    // Child logger with shared attributes
+    reqLog := slog.With("request_id", id)
+    reqLog.Info("handling request")
 }
 ```
 
 > [!IMPORTANT]
-> **Do NOT use wrapper functions like `log.Info()`, `log.Errorf()`.** These have been removed. Use `zap.L()` or `zap.S()` directly.
+> **Do NOT use wrapper functions like `log.Info()`, `log.Errorf()` or printf-style formatting.** Use the package-level `slog.*` functions with key/value attributes. Call `log.Init()` again after config reloads to apply the latest `LOG_LEVEL` / `LOG_FORMAT`. Output is fixed to `os.Stdout`.
+
+> [!NOTE]
+> Migrating from zap? Use the `migrate-zap-to-slog` skill. Core mapping: `zap.L()` / `zap.S()` → package-level `slog.*`; typed fields `zap.Int("port", 8080)` → plain pairs `"port", 8080`; `zap.S().Infof("…%s", x)` → build the message or pass attrs (slog has no printf form).
 
 ### 5. Metrics & Tracing (Remote Write vs OpenTelemetry)
 
@@ -196,15 +289,14 @@ The SDK provides two ways to publish metrics. Depending on the complexity and ne
 1. **Option A: Prometheus Remote Write** (Lightweight, developer-pushed write request — VictoriaMetrics, Mimir, or any remote-write compatible backend).
 2. **Option B: OpenTelemetry OTLP** (Standardized OTel SDK for metrics and distributed tracing).
 
-#### Option A: Remote Write (`MetricService`)
+#### Option A: Remote Write (`metric.Send`)
 
-Push time-series metrics to any Prometheus remote-write compatible backend using a lightweight HTTP-based writer. This requires no MeterProvider lifecycle management. Backends differ only in the endpoint URL:
+Push time-series metrics to any Prometheus remote-write compatible backend using a lightweight HTTP writer. No MeterProvider lifecycle to manage.
 
-| Backend                     | Constructor                          | Config key                            | Default endpoint                     |
-| --------------------------- | ------------------------------------ | ------------------------------------- | ------------------------------------ |
-| VictoriaMetrics (`default`) | `metric.NewVictoriaMetricsService()` | `VICTORIAMETRICS_URL`                 | `http://localhost:8428/api/v1/write` |
-| Mimir (compat alias)        | `metric.NewMimirService()`           | `MIMIR_URL`                           | `http://localhost:9009/api/v1/push`  |
-| Any remote-write backend    | `metric.NewMetricService(url)`       | `METRIC_URL` (when `url == ""`)       | `http://localhost:8428/api/v1/write` |
+> [!IMPORTANT]
+> **Default to the package-level generic `metric.Send[T IMetric](metrics []T)`.** It lazily creates and reuses a global `MetricService` bound to `METRIC_URL` (default VictoriaMetrics `http://localhost:8428/api/v1/write`) and auto-batches in groups of 50. You do NOT need to construct or hold a service. Reach for an explicit `MetricService` (below) **only when you need customization** — a non-default backend URL chosen at runtime, or an injected/testable instance.
+
+Anything that implements the `IMetric` interface can be sent. `metric.Metric` already implements it, so the simplest case is sending `[]metric.Metric` directly:
 
 ```go
 import (
@@ -212,32 +304,65 @@ import (
     "github.com/bizshuk/gosdk/metric"
 )
 
-func main() {
-    svc := metric.NewVictoriaMetricsService() // or NewMetricService("") to honor METRIC_URL
-
-    // 1. Send a single metric
-    _ = svc.Send(metric.Metric{
-        Name:      "app.operation.duration", // "." in name will be sanitized to "_" automatically
-        Timestamp: time.Now().Unix(),        // expects epoch SECONDS (int64)
+// Simplest: send plain Metric values (Metric implements IMetric)
+_ = metric.Send([]metric.Metric{
+    {
+        Name:      "app.operation.duration", // "." auto-sanitized to "_"
+        Timestamp: time.Now().Unix(),        // epoch SECONDS (int64), not millis
         Value:     15.4,
         Tags:      map[string]string{"env": "prod", "service": "api"},
-    })
-
-    // 2. Batch send (highly recommended for performance)
-    metrics := []metric.Metric{
-        {Name: "app.cpu.usage", Timestamp: time.Now().Unix(), Value: 42.5, Tags: map[string]string{"host": "srv1"}},
-        {Name: "app.memory.usage", Timestamp: time.Now().Unix(), Value: 80.0, Tags: map[string]string{"host": "srv1"}},
-    }
-    _ = svc.SendMulti(metrics)
-}
+    },
+    {Name: "app.cpu.usage", Timestamp: time.Now().Unix(), Value: 42.5, Tags: map[string]string{"host": "srv1"}},
+})
 ```
 
-Key behaviors of `MetricService`:
+`Send your own domain type` by implementing `IMetric` (`ConvertToMetric() []metric.Metric`) — one struct can expand into several samples:
 
-- Sanitization: `Metric.Name` replaces all `.` with `_` because Prometheus name spec disallows dots.
-- Timestamp: Expects **epoch seconds** (`time.Now().Unix()`), NOT milliseconds.
-- High-Performance: Uses HTTP connection pooling (`MaxIdleConnsPerHost: 100`).
-- Compatibility: `MimirService` is a type alias of `MetricService`; `NewMimirService()` is kept for backward compatibility — prefer `NewVictoriaMetricsService()` or `NewMetricService(url)` in new code.
+```go
+type ServerStat struct {
+    Host string
+    CPU  float64
+    Mem  float64
+}
+
+// ConvertToMetric makes ServerStat satisfy metric.IMetric.
+func (s ServerStat) ConvertToMetric() []metric.Metric {
+    ts := time.Now().Unix()
+    return []metric.Metric{
+        {Name: "app.cpu.usage", Timestamp: ts, Value: s.CPU, Tags: map[string]string{"host": s.Host}},
+        {Name: "app.memory.usage", Timestamp: ts, Value: s.Mem, Tags: map[string]string{"host": s.Host}},
+    }
+}
+
+// Now Send a slice of the domain type directly — no manual conversion needed
+_ = metric.Send([]ServerStat{
+    {Host: "srv1", CPU: 42.5, Mem: 80.0},
+    {Host: "srv2", CPU: 31.0, Mem: 65.5},
+})
+```
+
+`Customization (explicit service)` — only when the default global/`METRIC_URL` is not enough (e.g. a specific backend, or a service you inject for tests):
+
+| Backend                     | Constructor                          | Config key                      | Default endpoint                     |
+| --------------------------- | ------------------------------------ | ------------------------------- | ------------------------------------ |
+| VictoriaMetrics (`default`) | `metric.NewVictoriaMetricsService()` | `VICTORIAMETRICS_URL`           | `http://localhost:8428/api/v1/write` |
+| Mimir (compat alias)        | `metric.NewMimirService()`           | `MIMIR_URL`                     | `http://localhost:9009/api/v1/push`  |
+| Any remote-write backend    | `metric.NewMetricService(url)`       | `METRIC_URL` (when `url == ""`) | `http://localhost:8428/api/v1/write` |
+
+```go
+svc := metric.NewMetricService("http://metrics.internal:9009/api/v1/push")
+_ = svc.Send(metric.Metric{Name: "app.job.done", Timestamp: time.Now().Unix(), Value: 1})
+_ = svc.SendMulti(metrics) // batch via an explicit instance
+```
+
+Key behaviors:
+
+- **Default path is `metric.Send`** (package-level, `IMetric`, global service); explicit `MetricService` only for customization.
+- Sanitization: `Metric.Name` replaces all `.` with `_` (Prometheus disallows dots).
+- Timestamp: epoch **seconds** (`time.Now().Unix()`), NOT milliseconds.
+- Auto-batching: `metric.Send` chunks into batches of 50; `SendMulti` sends one request for the whole slice.
+- High-Performance: HTTP connection pooling (`MaxIdleConnsPerHost: 100`).
+- Compatibility: `MimirService` is a type alias of `MetricService`; prefer `metric.Send` / `NewVictoriaMetricsService()` / `NewMetricService(url)` over the deprecated `NewMimirService()`.
 
 ---
 
@@ -329,6 +454,8 @@ Use the `notify` package to send event summaries to one or more destinations. Th
 ```go
 import (
     "context"
+    "log/slog"
+
     "github.com/bizshuk/gosdk/notify"
 )
 
@@ -347,7 +474,7 @@ multi := notify.NewMulti(
 )
 if err := multi.Notify(ctx, "daily report ready"); err != nil {
     // errors.Join — contains errors from ALL failed notifiers
-    log.Errorf("notify failed: %v", err)
+    slog.Error("notify failed", "err", err)
 }
 ```
 
@@ -393,22 +520,24 @@ Key rules:
 
 ## Common Mistakes
 
-| Mistake                                          | Correction                                                                                                                                                        |
-| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Using `fmt.Println` or standard `log`            | Import `gosdk/log` for `Init()`, then use `zap.L()` (structured) or `zap.S()` (sugar) for all logging.                                                            |
-| Using removed `log.Info()` / `log.Errorf()` etc  | Sugar wrappers have been removed. Use `zap.S().Info()` / `zap.S().Errorf()` or `zap.L().Info()` with `zap.String()` fields.                                       |
-| Creating a global config struct                  | Use `viper.Get*()` directly at point of use. No global struct needed — viper IS the global config store.                                                          |
-| Setting defaults before `config.Default()`       | Call `viper.SetDefault()` AFTER `config.Default()` so file-loaded values take precedence over defaults.                                                           |
-| Hardcoding `viper` keys for DB                   | Use `db.InitSQLite()` / `db.InitMySQL()` which read flat `SQLITE_PATH` / `MYSQL_DSN` from viper, open a connection, and set the corresponding `Default<Storage>` singleton. |
-| Re-implementing security headers                 | Use `mw.Helmet()` instead of manually writing headers. It contains up-to-date best practices (e.g., `Permissions-Policy`, `Cross-Origin-Opener-Policy`).          |
-| Manual CSV opening and iteration                 | Use `csv.ProcessCSVFile` which handles skipping headers, filtering empty rows, and `.archived` marker generation.                                                 |
-| Calling `WithDefaultValue` alone                 | `WithDefaultValue` only writes if using `WithAppName` to ensure it is written to the correct folder.                                                              |
-| Using `.` in metric names manually escaped       | `metric.MetricService` sanitizes `.` → `_` automatically via `sanitizeMetricName`; don't pre-mangle names.                                                        |
-| Using `NewMimirService()` in new code            | Deprecated compat alias. Use `NewVictoriaMetricsService()` (default backend) or `NewMetricService(url)`.                                                          |
-| Passing milliseconds to `Metric.Timestamp`       | Field expects **seconds** (epoch); use `time.Now().Unix()`, not `UnixMilli()`.                                                                                    |
-| Sending one metric at a time in tight loops      | Prefer `SendMulti` to batch samples into a single remote-write request (lower overhead, fewer HTTP round trips).                                                  |
-| Forgetting to call `ShutdownOTel`                | Always `defer metric.ShutdownOTel(ctx)` at application startup to flush all buffered metrics and trace spans before application exit.                             |
-| Passing a struct directly to `Notify`            | `Notifier.Notify` only accepts a `string`. Serialize your payload (e.g., `fmt.Sprintf` or `json.Marshal`) before calling `Notify`.                                |
-| Expecting `Multi` to stop on first error         | `Multi.Notify` calls every notifier regardless of errors. Check the combined `errors.Join` error after the call — it may contain errors from multiple notifiers.  |
-| Panicking when Slack token is missing            | `NewSlackNotifier("", channelID)` is intentionally a no-op; it logs a warning and returns `nil`. No need to guard the constructor with an `if token != ""` check. |
-| Creating custom `expandPath()` / `expandHome()`  | Use `homedir.Expand()` directly at call site. No wrapper function needed — it handles no-`~` paths as no-op.                                                      |
+| Mistake                                         | Correction                                                                                                                                                                   |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Using `fmt.Println` or standard `log`           | Import `gosdk/log` for `Init()`, then use package-level `slog.*` (e.g. `slog.Info(msg, "key", val)`) for all logging.                                                        |
+| Using removed `log.Info()` / `log.Errorf()` etc | Wrapper funcs are gone. Use `slog.Info` / `slog.Error` with key/value attrs; no printf form (`slog.Error("notify failed", "err", err)`).                                     |
+| Creating a global config struct                 | Use `viper.Get*()` directly at point of use. No global struct needed — viper IS the global config store.                                                                     |
+| Setting defaults before `config.Default()`      | Call `viper.SetDefault()` AFTER `config.Default()` so file-loaded values take precedence over defaults.                                                                      |
+| Hardcoding `viper` keys for DB                  | Use `db.InitSQLite()` / `db.InitMySQL()` which read flat `SQLITE_PATH` / `MYSQL_DSN` from viper, open a connection, and set the corresponding `Default<Storage>` singleton.  |
+| Re-implementing security headers                | Use `mw.Helmet()` instead of manually writing headers. It contains up-to-date best practices (e.g., `Permissions-Policy`, `Cross-Origin-Opener-Policy`).                     |
+| Manual CSV opening and iteration                | Use `csv.ProcessCSVFile` which handles skipping headers, filtering empty rows, and `.archived` marker generation.                                                            |
+| Calling `WithDefaultValue` alone                | `WithDefaultValue` only writes if using `WithAppName` to ensure it is written to the correct folder.                                                                         |
+| Using `.` in metric names manually escaped      | `metric.MetricService` sanitizes `.` → `_` automatically via `sanitizeMetricName`; don't pre-mangle names.                                                                   |
+| Using `NewMimirService()` in new code           | Deprecated compat alias. Use `NewVictoriaMetricsService()` (default backend) or `NewMetricService(url)`.                                                                     |
+| Constructing a `MetricService` for normal sends | Default to package-level `metric.Send([]T)` (uses the global service + `METRIC_URL`, auto-batches). Build an explicit service only for a custom URL or an injected instance. |
+| Manually flattening structs into `[]Metric`     | Implement `IMetric` (`ConvertToMetric() []metric.Metric`) on your domain type and pass it straight to `metric.Send`.                                                         |
+| Passing milliseconds to `Metric.Timestamp`      | Field expects **seconds** (epoch); use `time.Now().Unix()`, not `UnixMilli()`.                                                                                               |
+| Sending one metric at a time in tight loops     | Prefer `SendMulti` to batch samples into a single remote-write request (lower overhead, fewer HTTP round trips).                                                             |
+| Forgetting to call `ShutdownOTel`               | Always `defer metric.ShutdownOTel(ctx)` at application startup to flush all buffered metrics and trace spans before application exit.                                        |
+| Passing a struct directly to `Notify`           | `Notifier.Notify` only accepts a `string`. Serialize your payload (e.g., `fmt.Sprintf` or `json.Marshal`) before calling `Notify`.                                           |
+| Expecting `Multi` to stop on first error        | `Multi.Notify` calls every notifier regardless of errors. Check the combined `errors.Join` error after the call — it may contain errors from multiple notifiers.             |
+| Panicking when Slack token is missing           | `NewSlackNotifier("", channelID)` is intentionally a no-op; it logs a warning and returns `nil`. No need to guard the constructor with an `if token != ""` check.            |
+| Creating custom `expandPath()` / `expandHome()` | Use `homedir.Expand()` directly at call site. No wrapper function needed — it handles no-`~` paths as no-op.                                                                 |

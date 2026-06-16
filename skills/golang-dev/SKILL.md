@@ -3,7 +3,7 @@ name: golang-dev
 description: >
     Use when writing Go code in a gosdk-based project — building a CLI with
     cobra, configuring apps with viper, adding database connections (SQLite,
-    MySQL, or PostgreSQL via gorm), structured logging with zap, test setup
+    MySQL, or PostgreSQL via gorm), structured logging with slog, test setup
     with testify, escape analysis for hot paths, or selecting between stdlib
     and third-party libraries.
 allowed-tools: Bash, Read, Edit, Grep, Glob, AskUserQuestion
@@ -232,25 +232,61 @@ server:
 
 ## 3. Common Libraries
 
-| Category   | Library                       | When to use                                                                                    |
-| ---------- | ----------------------------- | ---------------------------------------------------------------------------------------------- |
-| Logging    | `go.uber.org/zap`             | Structured logging. `zap.NewProduction()` for JSON, `zap.NewDevelopment()` for console.        |
-| Testing    | `github.com/stretchr/testify` | `assert` (continue on fail), `require` (stop on fail).                                         |
-| Linting    | `golangci-lint`               | Meta-linter. Install: `go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest`. |
-| HTTP       | `net/http` (stdlib)           | Prefer stdlib. Use `github.com/gin-gonic/gin` only when routing complexity justifies it.       |
-| Hot Reload | `github.com/air-verse/air`    | Dev-time file watcher. Run `air` instead of `go run`.                                          |
-| Mocking    | `github.com/bytedance/mockey` | Runtime monkey-patching for tests.                                                             |
-| CLI        | `github.com/spf13/cobra`      | CLI scaffolding (see Section 1).                                                               |
-| Config     | `github.com/spf13/viper`      | Config management (see Section 2).                                                             |
+| Category   | Library                       | When to use                                                                                      |
+| ---------- | ----------------------------- | ------------------------------------------------------------------------------------------------ |
+| Logging    | `log/slog` (stdlib)           | Structured logging. Use gosdk `log.Init()` (see Section 3.1); call package-level `slog.*` after. |
+| Testing    | `github.com/stretchr/testify` | `assert` (continue on fail), `require` (stop on fail).                                           |
+| Linting    | `golangci-lint`               | Meta-linter. Install: `go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest`.   |
+| HTTP       | `net/http` (stdlib)           | Prefer stdlib. Use `github.com/gin-gonic/gin` only when routing complexity justifies it.         |
+| Hot Reload | `github.com/air-verse/air`    | Dev-time file watcher. Run `air` instead of `go run`.                                            |
+| Mocking    | `github.com/bytedance/mockey` | Runtime monkey-patching for tests.                                                               |
+| CLI        | `github.com/spf13/cobra`      | CLI scaffolding (see Section 1).                                                                 |
+| Config     | `github.com/spf13/viper`      | Config management (see Section 2).                                                               |
 
-### zap quick setup
+### 3.1 Logging (slog)
+
+`When to use:` Any Go project that needs structured logging.
+
+IMPORTANT: If `github.com/bizshuk/gosdk` is available, always use its `log.Init()`. It wraps stdlib `log/slog` and registers the global default via `slog.SetDefault()`. Fall back to constructing a `slog.Handler` manually only if the SDK is not available.
 
 ```go
-func NewLogger(isDev bool) (*zap.Logger, error) {
+import (
+    "log/slog"
+
+    "github.com/bizshuk/gosdk/config"
+    "github.com/bizshuk/gosdk/log"
+)
+
+config.Default() // load viper settings first
+log.Init()       // reads LOG_LEVEL + LOG_FORMAT, calls slog.SetDefault()
+
+// Anywhere later — no logger object to thread around:
+slog.Info("server started", "port", 8080)
+slog.Error("query failed", "err", err)
+```
+
+Two viper keys drive it (override with `LOG_LEVEL` / `LOG_FORMAT` env vars under `config.Default()`):
+
+| Key          | Values (case-insensitive)           | Default |
+| ------------ | ----------------------------------- | ------- |
+| `LOG_LEVEL`  | `debug` / `info` / `warn` / `error` | `info`  |
+| `LOG_FORMAT` | `text` / `json`                     | `text`  |
+
+- Call `log.Init()` again after config is (re)loaded to apply the latest level/format. Output target is fixed to `os.Stdout`.
+- Prefer the structured key–value form (`slog.Info(msg, "key", val)`) over interpolated strings so logs stay machine-parseable.
+- Group repeated attributes with `slog.With(...)` to get a child logger: `l := slog.With("request_id", id); l.Info("...")`.
+
+`Migrating from zap?` There is a dedicated `migrate-zap-to-slog` skill. Core mapping: `zap.L()`/`zap.S()` → package-level `slog.*`; `zap.String("k", v)` typed fields → plain `"k", v` pairs; `logger.Sugar().Infof(...)` → `slog.Info(msg, attrs...)` (no printf-style formatting — build the message or pass attrs).
+
+### Manual slog fallback (no gosdk)
+
+```go
+func NewLogger(isDev bool) *slog.Logger {
+    opts := &slog.HandlerOptions{Level: slog.LevelInfo}
     if isDev {
-        return zap.NewDevelopment()
+        return slog.New(slog.NewTextHandler(os.Stdout, opts))
     }
-    return zap.NewProduction()
+    return slog.New(slog.NewJSONHandler(os.Stdout, opts))
 }
 ```
 

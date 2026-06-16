@@ -58,12 +58,10 @@ func main() {
 	//   5) settings.json     <- 共用 JSON 設定
 	//   6) settings.local.json <- 本地 JSON 覆蓋 (覆蓋 5)
 	//   7) APP_* 環境變數    <- 最高優先序 (覆蓋 1-6)
-	viper.SetDefault("CONFIG_DIR", "./conf")
-	config.Default()
-	// or config.DefaultWithDir("./conf")
+	config.Default(config.WithConfigDir("./conf"))
 
 	// --- 用法 1：直接從全域 viper 讀單一鍵值 ---
-	slog.Debug("config dir", "value", config.GetConfigDir())
+	slog.Debug("config dir", "value", viper.GetString("CONFIG_DIR"))
 	slog.Debug("APP_NAME", "value", viper.GetString("APP_NAME"))
 	slog.Debug("server.host", "value", viper.GetString("server.host"))
 	slog.Debug("server.port", "value", viper.GetInt("server.port"))

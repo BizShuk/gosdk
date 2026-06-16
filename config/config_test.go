@@ -16,7 +16,7 @@ func TestDefaultConfig(t *testing.T) {
 
 	Default()
 
-	dir := GetConfigDir()
+	dir := viper.GetString("CONFIG_DIR")
 	if dir != "." {
 		t.Errorf("Expected config dir ., got %s", dir)
 	}
@@ -29,13 +29,13 @@ func TestConfigDirDefault(t *testing.T) {
 
 	Default()
 
-	dir := GetConfigDir()
+	dir := viper.GetString("CONFIG_DIR")
 	if dir != "." {
 		t.Errorf("Expected default config dir '.', got %s", dir)
 	}
 }
 
-func TestDefaultWithDir(t *testing.T) {
+func TestDefaultWithConfigDirExpansion(t *testing.T) {
 	homeDir, _ := os.UserHomeDir()
 
 	tests := []struct {
@@ -65,9 +65,9 @@ func TestDefaultWithDir(t *testing.T) {
 			viper.Reset()
 			defer viper.Reset()
 
-			DefaultWithDir(tt.input)
+			Default(WithConfigDir(tt.input))
 
-			dir := GetConfigDir()
+			dir := viper.GetString("CONFIG_DIR")
 			if dir != tt.expected {
 				t.Errorf("For %s, expected config dir %s, got %s", tt.input, tt.expected, dir)
 			}

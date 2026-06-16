@@ -12,7 +12,7 @@ Go 語言通用開發工具包 (Shared SDK)，提供設定管理、HTTP 服務�
 
 `領域流程 (Domain Flow):`
 
-1. 呼叫 `config.Default()` 或 `config.DefaultWithDir("/path")` 啟動設定載入，綁定/指定 `CONFIG_DIR`
+1. 呼叫 `config.Default()`（可加 `WithConfigDir("/path")` 或 `WithAppName("myapp")` 等 option）啟動設定載入，綁定/指定 `CONFIG_DIR`
 2. `EnvConfig.Load()` 讀取 `.env` → `.env.local` 並合併至全域 Viper
 3. `YamlConfig.Load()` 讀取 `config.yaml` → `config.local.yaml` 並合併至全域 Viper
 4. `JsonConfig.Load()` 讀取 `settings.json` → `settings.local.json` 並合併至全域 Viper
@@ -21,7 +21,7 @@ Go 語言通用開發工具包 (Shared SDK)，提供設定管理、HTTP 服務�
 
 `核心實體 (Key Entities):` `Config` 介面, `EnvConfig`, `YamlConfig`, `JsonConfig`, `FSConfig`
 
-`相關處理器 (Related Handlers):` `config.Default()`, `config.DefaultWithDir()`, `WithAppName()`, `WithConfigDir()`, `WithConfigPath()`, `WithDefaultValue()`, `NewEnvConfig()`, `NewYamlConfig()`, `NewJsonConfig()`, `NewFSConfig()`
+`相關處理器 (Related Handlers):` `config.Default()`, `GetAppConfigDir()`, `WithAppName()`, `WithConfigDir()`, `WithConfigPath()`, `WithDefaultValue()`, `NewEnvConfig()`, `NewYamlConfig()`, `NewJsonConfig()`, `NewFSConfig()`
 
 ---
 
@@ -247,8 +247,8 @@ config.Default()
 viper.Set("CONFIG_DIR", "/custom/path")
 config.Default()
 
-// 方式 3：直接呼叫帶有自訂路徑的初始化函式
-config.DefaultWithDir("/custom/path")
+// 方式 3：以 option 自訂設定檔目錄
+config.Default(config.WithConfigDir("/custom/path"))
 
 // 方式 4：以 option 設定 app 名稱與預設值（載入 ~/.config/<app_name>/，
 // settings.json 不存在時以 defaultJSON 建立）

@@ -29,10 +29,12 @@ func ExpandHome(path string) string {
 
 // Default 載入預設設定檔。
 //
-// 備註 (Method 1)：應用程式層 (application layer) 可以在呼叫 Default() 之前，
-// 透過設定管理工具 (configuration management tool, Viper) 直接指定設定檔目錄：
+// 自訂設定檔目錄有兩種方式：
+//   - 傳入 option：config.Default(config.WithConfigDir("/path/to/config"))
+//   - 在呼叫前直接設定 viper：viper.Set("CONFIG_DIR", "/path/to/config")
 //
-//	viper.Set("CONFIG_DIR", "/path/to/config")
+// 若要使用應用程式專屬目錄 (~/.config/<appName>)，請改用
+// config.Default(config.WithAppName("myapp")) 並透過 GetAppConfigDir() 取得路徑。
 func Default(opts ...ConfigOption) {
 	o := applyOptions(opts...)
 
@@ -52,7 +54,7 @@ func Default(opts ...ConfigOption) {
 	}
 
 	slog.Debug("Load Configure...",
-		"CONFIG_DIR", GetConfigDir(),
+		"CONFIG_DIR", viper.GetString("CONFIG_DIR"),
 		"APP_CONFIG_DIR", GetAppConfigDir(),
 	)
 
@@ -83,19 +85,6 @@ func Default(opts ...ConfigOption) {
 	// 輸出結果
 	inlineJSON := string(jsonBytes)
 	slog.Debug("Config Loaded", "settings", inlineJSON)
-}
-
-// DefaultWithDir 允許自訂設定檔目錄，並載入設定。
-//
-// 備註 (Method 2)：應用程式層 (application layer) 可以直接呼叫此函式並傳入自訂目錄，
-// 例如：config.DefaultWithDir("/path/to/config")
-func DefaultWithDir(configDir string, opts ...ConfigOption) {
-	viper.Set("CONFIG_DIR", ExpandHome(configDir))
-	Default(opts...)
-}
-
-func GetConfigDir() string {
-	return viper.GetString("CONFIG_DIR")
 }
 
 func GetAppConfigDir() string {

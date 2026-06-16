@@ -28,7 +28,7 @@ gosdk/
 │   └── cobrasample/         # metric/cobra hook 使用範例（可執行 demo）
 │       └── main.go
 ├── config/                  # 設定管理模組
-│   ├── config.go            # Config 介面、Default()、DefaultWithDir()
+│   ├── config.go            # Config 介面、Default()、GetAppConfigDir()
 │   ├── config_test.go       # 基本設定載入測試
 │   ├── option.go            # ConfigOption：WithAppName / WithConfigDir / WithConfigPath / WithDefaultValue
 │   ├── option_test.go       # option 測試

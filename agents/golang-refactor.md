@@ -10,7 +10,7 @@ description: >-
 tools: Read, Edit, Write, Bash, Grep, Glob, AskUserQuestion
 model: inherit
 permissionMode: acceptEdits
-skills: golang-code-quality, golang-dead-code, golang-naming, golang-network, golang-performance-tuning, golang-mvc, golang-dev
+skills: golang-code-quality, golang-dead-code, golang-naming, golang-network, golang-performance-tuning, golang-mvc, golang-dev, golang-gosdk
 mcpServers:
 hooks:
 memory: local

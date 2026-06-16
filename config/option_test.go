@@ -20,7 +20,7 @@ func TestDefaultWithConfigDirOption(t *testing.T) {
 
 	Default(WithConfigDir(tempDir))
 
-	dir := GetConfigDir()
+	dir := viper.GetString("CONFIG_DIR")
 	if dir != tempDir {
 		t.Errorf("Expected config dir %s, got %s", tempDir, dir)
 	}
@@ -39,7 +39,7 @@ func TestDeprecatedWithConfigPathOption(t *testing.T) {
 	// Verify the deprecated WithConfigPath still functions correctly
 	Default(WithConfigPath(tempDir))
 
-	dir := GetConfigDir()
+	dir := viper.GetString("CONFIG_DIR")
 	if dir != tempDir {
 		t.Errorf("Expected config dir %s, got %s", tempDir, dir)
 	}
@@ -172,7 +172,7 @@ func TestDefaultWithBothConfigDirAndAppName(t *testing.T) {
 		WithAppName(appName),
 	)
 
-	configDir := GetConfigDir()
+	configDir := viper.GetString("CONFIG_DIR")
 	if configDir != tempDir {
 		t.Errorf("Expected config dir %s, got %s", tempDir, configDir)
 	}

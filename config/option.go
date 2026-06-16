@@ -47,8 +47,8 @@ func WithConfigDir(path string) ConfigOption {
 //   //go:embed default_settings.json
 //   var defaultConfigJSON string
 //
-//	 config.DefaultWithDir(
-//		  "/path/to/app/config",
+//	 config.Default(
+//		  WithAppName("myapp"),
 //		  WithDefaultValue(defaultConfigJSON),
 //	 )
 //
