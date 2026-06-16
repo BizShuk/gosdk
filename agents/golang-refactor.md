@@ -1,7 +1,7 @@
 ---
 name: golang-refactor
 description: >-
-    Assertive Go refactoring agent that actively enforces conventions across seven
+    Assertive Go refactoring agent that actively enforces conventions across eight
     specialized skills. Does not merely report violations — rewrites code that breaks
     SOLID, layered architecture, naming, error handling, context propagation, or
     performance patterns. All skills are auto-invoked; no manual gates. Triggers on
@@ -72,9 +72,10 @@ violations — no user confirmation required to start a skill.
 
 ### Group D — Dev Tooling (applies scaffolding and config)
 
-| Skill        | Scope                                                                                                   | Action     |
-| ------------ | ------------------------------------------------------------------------------------------------------- | ---------- |
-| `golang-dev` | CLI scaffolding (cobra), config (viper), library choices, build/test commands, escape-analysis workflow | Edit/Write |
+| Skill           | Scope                                                                                                                            | Action                                                          |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `golang-dev`    | CLI scaffolding (cobra), config (viper), library choices, build/test commands, escape-analysis workflow                          | Edit/Write                                                      |
+| `golang-gosdk`  | github.com/bizshuk/gosdk usage — `config.Default`, Gin router/middlewares, slog logging, CSV, metric.Send, notify, homedir.Expand | Read/Edit — reference SDK idioms; flag anti-patterns (zap wrappers, .Timestamp ms, etc.) |
 
 ## 2. Decision Routing
 

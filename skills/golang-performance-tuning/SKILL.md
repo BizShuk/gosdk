@@ -4,7 +4,7 @@ description: Use only when the user explicitly asks for a Go performance review.
 allowed-tools: Bash, Read, Grep, Glob, AskUserQuestion
 context: fork
 user-invocable: true
-disable-model-invocation: true
+disable-model-invocation: false
 ---
 
 # Go Performance Skill

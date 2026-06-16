@@ -10,7 +10,7 @@ allowed-tools: Bash, Read, Grep, Glob, AskUserQuestion
 model: sonnet
 effort: high
 context: fork
-disable-model-invocation: true
+disable-model-invocation: false
 user-invocable: true
 ---
 

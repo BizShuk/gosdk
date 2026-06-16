@@ -8,7 +8,7 @@ description: >
     and third-party libraries.
 allowed-tools: Bash, Read, Edit, Grep, Glob, AskUserQuestion
 user-invocable: true
-disable-model-invocation: true
+disable-model-invocation: false
 context: fork
 ---
 

@@ -29,21 +29,11 @@ func ExpandHome(path string) string {
 
 // Default 載入預設設定檔。
 //
-// 自訂設定檔目錄有兩種方式：
-//   - 傳入 option：config.Default(config.WithConfigDir("/path/to/config"))
-//   - 在呼叫前直接設定 viper：viper.Set("CONFIG_DIR", "/path/to/config")
-//
-// 若要使用應用程式專屬目錄 (~/.config/<appName>)，請改用
-// config.Default(config.WithAppName("myapp")) 並透過 GetAppConfigDir() 取得路徑。
+// 設定檔搜尋目錄固定為：目前工作目錄 (.)、./conf，以及應用程式專屬目錄
+// ~/.config/<appName>（需透過 config.Default(config.WithAppName("myapp")) 啟用，
+// 並可透過 GetAppConfigDir() 取得路徑）。
 func Default(opts ...ConfigOption) {
 	o := applyOptions(opts...)
-
-	viper.BindEnv("CONFIG_DIR", "CONFIG_DIR")
-	viper.SetDefault("CONFIG_DIR", ".")
-
-	if o.configPath != "" {
-		viper.Set("CONFIG_DIR", o.configPath)
-	}
 
 	if o.appName != "" {
 		appName = o.appName
@@ -54,7 +44,6 @@ func Default(opts ...ConfigOption) {
 	}
 
 	slog.Debug("Load Configure...",
-		"CONFIG_DIR", viper.GetString("CONFIG_DIR"),
 		"APP_CONFIG_DIR", GetAppConfigDir(),
 	)
 

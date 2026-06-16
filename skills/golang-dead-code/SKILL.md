@@ -3,7 +3,7 @@ name: golang-dead-code
 description: Use when the user asks to detect or remove dead code in a Go project — unused functions/vars/types/consts, unreachable branches, dead stores, deprecated APIs. Keywords - staticcheck, deadcode, unparam, U1000.
 argument-hint: [path]
 user-invocable: true
-disable-model-invocation: true
+disable-model-invocation: false
 allowed-tools: Bash, Read, Edit, Grep, Glob, AskUserQuestion
 effort: xhigh
 context: fork

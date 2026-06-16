@@ -3,7 +3,7 @@ name: golang-gosdk
 description: Use when developing, reviewing, or refactoring Go applications that utilize the github.com/bizshuk/gosdk library for configuration management, HTTP routing, logging, or data processing.
 allowed-tools: Bash, Read, Edit, Grep, Glob, AskUserQuestion
 user-invocable: true
-disable-model-invocation: true
+disable-model-invocation: false
 context: fork
 ---
 
@@ -48,28 +48,21 @@ Environment variables prefixed with `APP_` override config values (`APP_SERVER_P
 
 #### `config.Default()` Options
 
-`Default()` takes functional options. Without any option it loads only from the working dir (`CONFIG_DIR` defaults to `.`).
+`Default()` takes functional options. Without any option it loads from the working dir (`.` and `./conf`).
 
 | Option                      | Effect                                                                                                                                              |
 | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `WithAppName("myapp")`      | Sets the app name and enables the user config dir `~/.config/myapp` (`GetAppConfigDir()`). Required for `WithDefaultValue` and the app dir helpers. |
-| `WithConfigDir("~/x")`      | Sets the `CONFIG_DIR` search dir (the `~` is expanded). Added to the search path (lowest-priority dir).                                             |
-| `WithConfigPath("~/x")`     | Deprecated alias of `WithConfigDir`. Prefer `WithConfigDir`.                                                                                        |
 | `WithDefaultValue(jsonStr)` | Auto-creates `settings.json` in `GetAppConfigDir()` on first run if it does not exist. **No-op unless `WithAppName` is also set.**                  |
-
-Alternative to `WithConfigDir` for setting the search dir:
-
-- `viper.Set("CONFIG_DIR", "/path")` (or the `CONFIG_DIR` env var) **before** `config.Default()` — same effect as `WithConfigDir`.
 
 #### Where `config.Default()` Loads From
 
-Every format loader (`.env`, `config.yaml`, `settings.json`) searches the **same four directories, in this fixed order** — viper uses the _first_ directory in which the named file exists:
+Every format loader (`.env`, `config.yaml`, `settings.json`) searches the **same three directories, in this fixed order** — viper uses the _first_ directory in which the named file exists:
 
 ```tree
 1. .                       # current working dir
 2. ./conf                  # conf/ subdir of cwd
 3. ~/.config/<appName>     # GetAppConfigDir() — EMPTY unless WithAppName is set
-4. <CONFIG_DIR>            # from WithConfigDir option or CONFIG_DIR viper key/env (default ".")
 ```
 
 So a `settings.json` in the working dir shadows one in `~/.config/<appName>`. The app's installed/home config lives in dir 3; project-local overrides live in dirs 1–2.
@@ -493,7 +486,7 @@ multi := notify.NewMulti(&notify.StdoutNotifier{}, &EmailNotifier{addr: "ops@exa
 
 Key behaviors of the `notify` package:
 
-- **Graceful no-op**: `NewSlackNotifier` with an empty token creates a nil client; `Notify` logs a warning and returns nil without panicking. Safe to initialize unconditionally; skip-at-runtime if env vars are absent.
+- **Graceful no-op**: `NewSlackNotifier` with an empty token creates a nil client; `Notify` logs a debug message (`slog.Debug`) and returns nil without panicking. Safe to initialize unconditionally; skip-at-runtime if env vars are absent.
 - **Fan-out error handling**: `Multi.Notify` always calls every registered notifier — it never short-circuits on failure. All errors are joined via `errors.Join`; check the combined error after the call.
 - **Format is caller's responsibility**: The `summary string` is an opaque, pre-formatted message. Serialize your struct/report to a string before calling `Notify`.
 
@@ -539,5 +532,5 @@ Key rules:
 | Forgetting to call `ShutdownOTel`               | Always `defer metric.ShutdownOTel(ctx)` at application startup to flush all buffered metrics and trace spans before application exit.                                        |
 | Passing a struct directly to `Notify`           | `Notifier.Notify` only accepts a `string`. Serialize your payload (e.g., `fmt.Sprintf` or `json.Marshal`) before calling `Notify`.                                           |
 | Expecting `Multi` to stop on first error        | `Multi.Notify` calls every notifier regardless of errors. Check the combined `errors.Join` error after the call — it may contain errors from multiple notifiers.             |
-| Panicking when Slack token is missing           | `NewSlackNotifier("", channelID)` is intentionally a no-op; it logs a warning and returns `nil`. No need to guard the constructor with an `if token != ""` check.            |
+| Panicking when Slack token is missing           | `NewSlackNotifier("", channelID)` is intentionally a no-op; it logs a debug message and returns `nil`. No need to guard the constructor with an `if token != ""` check.      |
 | Creating custom `expandPath()` / `expandHome()` | Use `homedir.Expand()` directly at call site. No wrapper function needed — it handles no-`~` paths as no-op.                                                                 |

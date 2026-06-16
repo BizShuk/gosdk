@@ -30,7 +30,7 @@ gosdk/
 ├── config/                  # 設定管理模組
 │   ├── config.go            # Config 介面、Default()、GetAppConfigDir()
 │   ├── config_test.go       # 基本設定載入測試
-│   ├── option.go            # ConfigOption：WithAppName / WithConfigDir / WithConfigPath / WithDefaultValue
+│   ├── option.go            # ConfigOption：WithAppName / WithDefaultValue
 │   ├── option_test.go       # option 測試
 │   ├── env.go               # .env dotenv 載入器（雙檔案模式）
 │   ├── env_test.go          # env 載入器測試
@@ -58,7 +58,7 @@ gosdk/
 │       ├── gbk.go           # GBK 串流解碼器
 │       └── big5.go          # Big5 串流解碼器
 ├── log/                     # 結構化日誌模組
-│   ├── log.go               # zap Logger 初始化（Init + ReplaceGlobals）
+│   ├── log.go               # slog 全域 logger 初始化（init() 自動初始化 + Init() 套用 LOG_LEVEL/LOG_FORMAT）
 │   ├── log_test.go          # 日誌與日誌等級單元測試
 │   └── level.go             # LOG_LEVEL 環境變數解析
 ├── mw/                      # Gin 中介層
@@ -137,7 +137,7 @@ gosdk/
 - Key dependencies:
     - `spf13/viper` v1.17.0 — 階層式設定管理
     - `spf13/cobra` v1.9.1 — CLI 框架（gotmpl、versioning）
-    - `go.uber.org/zap` v1.27.1 — 結構化日誌
+    - `log/slog` (stdlib) — 結構化日誌（取代 zap）
     - `gorm.io/gorm` v1.31.1 — ORM（MySQL + SQLite + PostgreSQL，driver 各 v1.6.0）
     - `castai/promwrite` v0.6.0 — Prometheus remote-write client（MetricService）
     - `go.opentelemetry.io/otel` v1.44.0 — OpenTelemetry SDK（OTLP HTTP metrics/traces）
@@ -154,7 +154,7 @@ gosdk/
 - 扁平 viper key 直讀：`config.Default()` 載入設定後透過 `viper.Get*()` 取值；不再維護強型別 `ConfigSchema` / `ServerConfig` / `DBConfig` 等聚合結構（2026-06 重構後 `config/common` 已廢除）
 - 儲存型態採 per-service singleton：每種儲存是一個獨立 service（`db.SQLite` / `db.MySQL` / `db.Postgres`），各自有 `DefaultSQLite` / `DefaultMySQL` / `DefaultPostgres` 全域 singleton 與扁平 viper key（`SQLITE_PATH` / `MYSQL_DSN` / `POSTGRES_DSN`），守護函式 `InitSQLite()` / `InitMySQL()` / `InitPostgres()` 拒絕重複初始化以落實「micro-service: 同型態不可有兩個 instance」；MySQL 與 PostgreSQL 採單一 DSN 字串欄位而非拆 `HOST`/`PORT`/`USER`/`PASSWORD`，簡化設定並與舊 `url` 對齊(PostgreSQL 接受 URL 形式 `postgres://...` 或 keyword/value 形式 `host=... user=...`)
 - `stringer` 以 `GeneratorEx` 組合模式擴充標準庫 `stringer`：嵌入 `service.Generator`，額外產生 `List()`、`ValueList()`、`Map()`、`ValueMap()` 四個輔助函式
-- 日誌模組在 `init()` 時即初始化：確保任何 import 此套件的模組都能立即使用 `zap.L()` / `zap.S()`，`log.Init()` 可在設定載入後再次呼叫以更新等級。Sugar wrapper 函式已移除，消費端直接使用 zap SDK
+- 日誌模組在 `init()` 時即以預設值初始化 slog 全域 logger：確保任何 import 此套件的模組都能立即使用套件層級 `slog.*`，`log.Init()` 可在設定載入後再次呼叫以套用 `LOG_LEVEL` / `LOG_FORMAT`。不提供 wrapper 函式，消費端直接使用 stdlib `log/slog`
 - CSV 處理使用歸檔標記檔（`.archived`）防止重複處理：以簡單的檔案系統機制取代資料庫或 Redis 的已處理紀錄
 - Helmet 中介層採用靜態安全標頭：直接在 response header 注入 `X-Content-Type-Options`、`X-Frame-Options`、`CSP` 等，不依賴外部套件
 - 排程器採用極簡設計：`Scheduler` 僅負責按 `Interval` 觸發 `Job.Fn`，錯誤處理、日誌、重試等策略完全由呼叫方透過 `Job.OnError` 自行決定
@@ -276,6 +276,6 @@ GitHub Actions workflow 定義於 `.github/workflows/ci.yml`，於 push/PR 至 `
 
 - Naming: 套件名稱使用小寫單字（`config`, `log`, `mw`, `router`, `notify`, `scheduler`）；檔案名稱使用 camelCase（`correlationId.go`, `statsHandler.go`）；常數使用 `UPPER_SNAKE_CASE`
 - Error handling: 使用 `fmt.Errorf("...: %w", err)` 進行 error wrapping；設定載入失敗區分 `ConfigFileNotFoundError`（允許 fallback）與其他錯誤（`log.Warn` 或 `log.Fatal` 終止）
-- Logging: `gosdk/log` 僅提供 `Init()` 初始化 zap 全域實例；所有日誌記錄統一使用 `zap.L()`（結構化）或 `zap.S()`（sugar），不使用 wrapper 函式
+- Logging: `gosdk/log` 在 `init()` 自動初始化、並提供 `Init()` 套用 `LOG_LEVEL` / `LOG_FORMAT`；所有日誌記錄統一使用 stdlib 套件層級 `slog.*`（結構化 key/value），不使用 wrapper 函式
 - Testing: 測試檔案與被測檔案放在同一 package 內（白盒測試）；使用 `testing.T` 標準庫；測試前透過 `viper.Set()` 或 `os.Setenv()` 注入設定
-- Configuration: `CONFIG_DIR` 控制設定檔搜尋路徑；雙檔案模式（base + `.local`）自動載入；`APP_` 前綴環境變數自動覆蓋設定
+- Configuration: 設定檔搜尋路徑固定為 `.`、`./conf`、`~/.config/<appName>`（需 `WithAppName`）；雙檔案模式（base + `.local`）自動載入；`APP_` 前綴環境變數自動覆蓋設定

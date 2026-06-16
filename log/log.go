@@ -7,6 +7,13 @@ import (
 	"github.com/spf13/viper"
 )
 
+// init 在套件載入時即以預設值（LOG_LEVEL=info、LOG_FORMAT=text）初始化 slog
+// 全域 logger，確保任何 import 此套件的模組都能立即使用 slog。設定載入後
+// （例如 config.Default() 之後）可再次呼叫 Init() 以套用最新的 LOG_LEVEL / LOG_FORMAT。
+func init() {
+	Init()
+}
+
 // Init 根據 viper 設定的 LOG_LEVEL 與 LOG_FORMAT 初始化 slog 全域 logger。
 //
 // 設定來源：

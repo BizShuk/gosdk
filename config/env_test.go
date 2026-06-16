@@ -8,13 +8,11 @@ import (
 	"github.com/spf13/viper"
 )
 
-// setupConfigDir 為測試設定 CONFIG_DIR，確保全域 viper 能正確讀到。
-// 使用 t.Setenv 自動還原，避免並行測試 race condition。
+// setupConfigDir 將測試的工作目錄切換到 dir，使各 loader 透過固定的 "."
+// 搜尋路徑找到該目錄下的設定檔。t.Chdir 會在測試結束後自動還原。
 func setupConfigDir(t *testing.T, dir string) {
 	t.Helper()
-	t.Setenv("CONFIG_DIR", dir)
-	// 全域 viper 需要 BindEnv 才能讀取環境變數
-	viper.BindEnv("CONFIG_DIR", "CONFIG_DIR")
+	t.Chdir(dir)
 	t.Cleanup(func() {
 		viper.Reset()
 	})

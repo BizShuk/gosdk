@@ -8,7 +8,6 @@ import (
 )
 
 type configOptions struct {
-	configPath   string
 	defaultValue string
 	appName      string
 	appConfigDir string
@@ -16,22 +15,6 @@ type configOptions struct {
 
 // ConfigOption defines the functional option type for config loading.
 type ConfigOption func(*configOptions)
-
-// WithConfigPath sets a custom configuration directory.
-//
-// Deprecated: Use WithConfigDir instead.
-func WithConfigPath(path string) ConfigOption {
-	return func(o *configOptions) {
-		o.configPath = path
-	}
-}
-
-// WithConfigDir sets a custom configuration directory.
-func WithConfigDir(path string) ConfigOption {
-	return func(o *configOptions) {
-		o.configPath = path
-	}
-}
 
 // WithDefaultValue specifies a default JSON configuration string to write
 // if the config file does not exist. This only applies to jsonConfig (settings.json).
@@ -80,11 +63,6 @@ func applyOptions(opts ...ConfigOption) *configOptions {
 		if homeDir, err := os.UserHomeDir(); err == nil {
 			o.appConfigDir = filepath.Join(homeDir, ".config", o.appName)
 		}
-	}
-
-	// If WithConfigPath option is provided, expand home symbol
-	if o.configPath != "" {
-		o.configPath = ExpandHome(o.configPath)
 	}
 
 	// Only automatically create settings.json if it is using the appName config directory
