@@ -21,6 +21,9 @@
     "refactor",
     "code-review"
   ],
+  "agents": [
+    "./agents/golang-refactor.md"
+  ],
   "skills": [
     "./skills/golang-code-quality",
     "./skills/golang-dead-code",
@@ -31,8 +34,5 @@
     "./skills/golang-network",
     "./skills/golang-performance-tuning",
     "./skills/migrate-zap-to-slog"
-  ],
-  "agents": [
-    "./agents/golang-refactor.md"
   ]
 }
