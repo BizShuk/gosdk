@@ -7,7 +7,6 @@ import (
 
 	"github.com/bizshuk/gosdk/config"
 	"github.com/bizshuk/gosdk/db"
-	"github.com/bizshuk/gosdk/log"
 	"github.com/bizshuk/gosdk/mw"
 	"github.com/bizshuk/gosdk/router"
 	"github.com/gin-gonic/gin"
@@ -18,11 +17,10 @@ func main() {
 	// 1. Load Configurations via dual-file loading
 	config.Default()
 
-	// 2. Re-initialize log systems with configuration level
-	log.Init()
-	slog.Debug("Configurations loaded successfully.")
-
-	// 3. Connect DB(僅在對應 viper key 有設定時才初始化)
+	// 2. Connect DB(僅在對應 viper key 有設定時才初始化)
+	//
+	// 註：log 套件在 import 時即已透過 init() 完成 slog 設定，
+	// LOG_LEVEL / LOG_FORMAT 需在 import 前注入，這裡不再重新初始化。
 	if viper.IsSet("SQLITE_PATH") {
 		if err := db.InitSQLite(); err != nil {
 			slog.Error("SQLite connection failed", "err", err)
@@ -45,7 +43,7 @@ func main() {
 		}
 	}
 
-	// 4. Start HTTP Server
+	// 3. Start HTTP Server
 	HTTPServer()
 }
 

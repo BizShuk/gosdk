@@ -50,7 +50,19 @@ func setupSink(t *testing.T) *captureServer {
 
 	prev := viper.GetString("METRIC_URL")
 	viper.Set("METRIC_URL", ts.URL)
-	t.Cleanup(func() { viper.Set("METRIC_URL", prev) })
+
+	// Send() lazy-inits a package-level MetricService singleton on first
+	// call using the current METRIC_URL. If a previous test already
+	// triggered that lazy init, the singleton still points at that
+	// test's (now-closed) httptest server, so subsequent tests would
+	// silently fail to send. Reset it so each test's Send() rebinds to
+	// this test's server.
+	prevSvc := globalMetricService
+	globalMetricService = nil
+	t.Cleanup(func() {
+		viper.Set("METRIC_URL", prev)
+		globalMetricService = prevSvc
+	})
 	return cap
 }
 

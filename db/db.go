@@ -10,7 +10,6 @@
 // 典型用法:
 //
 //	config.Default()
-//	log.Init()
 //
 //	if viper.IsSet("SQLITE_PATH") {
 //	    if err := db.InitSQLite(); err != nil { /* 處理錯誤 */ }
