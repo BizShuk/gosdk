@@ -10,8 +10,8 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// CobraHookMetricName is the metric name emitted by CobraCMDHook.
-const CobraHookMetricName = "command_line_trigger"
+// COBRA_HOOK_METRIC_NAME is the metric name emitted by CobraCMDHook.
+const COBRA_HOOK_METRIC_NAME = "command_line_trigger"
 
 // CobraCMDHook wires a metric hook into root. Every execution of root
 // (or any of its subcommands) emits one metric:
@@ -34,7 +34,7 @@ func CobraCMDHook(root *cobra.Command) {
 
 	root.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 		m := Metric{
-			Name:      CobraHookMetricName,
+			Name:      COBRA_HOOK_METRIC_NAME,
 			Timestamp: time.Now().Unix(),
 			Value:     int64(1),
 			Tags: map[string]string{

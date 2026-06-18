@@ -142,11 +142,11 @@ func (g *GeneratorEx) buildListFn(runs [][]service.Value, typeName string) {
 		}
 	}
 	g.Printf("}\n")
-	g.Printf(listFnTemplate, typeName)
+	g.Printf(LIST_FN_TEMPLATE, typeName)
 }
 
 // Argument to format is the type name.
-const listFnTemplate = `func %[1]sList() []string {
+const LIST_FN_TEMPLATE = `func %[1]sList() []string {
 	return _%[1]s_list
 }
 `
@@ -162,11 +162,11 @@ func (g *GeneratorEx) buildValueListFn(runs [][]service.Value, typeName string) 
 	}
 
 	g.Printf("}\n")
-	g.Printf(valueListFnTemplate, typeName)
+	g.Printf(VALUE_LIST_FN_TEMPLATE, typeName)
 }
 
 // Argument to format is the type name.
-const valueListFnTemplate = `func %[1]sValueList() []int64 {
+const VALUE_LIST_FN_TEMPLATE = `func %[1]sValueList() []int64 {
 	return _%[1]s_value_list
 }
 `
@@ -180,11 +180,11 @@ func (g *GeneratorEx) buildMapFn(runs [][]service.Value, typeName string) {
 		}
 	}
 	g.Printf("}\n")
-	g.Printf(mapFnTemplate, typeName)
+	g.Printf(MAP_FN_TEMPLATE, typeName)
 }
 
 // Argument to format is the type name.
-const mapFnTemplate = `func %[1]sMap() map[string]int64 {
+const MAP_FN_TEMPLATE = `func %[1]sMap() map[string]int64 {
 	return _%[1]s_map
 }
 `
@@ -198,11 +198,11 @@ func (g *GeneratorEx) buildValueMapFn(runs [][]service.Value, typeName string) {
 		}
 	}
 	g.Printf("}\n")
-	g.Printf(valueMapFnTemplate, typeName)
+	g.Printf(VALUE_MAP_FN_TEMPLATE, typeName)
 }
 
 // Argument to format is the type name.
-const valueMapFnTemplate = `func %[1]sValueMap() map[int64]string {
+const VALUE_MAP_FN_TEMPLATE = `func %[1]sValueMap() map[int64]string {
 	return _%[1]s_value_map
 }
 `

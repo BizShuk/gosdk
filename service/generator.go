@@ -456,9 +456,9 @@ func (g *Generator) buildOneRun(runs [][]Value, typeName string) {
 		lessThanZero = "i < 0 || "
 	}
 	if values[0].value == 0 { // Signed or unsigned, 0 is still 0.
-		g.Printf(stringOneRun, typeName, usize(len(values)), lessThanZero)
+		g.Printf(STRING_ONE_RUN, typeName, usize(len(values)), lessThanZero)
 	} else {
-		g.Printf(stringOneRunWithOffset, typeName, values[0].String(), usize(len(values)), lessThanZero)
+		g.Printf(STRING_ONE_RUN_WITH_OFFSET, typeName, values[0].String(), usize(len(values)), lessThanZero)
 	}
 }
 
@@ -467,7 +467,7 @@ func (g *Generator) buildOneRun(runs [][]Value, typeName string) {
 //	[1]: type name
 //	[2]: size of index element (8 for uint8 etc.)
 //	[3]: less than zero check (for signed types)
-const stringOneRun = `func (i %[1]s) String() string {
+const STRING_ONE_RUN = `func (i %[1]s) String() string {
 	if %[3]si >= %[1]s(len(_%[1]s_index)-1) {
 		return "%[1]s(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
@@ -482,7 +482,7 @@ const stringOneRun = `func (i %[1]s) String() string {
 //	[4]: less than zero check (for signed types)
 /*
  */
-const stringOneRunWithOffset = `func (i %[1]s) String() string {
+const STRING_ONE_RUN_WITH_OFFSET = `func (i %[1]s) String() string {
 	i -= %[2]s
 	if %[4]si >= %[1]s(len(_%[1]s_index)-1) {
 		return "%[1]s(" + strconv.FormatInt(int64(i + %[2]s), 10) + ")"
@@ -536,11 +536,11 @@ func (g *Generator) buildMap(runs [][]Value, typeName string) {
 		}
 	}
 	g.Printf("}\n\n")
-	g.Printf(stringMap, typeName)
+	g.Printf(STRING_MAP, typeName)
 }
 
 // Argument to format is the type name.
-const stringMap = `func (i %[1]s) String() string {
+const STRING_MAP = `func (i %[1]s) String() string {
 	if str, ok := _%[1]s_map[i]; ok {
 		return str
 	}

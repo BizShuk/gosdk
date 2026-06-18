@@ -132,7 +132,7 @@ func TestCobraHook_EmitsCommandChainAndFlag(t *testing.T) {
 
 	ts := decodeLastMetric(t, cap)
 	labels := labelsToMap(ts)
-	if got, want := labels["__name__"], CobraHookMetricName; got != want {
+	if got, want := labels["__name__"], COBRA_HOOK_METRIC_NAME; got != want {
 		t.Errorf("metric name: got %q, want %q", got, want)
 	}
 	if got, want := labels["cmd"], "myapp sub action"; got != want {

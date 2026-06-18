@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const versionFile = "version"
+const VERSION_FILE = "version"
 
 var rootCmd = &cobra.Command{
 	Use:   "versioning",
@@ -71,7 +71,7 @@ func ParseVersion(s string) (Version, error) {
 }
 
 func ReadVersion() (Version, error) {
-	data, err := os.ReadFile(versionFile)
+	data, err := os.ReadFile(VERSION_FILE)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return Version{}, nil
@@ -86,13 +86,13 @@ func ReadVersion() (Version, error) {
 }
 
 func WriteVersion(v Version) error {
-	dir := filepath.Dir(versionFile)
+	dir := filepath.Dir(VERSION_FILE)
 	if dir != "" && dir != "." {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return fmt.Errorf("failed to create directory: %w", err)
 		}
 	}
-	if err := os.WriteFile(versionFile, []byte(v.String()), 0644); err != nil {
+	if err := os.WriteFile(VERSION_FILE, []byte(v.String()), 0644); err != nil {
 		return fmt.Errorf("failed to write version file: %w", err)
 	}
 	return nil

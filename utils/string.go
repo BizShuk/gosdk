@@ -8,7 +8,7 @@ func StringPointer(s string) *string {
 	return &s
 }
 
-const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+const CHARSET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 func StringWithCharset(length int, charset string) string {
 	b := make([]byte, length)
@@ -19,5 +19,5 @@ func StringWithCharset(length int, charset string) string {
 }
 
 func String(length int) string {
-	return StringWithCharset(length, charset)
+	return StringWithCharset(length, CHARSET)
 }

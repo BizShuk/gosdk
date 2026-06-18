@@ -144,9 +144,9 @@ func Send[T IMetric](metrics []T) error {
 		globalMetricService = NewMetricService("")
 	}
 
-	const batchSize = 50
-	for i := 0; i < len(metrics); i += batchSize {
-		end := min(i+batchSize, len(metrics))
+	const BATCH_SIZE = 50
+	for i := 0; i < len(metrics); i += BATCH_SIZE {
+		end := min(i+BATCH_SIZE, len(metrics))
 
 		var toSend []Metric
 		for _, m := range metrics[i:end] {
