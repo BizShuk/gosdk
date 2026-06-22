@@ -17,7 +17,7 @@ import (
 // 行為：
 //   - 從 viper 讀取 LOG_LEVEL 與 LOG_FORMAT，若為空字串或未設定則使用預設值
 //   - 構造 slog handler 後呼叫 slog.SetDefault() 註冊至標準全域
-//   - 輸出目標固定為 os.Stdout
+//   - 輸出目標依等級分流：Warn/Error 至 os.Stderr，Debug/Info 至 os.Stdout
 //
 // 注意：套件 init 在 import 時僅執行一次，且早於 config.Default() 載入 viper 設定。
 // 若需讓 LOG_LEVEL / LOG_FORMAT 生效，必須在 import gosdk/log 之前以環境變數
@@ -28,13 +28,16 @@ func init() {
 
 	opts := &slog.HandlerOptions{Level: level}
 
-	var handler slog.Handler
+	var stdoutH, stderrH slog.Handler
 	switch format {
 	case "json":
-		handler = slog.NewJSONHandler(os.Stdout, opts)
+		stdoutH = slog.NewJSONHandler(os.Stdout, opts)
+		stderrH = slog.NewJSONHandler(os.Stderr, opts)
 	default:
-		handler = slog.NewTextHandler(os.Stdout, opts)
+		stdoutH = slog.NewTextHandler(os.Stdout, opts)
+		stderrH = slog.NewTextHandler(os.Stderr, opts)
 	}
 
-	slog.SetDefault(slog.New(handler))
+	splitHandler := &LevelSplitHandler{stdoutHandler: stdoutH, stderrHandler: stderrH}
+	slog.SetDefault(slog.New(splitHandler))
 }

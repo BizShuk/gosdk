@@ -1,8 +1,10 @@
 package log
 
 import (
+	"bytes"
 	"fmt"
 	"log/slog"
+	"strings"
 	"testing"
 
 	"github.com/spf13/viper"
@@ -132,7 +134,77 @@ func TestInitDefaultValues(t *testing.T) {
 	if got := parseFormat(viper.GetString("LOG_FORMAT")); got != "text" {
 		t.Errorf("default LOG_FORMAT: expected text, got %q", got)
 	}
-	if got := fmt.Sprintf("%T", slog.Default().Handler()); got != "*slog.TextHandler" {
-		t.Errorf("default handler: expected *slog.TextHandler, got %s", got)
+
+	handler, ok := slog.Default().Handler().(*LevelSplitHandler)
+	if !ok {
+		t.Fatalf("expected handler type to be *LevelSplitHandler, got %T", slog.Default().Handler())
+	}
+	if got := fmt.Sprintf("%T", handler.stdoutHandler); got != "*slog.TextHandler" {
+		t.Errorf("default stdout handler: expected *slog.TextHandler, got %s", got)
+	}
+}
+
+func TestLevelSplitHandler(t *testing.T) {
+	// 建立 stdout 與 stderr 的緩衝區
+	var stdoutBuf bytes.Buffer
+	var stderrBuf bytes.Buffer
+
+	opts := &slog.HandlerOptions{Level: slog.LevelInfo}
+	stdoutH := slog.NewTextHandler(&stdoutBuf, opts)
+	stderrH := slog.NewTextHandler(&stderrBuf, opts)
+
+	handler := &LevelSplitHandler{
+		stdoutHandler: stdoutH,
+		stderrHandler: stderrH,
+	}
+	logger := slog.New(handler)
+
+	// 1. 測試 Info 等級下，slog.Info 去 stdout，slog.Error 去 stderr
+	logger.Info("info message")
+	logger.Error("error message")
+
+	stdoutStr := stdoutBuf.String()
+	stderrStr := stderrBuf.String()
+
+	if !strings.Contains(stdoutStr, "info message") {
+		t.Errorf("stdout should contain 'info message', got: %q", stdoutStr)
+	}
+	if strings.Contains(stdoutStr, "error message") {
+		t.Errorf("stdout should not contain 'error message', got: %q", stdoutStr)
+	}
+
+	if !strings.Contains(stderrStr, "error message") {
+		t.Errorf("stderr should contain 'error message', got: %q", stderrStr)
+	}
+	if strings.Contains(stderrStr, "info message") {
+		t.Errorf("stderr should not contain 'info message', got: %q", stderrStr)
+	}
+
+	// 重設緩衝區
+	stdoutBuf.Reset()
+	stderrBuf.Reset()
+
+	// 2. 測試 Warn 等級設定下，過濾 Info 訊息
+	optsWarn := &slog.HandlerOptions{Level: slog.LevelWarn}
+	stdoutHWarn := slog.NewTextHandler(&stdoutBuf, optsWarn)
+	stderrHWarn := slog.NewTextHandler(&stderrBuf, optsWarn)
+
+	handlerWarn := &LevelSplitHandler{
+		stdoutHandler: stdoutHWarn,
+		stderrHandler: stderrHWarn,
+	}
+	loggerWarn := slog.New(handlerWarn)
+
+	loggerWarn.Info("info message should be filtered")
+	loggerWarn.Error("error message should pass")
+
+	stdoutStrWarn := stdoutBuf.String()
+	stderrStrWarn := stderrBuf.String()
+
+	if stdoutStrWarn != "" {
+		t.Errorf("stdout should be empty when Level is Warn, got: %q", stdoutStrWarn)
+	}
+	if !strings.Contains(stderrStrWarn, "error message should pass") {
+		t.Errorf("stderr should contain 'error message should pass', got: %q", stderrStrWarn)
 	}
 }

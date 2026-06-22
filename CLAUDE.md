@@ -59,6 +59,7 @@ gosdk/
 │       └── big5.go          # Big5 串流解碼器
 ├── log/                     # 結構化日誌模組
 │   ├── log.go               # slog 全域 logger 初始化（init() 自動初始化 + Init() 套用 LOG_LEVEL/LOG_FORMAT）
+│   ├── levelSplitHandler.go # slog.Handler 實作，負責將 Warn/Error 與其餘層級日誌分流
 │   ├── log_test.go          # 日誌與日誌等級單元測試
 │   └── level.go             # LOG_LEVEL 環境變數解析
 ├── mw/                      # Gin 中介層
