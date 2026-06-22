@@ -8,6 +8,7 @@
   },
   "homepage": "https://github.com/bizshuk/gosdk",
   "repository": "https://github.com/bizshuk/gosdk",
+  "lspServers": "./.lsp.json",
   "license": "MIT",
   "keywords": [
     "golang",
