@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/bizshuk/gosdk/service"
+	"github.com/bizshuk/gosdk/service/stringer"
 )
 
 var (
@@ -109,13 +109,13 @@ func isDirectory(name string) bool {
 }
 
 type GeneratorEx struct {
-	service.Generator
+	stringer.Generator
 }
 
 func (g *GeneratorEx) generate(typeName string) {
 	g.Generator.Generate(typeName)
 
-	values := make([]service.Value, 0, 100)
+	values := make([]stringer.Value, 0, 100)
 	for _, file := range g.GetPackage().GetFile() {
 		// Set the state for this run of the walker.
 		file.SetTypeName(typeName)
@@ -125,7 +125,7 @@ func (g *GeneratorEx) generate(typeName string) {
 			values = append(values, file.GetValues()...)
 		}
 	}
-	runs := service.SplitIntoRuns(values)
+	runs := stringer.SplitIntoRuns(values)
 
 	g.buildListFn(runs, typeName)
 	g.buildValueListFn(runs, typeName)
@@ -133,7 +133,7 @@ func (g *GeneratorEx) generate(typeName string) {
 	g.buildValueMapFn(runs, typeName)
 }
 
-func (g *GeneratorEx) buildListFn(runs [][]service.Value, typeName string) {
+func (g *GeneratorEx) buildListFn(runs [][]stringer.Value, typeName string) {
 	g.Printf("\n")
 	g.Printf("var _%s_list = []string{\n", typeName)
 	for _, run := range runs {
@@ -151,7 +151,7 @@ const LIST_FN_TEMPLATE = `func %[1]sList() []string {
 }
 `
 
-func (g *GeneratorEx) buildValueListFn(runs [][]service.Value, typeName string) {
+func (g *GeneratorEx) buildValueListFn(runs [][]stringer.Value, typeName string) {
 	g.Printf("\n")
 	g.Printf("var _%s_value_list = []int64{\n", typeName)
 
@@ -171,7 +171,7 @@ const VALUE_LIST_FN_TEMPLATE = `func %[1]sValueList() []int64 {
 }
 `
 
-func (g *GeneratorEx) buildMapFn(runs [][]service.Value, typeName string) {
+func (g *GeneratorEx) buildMapFn(runs [][]stringer.Value, typeName string) {
 	g.Printf("\n")
 	g.Printf("var _%s_map = map[string]int64{\n", typeName)
 	for _, run := range runs {
@@ -189,7 +189,7 @@ const MAP_FN_TEMPLATE = `func %[1]sMap() map[string]int64 {
 }
 `
 
-func (g *GeneratorEx) buildValueMapFn(runs [][]service.Value, typeName string) {
+func (g *GeneratorEx) buildValueMapFn(runs [][]stringer.Value, typeName string) {
 	g.Printf("\n")
 	g.Printf("var _%s_value_map = map[int64]string{\n", typeName)
 	for _, run := range runs {

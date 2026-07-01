@@ -1,4 +1,45 @@
-- [ ] 依據 `plans/architecture-gosdk.md` 階段一：修正 `utils` 與 `metric` 的測試在沙盒 (Sandbox) 環境下寫入權限與網路連線受阻問題。
-- [ ] 依據 `plans/architecture-gosdk.md` 階段二：解耦公用庫 `utils` 與重構 `encode/` 目錄結構。
-- [ ] 依據 `plans/architecture-gosdk.md` 階段三：提供資料庫 `db` 顯式參數建構子以解耦 `viper`，並重構 `log` 套件導出顯式初始化方法。
-- [ ] 依據 `plans/architecture-gosdk.md` 階段四：重構 `HTTPServer` 模組導出至 `server/` 子包，並實作/對齊 OTel 規格指標。
+## 整體架構 (architecture)
+
+- [x] [architecture-gosdk.md](plans/architecture-gosdk.md) 階段一：修正 `utils` 與 `metric` 的測試在沙盒 (Sandbox) 環境下寫入權限與網路連線受阻問題。
+- [x] [architecture-gosdk.md](plans/architecture-gosdk.md) 階段二：解耦公用庫 `utils` 與重構 `encode/` 目錄結構。
+- [x] [architecture-gosdk.md](plans/architecture-gosdk.md) 階段三：提供資料庫 `db` 顯式參數建構子以解耦 `viper`，並重構 `log` 套件導出顯式初始化方法。
+- [ ] [architecture-gosdk.md](plans/architecture-gosdk.md) 階段四：重構 `HTTPServer` 模組導出至 `server/` 子包，並在 `metric/otel.go` 實作 Go 版 `OtelMetrics` 結構與 `ProcessCounter`/`ProcessHistogram`/`RecordProcessWithDuration` 方法（Python 版 `otel.py` 已完成，Go 版尚缺）。
+
+## config/ — 設定管理
+
+- [x] [2026-05-23-refactor-config-common.md](docs/specs/2026-05-23-refactor-config-common.md)：將 `config/db/`、`ConfigSchema`/`ServerConfig`/`DBConnConfig` 移轉至 `config/common`（後續已由 `cryptic-pondering-pie` 規格進一步廢除）。
+- [x] [2026-05-27-config-options.md](docs/specs/2026-05-27-config-options.md)：新增 `ConfigOption` Functional Options 模式，實作 `WithConfigPath`、`WithDefaultValue`（`WithAppName` 擴充）。
+- [x] ~~[architecture-gosdk.md](plans/architecture-gosdk.md) §3-1：將 `config/option.go` 中對 `utils.CreateIfNotExist` 的引用替換為 `config` 套件內部私有函式 `createIfNotExist`，解除 `config` 對 `utils` 的直接依賴（`config/option.go` 仍 import `gosdk/utils`）。~~
+- [x] ~~[architecture-gosdk.md](plans/architecture-gosdk.md) §5-1：重構 `config.Default()` 使其可接受 `loaders []Config` 參數，支援外部傳入自訂設定載入器（現行簽章僅接受 `opts ...ConfigOption`）。~~
+
+## log/ — 結構化日誌
+
+- [x] [2026-06-15-replace-zap-with-slog.md](docs/specs/2026-06-15-replace-zap-with-slog.md)：全面將 `gosdk/log` 與 13 個呼叫端從 `go.uber.org/zap` 遷移至 Go 標準 `log/slog`，以 Viper 注入 `LOG_LEVEL`/`LOG_FORMAT`。
+- [x] [2026-06-22-level-split-handler.md](docs/specs/2026-06-22-level-split-handler.md)：實作 `LevelSplitHandler`，將 Debug/Info 導至 `os.Stdout`、Warn/Error 導至 `os.Stderr`，修正 `Enabled` 恆回傳 `true` 的問題。
+
+## db/ — 資料庫連線
+
+- [x] [cryptic-pondering-pie.md](docs/specs/cryptic-pondering-pie.md)：將 `config/common/` DB 連線工廠重構為獨立 `db/` 套件，採 per-storage singleton（`DefaultSQLite`/`DefaultMySQL`/`DefaultPostgres`）+ 扁平 Viper key（`SQLITE_PATH`/`MYSQL_DSN`/`POSTGRES_DSN`），廢除 `config/common`。
+
+## metric/ — 指標監控
+
+- [x] [prancy-imagining-meteor.md](docs/specs/prancy-imagining-meteor.md)：定義跨語言 Process Metrics 規格（Counter/Histogram/Gauge 命名、標準 Tag Keys），Python 版 `OtelMetrics`（`otel.py`）、`SlackNotifier`（`slack.py`）已完成。
+- [ ] [architecture-gosdk.md](plans/architecture-gosdk.md) §3-6 + §6-階段四：在 `metric/otel.go` 實作 Go 版 `OtelMetrics` 結構、`NewOtelMetrics` 建構子，以及 `ProcessCounter`、`ProcessHistogram`、`RecordProcessWithDuration` 方法，對齊 Python `otel.py` 語義。
+
+## utils/ + encode/ — 工具函式與編碼
+
+- [x] [2026-06-14-create-file-with-backup.md](docs/specs/2026-06-14-create-file-with-backup.md)：實作 `WriteFile`/`CreateFile` 核心寫檔函式，支援 `WithBackup()`（遞迴備份 `*.bak`）與 `WithCreate()` 選項，重構 `SaveFile` 呼叫新介面。
+- [x] [2026-05-23-refactor-and-test-coverage.md](docs/specs/2026-05-23-refactor-and-test-coverage.md)：CSV 處理邏輯整合至 `encode/csv`，修正 `config/embedFS.go` 的 `GetFSReader` 錯誤處理，補充 `utils/`、`encode/csv` 單元測試；更新 `mw.Helmet()` 移除已棄用 `X-XSS-Protection`，新增 `Permissions-Policy`/`Cross-Origin-Opener-Policy`。
+- [x] [architecture-gosdk.md](plans/architecture-gosdk.md) §3-2 + §6-階段二：將 `encode/io/` 目錄下所有檔案（`decode.go`、`gbk.go`、`big5.go`、`decode_test.go`）移至 `encode/` 根目錄，套件名統一為 `encode`，消除目錄路徑與套件名稱不一致（`encode/io/` 目錄仍存在）。
+
+## service/ — 程式碼產生器
+
+- [ ] [architecture-gosdk.md](plans/architecture-gosdk.md) §4 遷移映射：將 `service/generator.go` 移至 `service/stringer/generator.go` 子套件，使根目錄結構清晰（`service/generator.go` 仍位於根目錄）。
+
+## server/ — HTTP 伺服器
+
+- [ ] [architecture-gosdk.md](plans/architecture-gosdk.md) §3-5 + §6-階段四：將 `main.go` 中的 `HTTPServer()` 移至新建 `server/server.go`（`package server`），`main.go` 僅作為入口呼叫 `server.HTTPServer()`，使其可被外部專案作為程式庫引用（`server/` 目錄尚不存在）。
+
+## 基礎建設 — Makefile / Dockerfile / CI
+
+- [x] [2026-05-22-fix-readme-problems.md](docs/specs/2026-05-22-fix-readme-problems.md)：合併重複 decode/sleep 邏輯、統一 log 系統、SQLite 錯誤訊息、CSV Processor 參數化、補充單元測試、建立 Makefile/Dockerfile/GitHub Actions CI。
