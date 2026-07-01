@@ -1,0 +1,4 @@
+- [ ] 依據 `plans/architecture-gosdk.md` 階段一：修正 `utils` 與 `metric` 的測試在沙盒 (Sandbox) 環境下寫入權限與網路連線受阻問題。
+- [ ] 依據 `plans/architecture-gosdk.md` 階段二：解耦公用庫 `utils` 與重構 `encode/` 目錄結構。
+- [ ] 依據 `plans/architecture-gosdk.md` 階段三：提供資料庫 `db` 顯式參數建構子以解耦 `viper`，並重構 `log` 套件導出顯式初始化方法。
+- [ ] 依據 `plans/architecture-gosdk.md` 階段四：重構 `HTTPServer` 模組導出至 `server/` 子包，並實作/對齊 OTel 規格指標。
