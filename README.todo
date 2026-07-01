@@ -3,7 +3,7 @@
 - [x] [architecture-gosdk.md](plans/architecture-gosdk.md) 階段一：修正 `utils` 與 `metric` 的測試在沙盒 (Sandbox) 環境下寫入權限與網路連線受阻問題。
 - [x] [architecture-gosdk.md](plans/architecture-gosdk.md) 階段二：解耦公用庫 `utils` 與重構 `encode/` 目錄結構。
 - [x] [architecture-gosdk.md](plans/architecture-gosdk.md) 階段三：提供資料庫 `db` 顯式參數建構子以解耦 `viper`，並重構 `log` 套件導出顯式初始化方法。
-- [ ] [architecture-gosdk.md](plans/architecture-gosdk.md) 階段四：重構 `HTTPServer` 模組導出至 `server/` 子包，並在 `metric/otel.go` 實作 Go 版 `OtelMetrics` 結構與 `ProcessCounter`/`ProcessHistogram`/`RecordProcessWithDuration` 方法（Python 版 `otel.py` 已完成，Go 版尚缺）。
+- [x] [architecture-gosdk.md](plans/architecture-gosdk.md) 階段四：重構 `HTTPServer` 模組導出至 `server/` 子包（`func Run(ctx context.Context) error`，支援 graceful shutdown），並在 `metric/otel.go` 實作 Go 版 `OtelMetrics` 結構與 `ProcessCounter`/`ProcessHistogram`/`RecordProcessWithDuration` 方法（Python 版 `otel.py` 已完成，Go 版尚缺）。
 
 ## config/ — 設定管理
 
@@ -24,7 +24,7 @@
 ## metric/ — 指標監控
 
 - [x] [prancy-imagining-meteor.md](docs/specs/prancy-imagining-meteor.md)：定義跨語言 Process Metrics 規格（Counter/Histogram/Gauge 命名、標準 Tag Keys），Python 版 `OtelMetrics`（`otel.py`）、`SlackNotifier`（`slack.py`）已完成。
-- [ ] [architecture-gosdk.md](plans/architecture-gosdk.md) §3-6 + §6-階段四：在 `metric/otel.go` 實作 Go 版 `OtelMetrics` 結構、`NewOtelMetrics` 建構子，以及 `ProcessCounter`、`ProcessHistogram`、`RecordProcessWithDuration` 方法，對齊 Python `otel.py` 語義。
+- [x] [architecture-gosdk.md](plans/architecture-gosdk.md) §3-6 + §6-階段四：在 `metric/otel.go` 實作 Go 版 `OtelMetrics` 結構、`NewOtelMetrics` 建構子，以及 `ProcessCounter`、`ProcessHistogram`、`RecordProcessWithDuration` 方法，對齊 Python `otel.py` 語義（命名採 `dot→underscore` 對齊 Prometheus；`error_type` 空字串省略；unit `ms`；採用 NoopProvider / ManualReader 白箱測試）。
 
 ## utils/ + encode/ — 工具函式與編碼
 
@@ -38,7 +38,7 @@
 
 ## server/ — HTTP 伺服器
 
-- [ ] [architecture-gosdk.md](plans/architecture-gosdk.md) §3-5 + §6-階段四：將 `main.go` 中的 `HTTPServer()` 移至新建 `server/server.go`（`package server`），`main.go` 僅作為入口呼叫 `server.HTTPServer()`，使其可被外部專案作為程式庫引用（`server/` 目錄尚不存在）。
+- [x] [architecture-gosdk.md](plans/architecture-gosdk.md) §3-5 + §6-階段四：將 `main.go` 中的 `HTTPServer()` 移至新建 `server/server.go`（`package server`），改為 `func Run(ctx context.Context) error` 支援 graceful shutdown；`main.go` 改為 `signal.NotifyContext` 觸發 cancel，可被外部專案作為程式庫引用（`server/server_test.go` 涵蓋 4 條路由 + ctx cancel）。
 
 ## 基礎建設 — Makefile / Dockerfile / CI
 
