@@ -18,9 +18,9 @@
   [main.go](file:///Users/shuk/projects/tmp/gosdk/main.go) 將 `HTTPServer()` 函數置於 `package main` 中，使得其他 Go 專案無法將其作為程式庫（library）匯入重用，與 SDK 作為可嵌入服務基礎模組的定位不符。
 
 - `測試環境與沙盒限制之衝突 (Conflict between Test Environment and Sandbox Limits)`：
-  在沙盒 (Sandbox) 環境下執行測試時：
-  1. `utils` 套件的測試會因嘗試寫入外部使用者目錄 `/Users/shuk/` 而遭遇權限拒絕錯誤，因為沙盒限制了對工作區外部目錄的寫入權限。
-  2. `metric` 套件的測試會嘗試向外部的 `localhost:8428` 等真實端點發送 TCP 請求，而在沙盒環境下這會因缺少網路權限而失敗。
+  在標準沙盒 (Standard Sandbox) 環境下執行測試時：
+  1. `utils` 與 `config` 套件的測試會因嘗試讀寫外部使用者目錄（如 `/Users/shuk/` 或 `/Users/shuk/.config/`）而遭遇權限拒絕錯誤，因為沙盒限制了對工作區外部目錄的讀寫權限。
+  2. `metric` 套件與 `notify` 套件的測試會嘗試向真實端點或 `httptest.NewServer` 發送 HTTP 請求。在沙盒限制下，所有 TCP/UDP 網路通訊（包括本地回環 loopback 地址 `127.0.0.1` 或是 `localhost`）均被徹底阻斷，導致連線失敗。因此，必須改用基於記憶體 (In-memory) 的傳輸器或是 `http.RoundTripper` 攔截器，完全避免發起網路 socket 連線。
 
 - `OpenTelemetry 規格實作不一致與缺失 (Inconsistent OTel Metrics Specification & Gaps)`：
   根據 [SPEC.md](file:///Users/shuk/projects/tmp/gosdk/SPEC.md) 定義，Go 監控端應提供 `OtelMetrics` 結構、`NewOtelMetrics` 建構子，以及 `ProcessCounter`、`ProcessHistogram` 與 `RecordProcessWithDuration` 等上層指標封裝，以便外部專案進行程序指標監控。目前 [otel.go](file:///Users/shuk/projects/tmp/gosdk/metric/otel.go) 僅有低階 Provider 初始化，缺乏高階抽象。
@@ -35,9 +35,10 @@
 本專案 Go 原始碼檔案之程式碼行數（排除測試與 vendor）排名前列者如下：
 
 - [generator.go](file:///Users/shuk/projects/tmp/gosdk/service/generator.go) — `549` 行（包含 AST 解析與 `stringer` 生成邏輯，為最複雜的單一邏輯檔案）
-- [file.go](file:///Users/shuk/projects/tmp/gosdk/utils/file.go) — `323` 行（包含一般讀寫、備份、CSV 讀寫與回呼，職責過度混雜）
+- [file.go](file:///Users/shuk/projects/tmp/gosdk/utils/file.go) — `322` 行（包含一般讀寫、備份、CSV 讀寫與回呼，職責過度混雜）
 - [main.go](file:///Users/shuk/projects/tmp/gosdk/cmd/stringer/main.go) (stringer CLI) — `208` 行
-- [metric.go](file:///Users/shuk/projects/tmp/gosdk/metric/metric.go) — `163` 行
+- [otel.go](file:///Users/shuk/projects/tmp/gosdk/metric/otel.go) — `151` 行
+- [metric.go](file:///Users/shuk/projects/tmp/gosdk/metric/metric.go) — `162` 行
 
 ### 改動頻率與熱點分析 (Change Frequency & Hotspot Analysis)
 
@@ -111,7 +112,7 @@ flowchart TD
    將 `utils/file.go` 中所有與 CSV 及 `gocsv` 相關的函式（`WriteCSV`、`ParseCSVFile`、`NewCSVFilelistCallback`、`LoadCSV`）全部移動到 `encode/csv` 子包。使 `utils` 包回歸純粹的檔案 IO 工具，解除對高階業務模組與第三方 CSV 函式庫的依賴。
 
 3. `資料庫連線服務之顯式參數建構子 (Explicit Constructors for Database Services)`：
-   在 `db` 模組中，為 SQLite、MySQL 與 Postgres 提供帶有連線參數的工廠建構子，例如 `NewSQLite(path string) (*SQLite, error)`。全域初始化函式 `InitSQLite()` 則作為 Viper 設定的便利 wrapper 呼叫新建構子，確保底層資料庫連線可脫離 Viper 獨立建構與測試。
+   in `db` 模組中，為 SQLite、MySQL 與 Postgres 提供帶有連線參數的工廠建構子，例如 `NewSQLite(path string) (*SQLite, error)`。全域初始化函式 `InitSQLite()` 則作為 Viper 設定的便利 wrapper 呼叫新建構子，確保底層資料庫連線可脫離 Viper 獨立建構與測試。
 
 4. `日誌套件導出顯式初始化與配置方法 (Export Explicit Logger Configuration)`：
    在 `log` 套件中新增並導出 `Init()` 函數。此函數在 `config.Default()` 載入設定後，從 `viper` 讀取 `LOG_LEVEL` 與 `LOG_FORMAT` 以重構全域的 `slog.Logger`。同時，修改原有的 `init()` 僅作基本的 stdout text fallback 兜底。
@@ -123,8 +124,11 @@ flowchart TD
    將 `encode/io/` 目錄下的所有原始碼檔案直接移動到 `encode/` 目錄下，並將包名統一為 `encode`，消除別名 `import encode "github.com/bizshuk/gosdk/encode/io"` 的冗餘。
 
 7. `修復測試沙盒限制 (Fix Test Sandbox Limitations)`：
-   - 檔案寫入：在 `utils/file_test.go` 中，將 `t.Setenv("HOME", t.TempDir())` 注入 `CreateIfNotExist` 涉及 `~` 路徑的測試中，防止寫入真實使用者目錄導致的權限錯誤。
-   - 網路連線：在 `metric/` 單元測試中，使用 `httptest.NewServer` 模擬 Promwrite 接收端，或使用 `otel` 內建的 `noop` / 記憶體傳輸層進行指標匯出測試，避免向 `localhost` 發送真實的 TCP 請求。
+   - `檔案寫入`：在 `utils/file_test.go` 與 `config/option_test.go` 中，將 `HOME` 環境變數覆寫為工作區內部的臨時子目錄（例如 `filepath.Join(wd, "tmp-home")`），以確保所有涉及 `~` 或 `os.UserHomeDir()` 的檔案讀寫均維持在沙盒工作區範圍內，防止觸發寫入權限錯誤。
+   - `網路連線解耦`：
+     1. 對於 `metric` 的 `promwrite` 測試，在單元測試中如果無設定特定的環境變數則自動跳過真實發送，或者為 `MetricService` 提供注入 `http.Client` 機制，使用 mock `http.RoundTripper` 攔截所有網路請求。
+     2. 對於 `otel` 的測試，不使用 HTTP 傳輸器，改用 OpenTelemetry 記憶體讀取器（如 `sdkmetric.NewManualReader`）或 noop 供應器，徹底避免發起 socket 連線。
+     3. 對於 `notify/slack_test.go`，修改設計以在 `SlackNotifier` 中允許注入客製化的 `http.Client`，在測試中利用 mock `http.RoundTripper` 來模擬 Slack API 回應，避免使用 `httptest.NewServer` 觸發沙盒網路阻擋。
 
 ## 4. 目錄與模組重整方案 (Reorganization Map)
 
@@ -187,10 +191,11 @@ gosdk/
 ### 階段一：建立測試安全網與環境解耦 (Characterization Test & Environment Decoupling)
 
 - `目標`：
-  1. 在 `utils/file_test.go` 中加入 `t.Setenv("HOME", t.TempDir())` 覆寫，修復 `CreateIfNotExist` 在沙盒環境下對 `/Users/shuk/` 目錄的寫入權限問題。
-  2. 在 `metric` 單元測試中，將對真實網路的依賴改為 `httptest.NewServer` 或是 Mock，移除對真實 `localhost` 通訊的依賴。
+  1. 在 `utils/file_test.go` 與 `config/option_test.go` 中，將 `HOME` 環境變數覆寫為工作區內部的臨時子目錄（如 `filepath.Join(wd, "tmp-home")`），修復涉及 `~` 路徑與 `os.UserHomeDir()` 在沙盒環境下對工作區外部目錄的寫入權限問題。
+  2. 在 `metric` 單元測試中，移除對真實 `localhost` 網路的發送需求，改用 OpenTelemetry 內建 noop 或記憶體傳輸層；整合測試（如 `SendTest`）添加環境變數守衛，預設跳過，避免在沙盒環境下測試失敗。
+  3. 重構 `notify/slack_test.go`，避免使用 `httptest.NewServer`，改用自訂的 mock `http.RoundTripper` 來攔截測試請求，確保在無網路權限的沙盒環境下測試能順利通過。
 - `驗證`：
-  執行 `go test -v ./...` 確保測試綠燈，且 `metric` 與 `utils` 測試不再產生真實的外部網路請求與非法路徑寫入。
+  執行 `go test -v ./...` 確保測試綠燈，且所有測試皆可在無網路與寫入權限限制的沙盒中通過。
 
 ### 階段二：解耦公用庫與重構目錄結構 (Decouple Utils & Reorganize Directory Structure)
 
@@ -206,7 +211,7 @@ gosdk/
 
 - `目標`：
   1. 在 `db/sqlite.go`、`db/mysql.go` 與 `db/postgres.go` 中實作傳入 `path/dsn` 的 `NewSQLite`、`NewMySQL` 與 `NewPostgres` 函式。
-  2. 重構 `InitSQLite`、`InitMySQL` 與 `InitPostgres` 使用 these 建構子。
+  2. 重構 `InitSQLite`、`InitMySQL` 與 `InitPostgres` 使用這些建構子。
   3. 在 `log/log.go` 中新增並導出 `Init()` 函數，使能在 `config.Default()` 載入設定後，從 `viper` 重新套用 `LOG_LEVEL` 與 `LOG_FORMAT` 於全域 `slog.Logger`。
 - `驗證`：
   1. 執行 `go test -v ./db/... ./log/...` 確保測試通過。
@@ -225,7 +230,7 @@ gosdk/
 
 - `向下相容性中斷風險 (Compatibility Risk)`：
   將 CSV 處理函式從 `utils` 移動至 `encode/csv`，以及變更資料庫初始化函數簽名，可能導致依賴此 SDK 的外部專案在升級時發生編譯錯誤。
-  - `對策與回滾`：在 `utils/file.go` 中，保留 these CSV 函式的 `Deprecated` 版本，並在內部轉向調用 `encode/csv`。對資料庫初始化也保留舊有的全域無參數初始化方法（例如 `db.InitSQLite()`），標記為 `Deprecated`，確保現有用戶的 API 相容性，待未來大版本發行時再予以移除。
+  - `對策與回滾`：在 `utils/file.go` 中，保留這些 CSV 函式的 `Deprecated` 版本，並在內部轉向調用 `encode/csv`。對資料庫初始化也保留舊有的全域無參數初始化方法（例如 `db.InitSQLite()`），標記為 `Deprecated`，確保現有用戶的 API 相容性，待未來大版本發行時再予以移除。
 
 - `資料庫連線未初始化的錯誤 (Database Uninitialized Risk)`：
   重構資料庫流程可能導致依賴全域 `db.DefaultSQLite` 等實例的呼叫端，在尚未調用 `Init` 之前取到 `nil` 指標而發生恐慌 (Panic)。
