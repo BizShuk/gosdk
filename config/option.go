@@ -11,6 +11,7 @@ type configOptions struct {
 	defaultValue string
 	appName      string
 	appConfigDir string
+	watch        bool
 }
 
 // ConfigOption defines the functional option type for config loading.

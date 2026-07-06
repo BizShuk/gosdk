@@ -47,12 +47,11 @@ func Default(opts ...ConfigOption) {
 		"APP_CONFIG_DIR", GetAppConfigDir(),
 	)
 
-	v1 := NewEnvConfig().Load()
-	viper.MergeConfigMap(v1.AllSettings())
-	v2 := NewYamlConfig().Load()
-	viper.MergeConfigMap(v2.AllSettings())
-	v3 := NewJsonConfig().Load()
-	viper.MergeConfigMap(v3.AllSettings())
+	// --- Load & merge all configs ---
+	err := loadAllConfigs()
+	if err != nil {
+		slog.Debug("config load warning", "err", err)
+	}
 
 	// --- 4. 環境變數設定 (Environment Variables) ---
 	// 讓 Viper 知道要自動尋找以 APP 開頭的環境變數
@@ -74,6 +73,25 @@ func Default(opts ...ConfigOption) {
 	// 輸出結果
 	inlineJSON := string(jsonBytes)
 	slog.Debug("Config Loaded", "settings", inlineJSON)
+
+	// --- Start file watcher if requested ---
+	if o.watch {
+		if err := StartWatch(); err != nil {
+			slog.Warn("failed to start config watcher", "err", err)
+		}
+	}
+}
+
+// loadAllConfigs 載入所有設定格式並合併至全域 viper。
+// 供 Default() 首次載入與 watcher reload 共用。
+func loadAllConfigs() error {
+	v1 := NewEnvConfig().Load()
+	viper.MergeConfigMap(v1.AllSettings())
+	v2 := NewYamlConfig().Load()
+	viper.MergeConfigMap(v2.AllSettings())
+	v3 := NewJsonConfig().Load()
+	viper.MergeConfigMap(v3.AllSettings())
+	return nil
 }
 
 func GetAppConfigDir() string {

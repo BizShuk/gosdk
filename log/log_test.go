@@ -4,10 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"log/slog"
+	"os"
 	"strings"
 	"testing"
-
-	"github.com/spf13/viper"
 )
 
 func TestParseLevel(t *testing.T) {
@@ -79,10 +78,9 @@ func TestGetLogLevel(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			viper.Reset()
-			defer viper.Reset()
+			os.Setenv("LOG_LEVEL", tt.logLevel)
+			t.Cleanup(func() { os.Unsetenv("LOG_LEVEL") })
 
-			viper.Set("LOG_LEVEL", tt.logLevel)
 			actual := GetLogLevel()
 			if actual != tt.expected {
 				t.Errorf("expected level %v for LOG_LEVEL=%q, got %v", tt.expected, tt.logLevel, actual)
@@ -109,12 +107,11 @@ func TestInitWithLogLevels(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// 套件 init() 早已在 viper 為空時跑過一次並把 slog default 鎖在 info/text，
-			// runtime 改 viper 不再影響 handler；這裡僅驗證 GetLogLevel() 對 viper 值的讀取正確性。
-			viper.Reset()
-			defer viper.Reset()
+			// GetLogLevel 直接讀取 os.Getenv("LOG_LEVEL")，
+			// 此測試驗證 env var 能正確傳遞到 GetLogLevel()。
+			os.Setenv("LOG_LEVEL", tt.logLevel)
+			t.Cleanup(func() { os.Unsetenv("LOG_LEVEL") })
 
-			viper.Set("LOG_LEVEL", tt.logLevel)
 			if got := GetLogLevel(); got != tt.checkLevel && tt.shouldBeEnabled {
 				t.Errorf("GetLogLevel() with LOG_LEVEL=%q = %v, expected level <= %v",
 					tt.logLevel, got, tt.checkLevel)
@@ -124,14 +121,15 @@ func TestInitWithLogLevels(t *testing.T) {
 }
 
 func TestInitDefaultValues(t *testing.T) {
-	viper.Reset()
-	defer viper.Reset()
+	// 清除 env var 確保走預設值
+	os.Unsetenv("LOG_LEVEL")
+	os.Unsetenv("LOG_FORMAT")
 
 	// 不設定 LOG_LEVEL / LOG_FORMAT，預期 GetLogLevel / parseFormat 走預設
 	if got := GetLogLevel(); got != slog.LevelInfo {
 		t.Errorf("default LOG_LEVEL: expected info, got %v", got)
 	}
-	if got := parseFormat(viper.GetString("LOG_FORMAT")); got != "text" {
+	if got := parseFormat(""); got != "text" {
 		t.Errorf("default LOG_FORMAT: expected text, got %q", got)
 	}
 

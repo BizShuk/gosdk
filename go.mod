@@ -6,6 +6,7 @@ retract [v1.0.0, v1.0.4] // 這些版本已被廢棄
 
 require (
 	github.com/castai/promwrite v0.6.0
+	github.com/fsnotify/fsnotify v1.8.0
 	github.com/gin-gonic/gin v1.11.0
 	github.com/gocarina/gocsv v0.0.0-20260523204920-c264028e67ea
 	github.com/golang/snappy v1.0.0
@@ -100,7 +101,6 @@ require (
 	github.com/envoyproxy/protoc-gen-validate v1.3.3 // indirect
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
-	github.com/fsnotify/fsnotify v1.8.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.8 // indirect
 	github.com/gin-contrib/sse v1.1.0 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect

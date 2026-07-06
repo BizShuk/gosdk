@@ -2,17 +2,19 @@ package log
 
 import (
 	"log/slog"
+	"os"
 	"strings"
-
-	"github.com/spf13/viper"
 )
 
-// GetLogLevel 從 viper 讀取 LOG_LEVEL 並回傳對應的 slog.Level。
+// GetLogLevel 從環境變數 LOG_LEVEL 讀取並回傳對應的 slog.Level。
 //
 // 合法值 (case-insensitive): debug / info / warn / error。
 // 空字串、未設定或不合法值皆 fallback 為 slog.LevelInfo（預設值）。
+//
+// 直接讀取 os.Getenv 而非 viper，確保在 config.Default() 載入前（如 init()）
+// 即可取得正確的日誌等級。
 func GetLogLevel() slog.Level {
-	return parseLevel(viper.GetString("LOG_LEVEL"))
+	return parseLevel(os.Getenv("LOG_LEVEL"))
 }
 
 // parseLevel 解析 LOG_LEVEL 字串到 slog.Level。
