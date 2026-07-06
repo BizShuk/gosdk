@@ -21,19 +21,5 @@
     "slog",
     "refactor",
     "code-review"
-  ],
-  "agents": [
-    "./agents/golang-refactor.md"
-  ],
-  "skills": [
-    "./skills/golang-code-quality",
-    "./skills/golang-dead-code",
-    "./skills/golang-dev",
-    "./skills/golang-gosdk",
-    "./skills/golang-mvc",
-    "./skills/golang-naming",
-    "./skills/golang-network",
-    "./skills/golang-performance-tuning",
-    "./skills/migrate-zap-to-slog"
   ]
 }
