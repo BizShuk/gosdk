@@ -11,6 +11,7 @@
 - [x] [2026-05-27-config-options.md](docs/specs/2026-05-27-config-options.md)：新增 `ConfigOption` Functional Options 模式，實作 `WithConfigPath`、`WithDefaultValue`（`WithAppName` 擴充）。
 - [x] ~~[architecture-gosdk.md](plans/architecture-gosdk.md) §3-1：將 `config/option.go` 中對 `utils.CreateIfNotExist` 的引用替換為 `config` 套件內部私有函式 `createIfNotExist`，解除 `config` 對 `utils` 的直接依賴（`config/option.go` 仍 import `gosdk/utils`）。~~
 - [x] ~~[architecture-gosdk.md](plans/architecture-gosdk.md) §5-1：重構 `config.Default()` 使其可接受 `loaders []Config` 參數，支援外部傳入自訂設定載入器（現行簽章僅接受 `opts ...ConfigOption`）。~~
+- [ ] [architecture-config-dynamic-reload.md](plans/architecture-config-dynamic-reload.md)：設計與實作設定檔變更監聽與回調重載機制，使系統可即時套用最新參數。
 
 ## log/ — 結構化日誌
 
@@ -34,7 +35,7 @@
 
 ## service/ — 程式碼產生器
 
-- [ ] [architecture-gosdk.md](plans/architecture-gosdk.md) §4 遷移映射：將 `service/generator.go` 移至 `service/stringer/generator.go` 子套件，使根目錄結構清晰（`service/generator.go` 仍位於根目錄）。
+- [x] [architecture-service-generator-migration.md](plans/architecture-service-generator-migration.md) §4 遷移映射：將 `service/generator.go` 移至 `service/stringer/generator.go` 子套件，使根目錄結構清晰（已完成遷移且無遺留依賴）。
 
 ## server/ — HTTP 伺服器
 
