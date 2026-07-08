@@ -70,6 +70,7 @@ gosdk/
 ### 高改動熱點 (High Modification Hotspots)
 
 根據過去 6 個月 `Git` 提交統計，相關模組的改動頻率如下：
+
 - `config/config.go`：共變更 `18` 次。
 - `config/json.go`：共變更 `10` 次。
 - `config/yaml.go`：共變更 `9` 次.
@@ -106,13 +107,13 @@ flowchart TD
 
 ### 介面設計 (API Contract)
 
-| 介面/方法名稱 | 輸入參數 | 輸出參數 | 錯誤情況與行為 |
-| :--- | :--- | :--- | :--- |
-| `WithWatch` | `onReload func(err error)` | `ConfigOption` | 於 `config.Default` 中啟用設定檔監聽並註冊初始回呼。若初始化監聽器失敗，會將錯誤傳遞給 `onReload` 回呼。 |
-| `RegisterReloadCallback` | `name string`, `callback func(err error)` | (無) | 註冊新的回呼函式。若名稱重複則覆蓋。若傳入 `callback` 為 `nil`，則不進行註冊。 |
-| `UnregisterReloadCallback` | `name string` | (無) | 移除指定名稱的回呼函式。若名稱不存在，則無操作。 |
-| `StartWatch` | (無) | `error` | 啟動設定檔目錄背景監聽。若監聽器已啟動則回傳 `ErrWatcherAlreadyRunning` 錯誤；若監聽目錄不存在或初始化失敗，則回傳對應的系統錯誤。 |
-| `StopWatch` | (無) | `error` | 停止背景監聽並釋放 `fsnotify` 資源。若未啟動監聽器則回傳 `ErrWatcherNotRunning` 錯誤。 |
+| 介面/方法名稱              | 輸入參數                                  | 輸出參數       | 錯誤情況與行為                                                                                                                     |
+| :------------------------- | :---------------------------------------- | :------------- | :--------------------------------------------------------------------------------------------------------------------------------- |
+| `WithWatch`                | `onReload func(err error)`                | `ConfigOption` | 於 `config.Default` 中啟用設定檔監聽並註冊初始回呼。若初始化監聽器失敗，會將錯誤傳遞給 `onReload` 回呼。                           |
+| `RegisterReloadCallback`   | `name string`, `callback func(err error)` | (無)           | 註冊新的回呼函式。若名稱重複則覆蓋。若傳入 `callback` 為 `nil`，則不進行註冊。                                                     |
+| `UnregisterReloadCallback` | `name string`                             | (無)           | 移除指定名稱的回呼函式。若名稱不存在，則無操作。                                                                                   |
+| `StartWatch`               | (無)                                      | `error`        | 啟動設定檔目錄背景監聽。若監聽器已啟動則回傳 `ErrWatcherAlreadyRunning` 錯誤；若監聽目錄不存在或初始化失敗，則回傳對應的系統錯誤。 |
+| `StopWatch`                | (無)                                      | `error`        | 停止背景監聽並釋放 `fsnotify` 資源。若未啟動監聽器則回傳 `ErrWatcherNotRunning` 錯誤。                                             |
 
 ### 資料流圖 (Data Flow)
 
@@ -141,12 +142,12 @@ flowchart TD
 
 ## 6. 漸進落地步驟 (Incremental Steps)
 
-| 步驟 (Step) | 做什麼 (What) | 驗證 (Verify) | 回滾 (Rollback) |
-| :--- | :--- | :--- | :--- |
-| 1. 實作回呼管理器與 Option | 在 `config/` 新增 `watcher.go`，實作 `CallbackManager`、`RegisterReloadCallback` 與 `UnregisterReloadCallback` 函式。在 `option.go` 中新增 `WithWatch` Option。 | 撰寫單元測試，驗證註冊 Callback 後，手動觸發 Reload 能正確執行所有註冊的回調並接收錯誤。 | 刪除 `watcher.go` 中相關程式碼，並還原 `option.go` 的修改。 |
-| 2. 實作 fsnotify 檔案監聽與重新載入 | 在 `watcher.go` 中實作 `StartWatch`，使用 `fsnotify` 監聽設定檔所在目錄（如 `.`, `./conf`, `GetAppConfigDir()`）。當檔案寫入完成時，重新載入設定並調用 `viper.MergeConfigMap` 更新全域設定，最後呼叫 callbacks。 | 撰寫單元測試，模擬動態寫入 `config.local.yaml`，確認全域 `viper` 的設定值被即時更新，且對應的回調被觸發。 | 還原 `watcher.go` 中的 `StartWatch` 邏輯。 |
-| 3. 將 log 套件接軌動態設定變更 | 在 `log.go` 中新增公開的 `Init()` 函式以供呼叫。並在初始化時，註冊回調以在日誌設定變更時自動呼叫 `log.Init()`，調整日誌等級。 | 執行集成測試，動態變更 `LOG_LEVEL` 檔案，驗證在不重啟程式下，`slog` 的輸出層級隨之改變。 | 註銷 `log` 中的 reload callbacks，還原修改。 |
-| 4. 主程式啟用與全面驗證 | 在 `main.go` 或 `cobrasample/main.go` 啟用 `config.Default(config.WithWatch(nil))`，並執行 `make test` 確保全模組無誤。 | 執行 `make test` 和 `make build` 確保無編譯與單元測試錯誤。 | 還原 `main.go` 中的配置。 |
+| 步驟 (Step)                         | 做什麼 (What)                                                                                                                                                                                                    | 驗證 (Verify)                                                                                             | 回滾 (Rollback)                                             |
+| :---------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------- | :---------------------------------------------------------- |
+| 1. 實作回呼管理器與 Option          | 在 `config/` 新增 `watcher.go`，實作 `CallbackManager`、`RegisterReloadCallback` 與 `UnregisterReloadCallback` 函式。在 `option.go` 中新增 `WithWatch` Option。                                                  | 撰寫單元測試，驗證註冊 Callback 後，手動觸發 Reload 能正確執行所有註冊的回調並接收錯誤。                  | 刪除 `watcher.go` 中相關程式碼，並還原 `option.go` 的修改。 |
+| 2. 實作 fsnotify 檔案監聽與重新載入 | 在 `watcher.go` 中實作 `StartWatch`，使用 `fsnotify` 監聽設定檔所在目錄（如 `.`, `./conf`, `GetAppConfigDir()`）。當檔案寫入完成時，重新載入設定並調用 `viper.MergeConfigMap` 更新全域設定，最後呼叫 callbacks。 | 撰寫單元測試，模擬動態寫入 `config.local.yaml`，確認全域 `viper` 的設定值被即時更新，且對應的回調被觸發。 | 還原 `watcher.go` 中的 `StartWatch` 邏輯。                  |
+| 3. 將 log 套件接軌動態設定變更      | 在 `log.go` 中新增公開的 `Init()` 函式以供呼叫。並在初始化時，註冊回調以在日誌設定變更時自動呼叫 `log.Init()`，調整日誌等級。                                                                                    | 執行集成測試，動態變更 `LOG_LEVEL` 檔案，驗證在不重啟程式下，`slog` 的輸出層級隨之改變。                  | 註銷 `log` 中的 reload callbacks，還原修改。                |
+| 4. 主程式啟用與全面驗證             | 在 `main.go` 或 `cobrasample/main.go` 啟用 `config.Default(config.WithWatch(nil))`，並執行 `make test` 確保全模組無誤。                                                                                          | 執行 `make test` 和 `make build` 確保無編譯與單元測試錯誤。                                               | 還原 `main.go` 中的配置。                                   |
 
 ## 7. 風險與假設 (Risks & Assumptions)
 
