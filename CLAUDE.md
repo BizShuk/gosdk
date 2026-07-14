@@ -103,6 +103,41 @@ gosdk/
 │   ├── roc_test.go          # ROC 日期解析測試
 │   ├── sleep.go             # 設定驅動的延遲函式
 │   └── sleep_test.go        # ConfigSleep 測試
+├── validator/               # 通用驗證框架（IValidator + composite Validator）
+│   ├── validator.go         # IValidator 介面 + 通用 Validator(struct, 短路回傳第一個錯誤，可遞迴嵌套)
+│   ├── validator_test.go    # composite / 遞迴 / defensive copy 等測試
+│   ├── string/              # sub-package：字串驗證器實作（每個 validator 都有 typed *Error + sentinel + Is() 橋接）
+│   │   ├── notEmpty.go      # NotEmpty (空字串檢查)
+│   │   ├── notEmpty_test.go
+│   │   ├── minLen.go        # MinLen (最小長度檢查, error 帶實際/要求長度)
+│   │   ├── minLen_test.go
+│   │   ├── maxLen.go        # MaxLen (最大長度檢查)
+│   │   ├── maxLen_test.go
+│   │   ├── pattern.go       # Pattern (regex match, 接受預編譯 *regexp.Regexp; nil 不 panic)
+│   │   ├── pattern_test.go
+│   │   ├── email.go         # Email (net/mail.ParseAddress; EmailError.Cause 透過 Unwrap 暴露底層錯誤)
+│   │   ├── email_test.go
+│   │   ├── url.go           # URL (net/url.Parse + scheme/host 必要檢查; URLError.Cause/Reason)
+│   │   ├── url_test.go
+│   │   ├── oneOf.go         # OneOf (值須在 allowed 集合內, defensive copy, case-sensitive)
+│   │   ├── oneOf_test.go
+│   │   ├── equalTo.go       # EqualTo (form: 密碼 vs 確認密碼)
+│   │   ├── equalTo_test.go
+│   │   ├── notEqualTo.go    # NotEqualTo (form: 拒絕 placeholder/sentinel)
+│   │   └── notEqualTo_test.go
+│   └── numeric/             # sub-package：int 驗證器實作（每個 validator 都有 typed *Error + sentinel + Is() 橋接）
+│       ├── positive.go      # Positive (> 0)
+│       ├── positive_test.go
+│       ├── nonNegative.go   # NonNegative (>= 0)
+│       ├── nonNegative_test.go
+│       ├── negative.go      # Negative (< 0)
+│       ├── negative_test.go
+│       ├── min.go           # Min (>= floor, error 帶 actual/want)
+│       ├── min_test.go
+│       ├── max.go           # Max (<= ceiling, error 帶 actual/want)
+│       ├── max_test.go
+│       ├── range.go         # Range (closed interval [min, max])
+│       └── range_test.go
 ├── utils/                   # 通用工具函式
 │   ├── file.go              # 檔案操作、CSV 批次處理、CreateIfNotExist()
 │   ├── file_test.go         # 檔案操作測試
@@ -193,6 +228,7 @@ gosdk/
 | 通用通知              | `notify/`                               | 各通知器獨立建構與呼叫                                     |
 | 排程管理              | `scheduler/`                            | `scheduler.New()`                                          |
 | 編碼與資料處理        | `encode/`, `utils/`, `time/`            | 各函式獨立呼叫                                             |
+| 通用驗證              | `validator/`, `validator/string/`, `validator/numeric/` | `validator.New()` (composite), `string.NewNotEmpty()` / `string.NewEmail()` / `string.NewEqualTo()`, `numeric.NewRange()` |
 | 日誌與觀測            | `log/`                                  | `log.Init()`                                               |
 | Remote Write 指標     | `metric/`                               | `NewMetricService()` / `NewVictoriaMetricsService()`       |
 | Cobra CLI Hook 指標   | `metric/`                               | `metric.CobraCMDHook()`                                    |
