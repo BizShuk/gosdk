@@ -14,12 +14,23 @@ import (
 
 // FileStore 是一個泛型檔案儲存庫，用於在指定目錄下存取物件
 type FileStore[T any] struct {
-	dir string
+	dir  string
+	perm os.FileMode
+}
+
+// StoreOption 是一個用於設定 FileStore 的函式類型
+type StoreOption[T any] func(*FileStore[T])
+
+// WithFilePerm 設定 FileStore 儲存檔案時的檔案權限 (file permission)
+func WithFilePerm[T any](perm os.FileMode) StoreOption[T] {
+	return func(s *FileStore[T]) {
+		s.perm = perm
+	}
 }
 
 // NewFileStore 建立並初始化一個 FileStore 實例。
 // 若指定目錄不存在，會自動嘗試建立。
-func NewFileStore[T any](dir string) (*FileStore[T], error) {
+func NewFileStore[T any](dir string, opts ...StoreOption[T]) (*FileStore[T], error) {
 	if dir == "" {
 		return nil, errors.New("directory path cannot be empty")
 	}
@@ -34,7 +45,16 @@ func NewFileStore[T any](dir string) (*FileStore[T], error) {
 		return nil, fmt.Errorf("failed to create directory %s: %w", absDir, err)
 	}
 
-	return &FileStore[T]{dir: absDir}, nil
+	s := &FileStore[T]{
+		dir:  absDir,
+		perm: 0o644,
+	}
+
+	for _, opt := range opts {
+		opt(s)
+	}
+
+	return s, nil
 }
 
 // Store 將物件以 JSON 格式儲存至名為 name.json 的檔案中。
@@ -65,7 +85,7 @@ func (s *FileStore[T]) Store(name string, obj T) error {
 	}
 
 	filePath := filepath.Join(s.dir, name+".json")
-	if err := os.WriteFile(filePath, data, 0o644); err != nil {
+	if err := os.WriteFile(filePath, data, s.perm); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
 
@@ -120,3 +140,58 @@ func (s *FileStore[T]) UpdateDir(dir string) error {
 	return nil
 }
 
+// Dir 回傳憑證目錄。
+func (s *FileStore[T]) Dir() string { return s.dir }
+
+// Path 回傳某個憑證的檔案路徑。
+func (s *FileStore[T]) Path(name string) string {
+	return filepath.Join(s.dir, name+".json")
+}
+
+// List 讀取目錄下所有的 JSON 檔案並反序列化為 []*T。
+func (s *FileStore[T]) List() ([]*T, error) {
+	entries, err := os.ReadDir(s.dir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read directory: %w", err)
+	}
+
+	var list []*T
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		if filepath.Ext(entry.Name()) != ".json" {
+			continue
+		}
+
+		name := strings.TrimSuffix(entry.Name(), ".json")
+		obj, err := s.Read(name)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read %s: %w", entry.Name(), err)
+		}
+		val := obj
+		list = append(list, &val)
+	}
+	return list, nil
+}
+
+// Delete 刪除指定的 JSON 檔案。
+func (s *FileStore[T]) Delete(name string) error {
+	if name == "" {
+		return errors.New("file name cannot be empty")
+	}
+
+	// 安全性檢查
+	if strings.ContainsAny(name, `/\`) || filepath.Base(name) != name {
+		return fmt.Errorf("invalid file name: %s", name)
+	}
+
+	filePath := s.Path(name)
+	if err := os.Remove(filePath); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("file not found: %w", err)
+		}
+		return fmt.Errorf("failed to delete file: %w", err)
+	}
+	return nil
+}

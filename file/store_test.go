@@ -153,6 +153,125 @@ func TestFileStore(t *testing.T) {
 			t.Errorf("expected Name to be Eve, got %s", readUser.Name)
 		}
 	})
+
+	t.Run("Custom File Permission Option", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "filestore_test_perm_*")
+		if err != nil {
+			t.Fatalf("failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		customPerm := os.FileMode(0o600)
+		store, err := NewFileStore[mockUser](tmpDir, WithFilePerm[mockUser](customPerm))
+		if err != nil {
+			t.Fatalf("failed to create store with custom perm: %v", err)
+		}
+
+		user := mockUser{ID: 5, Name: "Frank", Email: "frank@example.com"}
+		err = store.Store("frank", user)
+		if err != nil {
+			t.Fatalf("failed to store: %v", err)
+		}
+
+		filePath := filepath.Join(tmpDir, "frank.json")
+		info, err := os.Stat(filePath)
+		if err != nil {
+			t.Fatalf("failed to stat file: %v", err)
+		}
+
+		if info.Mode().Perm() != customPerm {
+			t.Errorf("expected file permission to be %O, got %O", customPerm, info.Mode().Perm())
+		}
+	})
+
+	t.Run("Dir and Path methods", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "filestore_test_dirpath_*")
+		if err != nil {
+			t.Fatalf("failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		store, err := NewFileStore[mockUser](tmpDir)
+		if err != nil {
+			t.Fatalf("failed to create store: %v", err)
+		}
+
+		if store.Dir() != tmpDir {
+			t.Errorf("Dir() expected %s, got %s", tmpDir, store.Dir())
+		}
+
+		expectedPath := filepath.Join(tmpDir, "test.json")
+		if store.Path("test") != expectedPath {
+			t.Errorf("Path() expected %s, got %s", expectedPath, store.Path("test"))
+		}
+	})
+
+	t.Run("List and Delete methods", func(t *testing.T) {
+		tmpDir, err := os.MkdirTemp("", "filestore_test_listdelete_*")
+		if err != nil {
+			t.Fatalf("failed to create temp dir: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+
+		store, err := NewFileStore[mockUser](tmpDir)
+		if err != nil {
+			t.Fatalf("failed to create store: %v", err)
+		}
+
+		list, err := store.List()
+		if err != nil {
+			t.Fatalf("List() failed: %v", err)
+		}
+		if len(list) != 0 {
+			t.Errorf("expected empty list, got %d items", len(list))
+		}
+
+		u1 := mockUser{ID: 10, Name: "User1"}
+		u2 := mockUser{ID: 20, Name: "User2"}
+		if err := store.Store("u1", u1); err != nil {
+			t.Fatalf("failed to store u1: %v", err)
+		}
+		if err := store.Store("u2", u2); err != nil {
+			t.Fatalf("failed to store u2: %v", err)
+		}
+
+		list, err = store.List()
+		if err != nil {
+			t.Fatalf("List() failed: %v", err)
+		}
+		if len(list) != 2 {
+			t.Errorf("expected list length 2, got %d", len(list))
+		}
+
+		items := make(map[int]string)
+		for _, item := range list {
+			items[item.ID] = item.Name
+		}
+		if items[10] != "User1" || items[20] != "User2" {
+			t.Errorf("mismatch list items, got %+v", items)
+		}
+
+		if err := store.Delete("u1"); err != nil {
+			t.Fatalf("Delete(u1) failed: %v", err)
+		}
+
+		if _, err := os.Stat(store.Path("u1")); !os.IsNotExist(err) {
+			t.Errorf("expected u1.json to be deleted, stat error: %v", err)
+		}
+
+		list, err = store.List()
+		if err != nil {
+			t.Fatalf("List() failed: %v", err)
+		}
+		if len(list) != 1 {
+			t.Errorf("expected list length 1, got %d", len(list))
+		}
+		if list[0].ID != 20 {
+			t.Errorf("expected remaining item to be User2 (ID 20), got ID %d", list[0].ID)
+		}
+
+		if err := store.Delete("u1"); err == nil {
+			t.Error("expected error deleting non-existent file, got nil")
+		}
+	})
 }
-
-
