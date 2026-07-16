@@ -237,7 +237,44 @@ Key behaviors:
 - **Always truncates**: an existing file is overwritten (`os.Create` semantics); combine with `WithBackup()` if you must preserve the prior content.
 - **`SaveFile` is deprecated**: it just calls `WriteFile(..., WithCreate())` — use `WriteFile` directly.
 
-### 4. Logging
+### 4. Terminal Tables (`tui.Table`)
+
+Use `tui.Table` for CLI reports that need Unicode borders, multi-line cells, alignment, optional row separators, and ANSI colour highlighting. `Align` **must contain one value per header** (`0` = left, `1` = right), because `Draw` indexes it for every column.
+
+```go
+import (
+    "os"
+
+    "github.com/bizshuk/gosdk/tui"
+)
+
+table := tui.Table{
+    Headers: []string{"Item", "Count", "Notes"},
+    Align:  []int{0, 1, 0},
+    Rows: [][]tui.Cell{
+        {"Processed", "42", []string{"all records", "validated"}},
+        {"Failed", "2", "retry required"},
+        {"Total", "44", ""},
+    },
+    // Add a horizontal rule after the second data row. The total row also
+    // receives one automatically when hasTotalRow is true.
+    Separators: []bool{false, true},
+}
+
+table.Draw(os.Stdout, true, true)
+```
+
+| Field / argument | Behaviour |
+| ---------------- | --------- |
+| `Headers` | Required; an empty slice produces no output. |
+| `Rows` | Each cell may be a `string`, `[]string` (one terminal line per value), `nil`, or another value rendered with `fmt.Sprintf`. Extra cells are ignored. |
+| `Separators` | `Separators[i]` draws a rule after `Rows[i]`; a shorter slice simply leaves later rows without a rule. |
+| `hasTotalRow` | Treats the final row as a yellow, bold total row and draws a preceding rule. |
+| `highlightLastCol` | Renders the final column in yellow, except the total row which is already bold yellow. |
+
+The width calculation uses Go byte lengths. Avoid ANSI escape sequences and non-ASCII/CJK content when exact visual column alignment matters.
+
+### 5. Logging
 
 The `log` package provides `Init()` to configure the stdlib `log/slog` global default (level + format). It reads two viper keys and calls `slog.SetDefault()`. After `log.Init()`, use the package-level `slog.*` functions directly — there is no logger object to thread around and no wrapper functions.
 
@@ -275,7 +312,7 @@ func main() {
 > [!NOTE]
 > Migrating from zap? Use the `migrate-zap-to-slog` skill. Core mapping: `zap.L()` / `zap.S()` → package-level `slog.*`; typed fields `zap.Int("port", 8080)` → plain pairs `"port", 8080`; `zap.S().Infof("…%s", x)` → build the message or pass attrs (slog has no printf form).
 
-### 5. Metrics & Tracing (Remote Write vs OpenTelemetry)
+### 6. Metrics & Tracing (Remote Write vs OpenTelemetry)
 
 The SDK provides two ways to publish metrics. Depending on the complexity and needs of the project:
 
@@ -440,7 +477,7 @@ Key behaviors of OTel Integration:
 - **Shutdown is Critical**: Always use `defer metric.ShutdownOTel(ctx)` at the application entry point to prevent metrics/traces loss.
 - **Synchronous Gauges**: The default `Float64Gauge` requires you to record values synchronously using `Record(ctx, val, attrs)`.
 
-### 6. Notifications (notify)
+### 7. Notifications (notify)
 
 Use the `notify` package to send event summaries to one or more destinations. The package is backend-agnostic: all implementations satisfy the `Notifier` interface.
 
@@ -490,7 +527,7 @@ Key behaviors of the `notify` package:
 - **Fan-out error handling**: `Multi.Notify` always calls every registered notifier — it never short-circuits on failure. All errors are joined via `errors.Join`; check the combined error after the call.
 - **Format is caller's responsibility**: The `summary string` is an opaque, pre-formatted message. Serialize your struct/report to a string before calling `Notify`.
 
-### 7. Home Path Expansion
+### 8. Home Path Expansion
 
 Use `github.com/mitchellh/go-homedir` to expand `~` in paths. Call `homedir.Expand()` directly at point of use — do NOT create a custom expand function.
 
