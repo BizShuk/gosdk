@@ -498,10 +498,9 @@ Use `github.com/mitchellh/go-homedir` to expand `~` in paths. Call `homedir.Expa
 import "github.com/mitchellh/go-homedir"
 
 // Standard pattern: expand and fall back silently on error
-dbPath := viper.GetString("state.db_path")  // e.g. "~/.config/myapp/state.db"
-path, err := homedir.Expand(dbPath)
+path, err := homedir.Expand("~/.config/myapp/state.db")
 if err != nil {
-    path = dbPath
+    ...
 }
 ```
 
