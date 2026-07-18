@@ -110,8 +110,8 @@ func GetAppName() string {
 }
 
 // GetAppLogDir returns the application log directory: ~/.config/appName/log
-func GetAppLogDir() string {
-	return filepath.Join(GetAppConfigDir(), "log")
+func GetAppLogsDir() string {
+	return filepath.Join(GetAppConfigDir(), "logs")
 }
 
 // GetAppDataDir returns the application data directory: ~/.config/appName/data
