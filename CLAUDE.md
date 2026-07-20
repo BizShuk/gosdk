@@ -7,8 +7,8 @@ gosdk/
 ├── main.go                  # HTTP 伺服器入口
 ├── go.mod                   # Go 1.26, module: github.com/bizshuk/gosdk
 ├── Makefile                 # build / test / generate / run / clean
-├── version                  # 版本號檔案（語義版本，如 1.0.1）
-├── outputgittag.sh          # 輸出 Git tag 格式的版本號腳本
+├── VERSION                  # 版本號檔案（語義版本，如 1.0.1），單一事實來源
+├── outputgittag.sh          # 輸出 Git tag/commit 至 build.version（建置戳記用，勿寫入 VERSION）
 ├── build/
 │   └── dockerfile           # Multi-stage Docker 建置（golang:1.26-alpine）
 ├── cmd/
@@ -195,7 +195,7 @@ gosdk/
 - Helmet 中介層採用靜態安全標頭：直接在 response header 注入 `X-Content-Type-Options`、`X-Frame-Options`、`CSP` 等，不依賴外部套件
 - 排程器採用極簡設計：`Scheduler` 僅負責按 `Interval` 觸發 `Job.Fn`，錯誤處理、日誌、重試等策略完全由呼叫方透過 `Job.OnError` 自行決定
 - `Notifier` 介面保持單一方法（`Notify`）：不綁定特定訊息格式，呼叫方自行序列化 summary 字串，使通知器可輕易替換或組合
-- `versioning` CLI 使用純文字 `version` 檔案：避免依賴 git tags 或外部服務，檔案格式為 `major.minor.patch`，可直接納入版本控制
+- `versioning` CLI 使用純文字 `VERSION` 檔案：避免依賴 git tags 或外部服務，檔案格式為 `major.minor.patch`，可直接納入版本控制
 - Cobra hook 採極簡設計（無 option、同步送出）：`CobraCMDHook(root)` 在 PreRun 送出 `command_line_trigger{cmd, flag}`（PreRun 而非 PostRun：永遠會送，即使 RunE 失敗）；`cmd` 為完整指令鏈（`cmd.CommandPath()`，root → leaf）；`flag` 收集使用者實際設定的 flags（走訪整條 chain、`seen` map 去重 persistent flag），字母排序後以 `-` 串接；發送走套件層級 `Send()`（全域 `MetricService`，首次使用時以 `METRIC_URL` 建立；測試以 `viper.Set` 覆寫）
 
 ### Remote Write 與 OpenTelemetry 指標發送差異 (Remote Write vs OpenTelemetry Metrics)
@@ -316,3 +316,24 @@ GitHub Actions workflow 定義於 `.github/workflows/ci.yml`，於 push/PR 至 `
 - Logging: `gosdk/log` 在 `init()` 自動初始化、並提供 `Init()` 套用 `LOG_LEVEL` / `LOG_FORMAT`；所有日誌記錄統一使用 stdlib 套件層級 `slog.*`（結構化 key/value），不使用 wrapper 函式
 - Testing: 測試檔案與被測檔案放在同一 package 內（白盒測試）；使用 `testing.T` 標準庫；測試前透過 `viper.Set()` 或 `os.Setenv()` 注入設定
 - Configuration: 設定檔搜尋路徑固定為 `.`、`./conf`、`~/.config/<appName>`（需 `WithAppName`）；雙檔案模式（base + `.local`）自動載入；`APP_` 前綴環境變數自動覆蓋設定
+
+## 版本規則 (Versioning Rule)
+
+本 SDK 每次更新一律自動遞增版本號，`VERSION` 檔案為單一事實來源 (single source of truth)，格式 `major.minor.patch`。
+
+- 只遞增 `minor` 或 `patch`，永不自動遞增 `major`。`major` 屬 breaking change，必須由人為明確指示才可變動
+- 判定準則：
+    - `minor`（`versioning minor`）— 新增公開 API、新套件、新 CLI 子命令等向後相容的功能新增
+    - `patch`（`versioning patch`）— bug fix、重構、文件、測試、依賴更新等不改變公開 API 的變動
+- 遞增後必須同步 `.claude-plugin/plugin.json` 的 `version` 欄位（與 `VERSION` 一致，不帶 `v` 前綴）
+- 每次遞增後打 Git tag 並推送遠端，tag 格式為 `v<major>.<minor>.<patch>`（帶 `v` 前綴，與 `VERSION` 內容差一個 `v`）
+
+```bash
+./bin/versioning patch          # 或 minor；就地更新 VERSION
+V=$(cat VERSION)
+git commit -am "chore: bump version to ${V}"
+git tag "v${V}"
+git push origin master --follow-tags
+```
+
+- `outputgittag.sh` 產生的 `build.version` 僅供建置戳記 (build stamp)，與 `VERSION` 無關，不可互相覆寫

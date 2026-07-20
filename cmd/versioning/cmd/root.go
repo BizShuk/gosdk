@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const VERSION_FILE = "version"
+const VERSION_FILE = "VERSION"
 
 var rootCmd = &cobra.Command{
 	Use:   "versioning",

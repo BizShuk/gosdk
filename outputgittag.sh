@@ -1,6 +1,8 @@
 #!/bin/bash
 
-# output current tags/commit to version
+# output current tags/commit to build.version
+# NOTE: must NOT write to `version`/`VERSION` — that file is the semver source of
+# truth, and on case-insensitive filesystems (macOS) `>version` would clobber it.
 versions=()
 
 # 讀取目前的標記 (tags) 到陣列
@@ -13,7 +15,7 @@ while IFS= read -r line || [ -n "$line" ]; do
     [ -n "$line" ] && versions+=("$line")
 done < <(git log --pretty=format:'%h' -n 1)
 
-echo -n "${versions[*]}" >version
+echo -n "${versions[*]}" >build.version
 
 # build with version
-#go build -ldflags="-X 'github.com/bizshuk/gosdk/config.Version=$(cat version)'"
+#go build -ldflags="-X 'github.com/bizshuk/gosdk/config.Version=$(cat build.version)'"
