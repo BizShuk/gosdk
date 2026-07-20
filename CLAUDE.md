@@ -7,8 +7,6 @@ gosdk/
 ├── main.go                  # HTTP 伺服器入口
 ├── go.mod                   # Go 1.26, module: github.com/bizshuk/gosdk
 ├── Makefile                 # build / test / generate / run / clean
-├── VERSION                  # 版本號檔案（語義版本，如 1.0.1），單一事實來源
-├── outputgittag.sh          # 輸出 Git tag/commit 至 build.version（建置戳記用，勿寫入 VERSION）
 ├── build/
 │   └── dockerfile           # Multi-stage Docker 建置（golang:1.26-alpine）
 ├── cmd/
@@ -150,10 +148,8 @@ gosdk/
 │   ├── type.go              # IsNil() reflect 檢查
 │   ├── type_test.go         # IsNil 測試
 │   └── stringer.go          # stringer go:generate 範例
-├── .githooks/               # 版控的 Git hooks（需 git config core.hooksPath .githooks）
-│   └── pre-push             # 強制版本規則：VERSION 遞增、禁 major、tag 存在、plugin.json 同步
 ├── .claude-plugin/          # Claude Code plugin manifest
-│   └── plugin.json          # plugin metadata（name=gosdk、version 對齊 VERSION 檔）
+│   └── plugin.json          # plugin metadata（name=gosdk；version 於 release 時人工對齊 tag）
 ├── plans/                   # 開發計畫文件
 ├── skills/                  # Agent skills（9 個：golang-dev、golang-gosdk、golang-mvc、golang-code-quality、golang-dead-code、golang-naming、golang-network、golang-performance-tuning、migrate-zap-to-slog）
 ├── agents/                  # Agent 定義（golang-refactor.md）
@@ -197,7 +193,7 @@ gosdk/
 - Helmet 中介層採用靜態安全標頭：直接在 response header 注入 `X-Content-Type-Options`、`X-Frame-Options`、`CSP` 等，不依賴外部套件
 - 排程器採用極簡設計：`Scheduler` 僅負責按 `Interval` 觸發 `Job.Fn`，錯誤處理、日誌、重試等策略完全由呼叫方透過 `Job.OnError` 自行決定
 - `Notifier` 介面保持單一方法（`Notify`）：不綁定特定訊息格式，呼叫方自行序列化 summary 字串，使通知器可輕易替換或組合
-- `versioning` CLI 使用純文字 `VERSION` 檔案：避免依賴 git tags 或外部服務，檔案格式為 `major.minor.patch`，可直接納入版本控制
+- `cmd/versioning` 為操作純文字版本檔的獨立 CLI：不依賴 git tag 或外部服務，檔案格式 `major.minor.patch`，供需要檔案式版本號的專案使用
 - Cobra hook 採極簡設計（無 option、同步送出）：`CobraCMDHook(root)` 在 PreRun 送出 `command_line_trigger{cmd, flag}`（PreRun 而非 PostRun：永遠會送，即使 RunE 失敗）；`cmd` 為完整指令鏈（`cmd.CommandPath()`，root → leaf）；`flag` 收集使用者實際設定的 flags（走訪整條 chain、`seen` map 去重 persistent flag），字母排序後以 `-` 串接；發送走套件層級 `Send()`（全域 `MetricService`，首次使用時以 `METRIC_URL` 建立；測試以 `viper.Set` 覆寫）
 
 ### Remote Write 與 OpenTelemetry 指標發送差異 (Remote Write vs OpenTelemetry Metrics)
@@ -318,32 +314,3 @@ GitHub Actions workflow 定義於 `.github/workflows/ci.yml`，於 push/PR 至 `
 - Logging: `gosdk/log` 在 `init()` 自動初始化、並提供 `Init()` 套用 `LOG_LEVEL` / `LOG_FORMAT`；所有日誌記錄統一使用 stdlib 套件層級 `slog.*`（結構化 key/value），不使用 wrapper 函式
 - Testing: 測試檔案與被測檔案放在同一 package 內（白盒測試）；使用 `testing.T` 標準庫；測試前透過 `viper.Set()` 或 `os.Setenv()` 注入設定
 - Configuration: 設定檔搜尋路徑固定為 `.`、`./conf`、`~/.config/<appName>`（需 `WithAppName`）；雙檔案模式（base + `.local`）自動載入；`APP_` 前綴環境變數自動覆蓋設定
-
-## 版本規則 (Versioning Rule)
-
-本 SDK 每次更新一律遞增版本號，`VERSION` 檔案為單一事實來源 (single source of truth)，格式 `major.minor.patch`。
-
-判定準則（`.githooks/pre-push` 無法代為判斷，須由撰寫者決定）：
-
-| 變動性質                                            | 遞增    | 指令                            |
-| --------------------------------------------------- | ------- | ------------------------------- |
-| 新增公開 API、新套件、新 CLI 子命令（向後相容）     | `minor` | `go run ./cmd/versioning minor` |
-| bug fix、重構、文件、測試、依賴更新（不改公開 API） | `patch` | `go run ./cmd/versioning patch` |
-| breaking change                                     | `major` | 不自動遞增，須人為明確指示      |
-
-`major` 永不自動遞增；確有需要時以 `git push --no-verify` 繞過 hook，代表這是一次刻意的人為決定。
-
-其餘規則由 `.githooks/pre-push` 在推送 `master` / `main` 時強制驗證，不需人工記憶：
-
-- `VERSION` 相對遠端必須有遞增
-- `major` 不得遞增
-- tag `v<major>.<minor>.<patch>` 必須存在且指向被推送的 commit（帶 `v` 前綴，與 `VERSION` 內容差一個 `v`）
-- `.claude-plugin/plugin.json` 的 `version` 必須與 `VERSION` 一致（不帶 `v` 前綴）
-
-啟用 hook（`.git/hooks/` 不進版控，clone 後須執行一次）：
-
-```bash
-git config core.hooksPath .githooks
-```
-
-`outputgittag.sh` 產生的 `build.version` 僅供建置戳記 (build stamp)，與 `VERSION` 無關，不可互相覆寫。

@@ -97,7 +97,6 @@ Go 語言通用開發工具包 (Shared SDK)，提供設定管理、HTTP 服務�
 2. `ReadVersion()` 從 `version` 檔案讀取目前版本；若檔案不存在則回傳零值
 3. 根據子命令遞增對應的版本欄位（`Major++` / `Minor++` / `Patch++`）
 4. `WriteVersion()` 將新版本號寫回 `version` 檔案，並輸出至 stdout
-5. `outputgittag.sh` 腳本搭配使用，可將版本號轉換為 Git tag 格式
 
 `核心實體 (Key Entities):` `Version` 結構, `versionFile` 常數
 
@@ -228,7 +227,7 @@ Go 語言通用開發工具包 (Shared SDK)，提供設定管理、HTTP 服務�
 - `HTTP 服務` 依賴 `日誌與觀測` 提供請求日誌，依賴 `設定管理` 取得 host/port、版本號等資訊
 - `通用通知` 可被 `排程管理` 組合使用：定期任務完成後透過 `Notifier.Notify()` 推送摘要
 - `程式碼產生` 為獨立工具領域，不依賴其他執行時期領域，但產出的程式碼（`*_string.go`）可能被其他領域使用
-- `版本管理` 為獨立 CLI 工具領域，透過 `VERSION` 檔案與 `outputgittag.sh` 和 CI/CD 流程整合
+- `版本管理` 為獨立 CLI 工具領域，不依賴其他執行時期領域，操作純文字版本檔
 - `編碼與資料處理` 為獨立工具領域，提供底層工具函式給其他領域使用（如 CSV 處理、檔案操作、型別轉換）
 - `日誌與觀測` 被所有需要記錄的領域引用，提供統一的結構化日誌出口
 
@@ -305,18 +304,11 @@ go run ./cmd/gotmpl --config config.yaml
 
 ### 版本管理
 
+操作純文字版本檔的獨立 CLI：
+
 ```bash
-# 查看目前版本
-go run ./cmd/versioning
-
-# 遞增 patch 版本（例如 1.0.1 → 1.0.2）
-go run ./cmd/versioning patch
-
-# 遞增 minor 版本（例如 1.0.1 → 1.1.0）
-go run ./cmd/versioning minor
-
-# 遞增 major 版本（例如 1.0.1 → 2.0.0）
-go run ./cmd/versioning major
+go run ./cmd/versioning          # 查看
+go run ./cmd/versioning patch    # 遞增 patch（minor / major 同理）
 ```
 
 ### 通用通知
@@ -409,8 +401,6 @@ claude --plugin-url https://github.com/bizshuk/gosdk
 /gosdk:golang-dev
 /gosdk:migrate-zap-to-slog
 ```
-
-`版本管理 (Versioning):` plugin `version` 欄位對齊 repo 根目錄的 `VERSION` 檔（目前 `1.2.0`），可透過 `cmd/versioning` CLI 同步遞增。每次更新只遞增 `minor` 或 `patch`，並以 `v<major>.<minor>.<patch>` 打 Git tag 推送遠端，詳見 [CLAUDE.md](./CLAUDE.md) 的 `版本規則`。
 
 ---
 
