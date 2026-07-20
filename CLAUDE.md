@@ -150,8 +150,10 @@ gosdk/
 │   ├── type.go              # IsNil() reflect 檢查
 │   ├── type_test.go         # IsNil 測試
 │   └── stringer.go          # stringer go:generate 範例
+├── .githooks/               # 版控的 Git hooks（需 git config core.hooksPath .githooks）
+│   └── pre-push             # 強制版本規則：VERSION 遞增、禁 major、tag 存在、plugin.json 同步
 ├── .claude-plugin/          # Claude Code plugin manifest
-│   └── plugin.json          # plugin metadata（name=gosdk、version 對齊 version 檔）
+│   └── plugin.json          # plugin metadata（name=gosdk、version 對齊 VERSION 檔）
 ├── plans/                   # 開發計畫文件
 ├── skills/                  # Agent skills（9 個：golang-dev、golang-gosdk、golang-mvc、golang-code-quality、golang-dead-code、golang-naming、golang-network、golang-performance-tuning、migrate-zap-to-slog）
 ├── agents/                  # Agent 定義（golang-refactor.md）
@@ -319,21 +321,29 @@ GitHub Actions workflow 定義於 `.github/workflows/ci.yml`，於 push/PR 至 `
 
 ## 版本規則 (Versioning Rule)
 
-本 SDK 每次更新一律自動遞增版本號，`VERSION` 檔案為單一事實來源 (single source of truth)，格式 `major.minor.patch`。
+本 SDK 每次更新一律遞增版本號，`VERSION` 檔案為單一事實來源 (single source of truth)，格式 `major.minor.patch`。
 
-- 只遞增 `minor` 或 `patch`，永不自動遞增 `major`。`major` 屬 breaking change，必須由人為明確指示才可變動
-- 判定準則：
-    - `minor`（`versioning minor`）— 新增公開 API、新套件、新 CLI 子命令等向後相容的功能新增
-    - `patch`（`versioning patch`）— bug fix、重構、文件、測試、依賴更新等不改變公開 API 的變動
-- 遞增後必須同步 `.claude-plugin/plugin.json` 的 `version` 欄位（與 `VERSION` 一致，不帶 `v` 前綴）
-- 每次遞增後打 Git tag 並推送遠端，tag 格式為 `v<major>.<minor>.<patch>`（帶 `v` 前綴，與 `VERSION` 內容差一個 `v`）
+判定準則（`.githooks/pre-push` 無法代為判斷，須由撰寫者決定）：
+
+| 變動性質                                            | 遞增    | 指令                            |
+| --------------------------------------------------- | ------- | ------------------------------- |
+| 新增公開 API、新套件、新 CLI 子命令（向後相容）     | `minor` | `go run ./cmd/versioning minor` |
+| bug fix、重構、文件、測試、依賴更新（不改公開 API） | `patch` | `go run ./cmd/versioning patch` |
+| breaking change                                     | `major` | 不自動遞增，須人為明確指示      |
+
+`major` 永不自動遞增；確有需要時以 `git push --no-verify` 繞過 hook，代表這是一次刻意的人為決定。
+
+其餘規則由 `.githooks/pre-push` 在推送 `master` / `main` 時強制驗證，不需人工記憶：
+
+- `VERSION` 相對遠端必須有遞增
+- `major` 不得遞增
+- tag `v<major>.<minor>.<patch>` 必須存在且指向被推送的 commit（帶 `v` 前綴，與 `VERSION` 內容差一個 `v`）
+- `.claude-plugin/plugin.json` 的 `version` 必須與 `VERSION` 一致（不帶 `v` 前綴）
+
+啟用 hook（`.git/hooks/` 不進版控，clone 後須執行一次）：
 
 ```bash
-./bin/versioning patch          # 或 minor；就地更新 VERSION
-V=$(cat VERSION)
-git commit -am "chore: bump version to ${V}"
-git tag "v${V}"
-git push origin master --follow-tags
+git config core.hooksPath .githooks
 ```
 
-- `outputgittag.sh` 產生的 `build.version` 僅供建置戳記 (build stamp)，與 `VERSION` 無關，不可互相覆寫
+`outputgittag.sh` 產生的 `build.version` 僅供建置戳記 (build stamp)，與 `VERSION` 無關，不可互相覆寫。

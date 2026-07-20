@@ -46,3 +46,6 @@ plans/implementation_plan.md
 .gitignore
 plans/walkthrough.md
 plans/task.md
+
+# outputgittag.sh 產生的建置戳記
+build.version
