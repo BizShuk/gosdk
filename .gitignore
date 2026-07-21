@@ -38,9 +38,7 @@ gosdk
 *_string.go
 .aider*
 .env
-.env
 .claude/settings.local.json
-bin/server
 sample/config/sample.db
 plans/implementation_plan.md
 .gitignore
