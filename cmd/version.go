@@ -6,40 +6,13 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-
-	"github.com/spf13/cobra"
 )
 
+// VERSION_FILE is the plain-text file MajorCmd, MinorCmd and PatchCmd read and
+// write, resolved relative to the working directory.
 const VERSION_FILE = "VERSION"
 
-var rootCmd = &cobra.Command{
-	Use:   "versioning",
-	Short: "Version management CLI tool",
-	Long:  `A CLI tool to manage semver version in a version file.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		v, err := ReadVersion()
-		if err != nil {
-			return err
-		}
-		if v.Major == 0 && v.Minor == 0 && v.Patch == 0 {
-			if err := WriteVersion(Version{Major: 0, Minor: 0, Patch: 1}); err != nil {
-				return err
-			}
-			fmt.Println("0.0.1")
-			return nil
-		}
-		fmt.Println(v.String())
-		return nil
-	},
-}
-
-func Execute() {
-	err := rootCmd.Execute()
-	if err != nil {
-		os.Exit(1)
-	}
-}
-
+// Version is a semantic version stored in VERSION_FILE as "major.minor.patch".
 type Version struct {
 	Major int
 	Minor int
@@ -50,6 +23,7 @@ func (v Version) String() string {
 	return fmt.Sprintf("%d.%d.%d", v.Major, v.Minor, v.Patch)
 }
 
+// ParseVersion reads a "major.minor.patch" string.
 func ParseVersion(s string) (Version, error) {
 	parts := strings.Split(s, ".")
 	if len(parts) != 3 {
@@ -70,6 +44,8 @@ func ParseVersion(s string) (Version, error) {
 	return Version{Major: major, Minor: minor, Patch: patch}, nil
 }
 
+// ReadVersion loads VERSION_FILE. A missing file is not an error: it yields the
+// zero Version, which callers treat as "not initialised yet".
 func ReadVersion() (Version, error) {
 	data, err := os.ReadFile(VERSION_FILE)
 	if err != nil {
@@ -85,6 +61,7 @@ func ReadVersion() (Version, error) {
 	return version, nil
 }
 
+// WriteVersion rewrites VERSION_FILE.
 func WriteVersion(v Version) error {
 	dir := filepath.Dir(VERSION_FILE)
 	if dir != "" && dir != "." {

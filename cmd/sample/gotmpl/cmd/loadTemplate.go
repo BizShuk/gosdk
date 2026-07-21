@@ -7,7 +7,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/bizshuk/gosdk/cmd/gotmpl/tmpl"
+	"github.com/bizshuk/gosdk/cmd/sample/gotmpl/tmpl"
 	"github.com/hairyhenderson/gomplate/v4"
 )
 

@@ -6,7 +6,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var majorCmd = &cobra.Command{
+// MajorCmd increments the major version in VERSION_FILE and resets minor and
+// patch to 0.
+var MajorCmd = &cobra.Command{
 	Use:   "major",
 	Short: "Increment major version",
 	Long:  `Increments the major version and resets minor and patch to 0.`,
@@ -24,8 +26,4 @@ var majorCmd = &cobra.Command{
 		fmt.Println(v)
 		return nil
 	},
-}
-
-func init() {
-	rootCmd.AddCommand(majorCmd)
 }
