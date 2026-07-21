@@ -218,25 +218,25 @@ gosdk/
 
 ## 模組對應 (Module Mapping)
 
-| 業務領域 (Domain)     | 套件/模組 (Package/Module)              | 進入點 (Entry Point)                                       |
-| --------------------- | --------------------------------------- | ---------------------------------------------------------- |
-| 設定管理              | `config/`                               | `config.Default()`                                         |
-| 資料庫連線            | `db/`                                   | `db.InitSQLite()` / `db.InitMySQL()` / `db.InitPostgres()` |
-| HTTP 服務             | `router/`, `mw/`, `main.go`             | `HTTPServer()`                                             |
-| 程式碼產生 — stringer | `cmd/sample/stringer/`, `service/generator.go` | `go test ./cmd/sample/stringer -run TestRunGeneratesStringerCode` |
-| 程式碼產生 — gotmpl   | `cmd/sample/gotmpl/`                    | `go test ./cmd/sample/gotmpl -run TestRun`                  |
-| 版本管理              | `cmd/` (`version.go`)                   | `cmd.MajorCmd` / `MinorCmd` / `PatchCmd`, `cmd.ReadVersion()` |
-| 設定檢視/修改 CLI     | `cmd/` (`config.go`)                    | `cmd.ConfigCmd`                                            |
-| Cobra Hook 範例       | `cmd/sample/`                           | `cmd/sample/main.go`                                       |
-| 通用通知              | `notify/`                               | 各通知器獨立建構與呼叫                                     |
-| 排程管理              | `scheduler/`                            | `scheduler.New()`                                          |
-| 編碼與資料處理        | `encode/`, `utils/`, `time/`            | 各函式獨立呼叫                                             |
+| 業務領域 (Domain)     | 套件/模組 (Package/Module)                              | 進入點 (Entry Point)                                                                                                      |
+| --------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| 設定管理              | `config/`                                               | `config.Default()`                                                                                                        |
+| 資料庫連線            | `db/`                                                   | `db.InitSQLite()` / `db.InitMySQL()` / `db.InitPostgres()`                                                                |
+| HTTP 服務             | `router/`, `mw/`, `main.go`                             | `HTTPServer()`                                                                                                            |
+| 程式碼產生 — stringer | `cmd/sample/stringer/`, `service/generator.go`          | `go test ./cmd/sample/stringer -run TestRunGeneratesStringerCode`                                                         |
+| 程式碼產生 — gotmpl   | `cmd/sample/gotmpl/`                                    | `go test ./cmd/sample/gotmpl -run TestRun`                                                                                |
+| 版本管理              | `cmd/` (`version.go`)                                   | `cmd.MajorCmd` / `MinorCmd` / `PatchCmd`, `cmd.ReadVersion()`                                                             |
+| 設定檢視/修改 CLI     | `cmd/` (`config.go`)                                    | `cmd.ConfigCmd`                                                                                                           |
+| Cobra Hook 範例       | `cmd/sample/`                                           | `cmd/sample/main.go`                                                                                                      |
+| 通用通知              | `notify/`                                               | 各通知器獨立建構與呼叫                                                                                                    |
+| 排程管理              | `scheduler/`                                            | `scheduler.New()`                                                                                                         |
+| 編碼與資料處理        | `encode/`, `utils/`, `time/`                            | 各函式獨立呼叫                                                                                                            |
 | 通用驗證              | `validator/`, `validator/string/`, `validator/numeric/` | `validator.New()` (composite), `string.NewNotEmpty()` / `string.NewEmail()` / `string.NewEqualTo()`, `numeric.NewRange()` |
-| 日誌與觀測            | `log/`                                  | `log.Init()`                                               |
-| Remote Write 指標     | `metric/`                               | `NewMetricService()` / `NewVictoriaMetricsService()`       |
-| Cobra CLI Hook 指標   | `metric/`                               | `metric.CobraCMDHook()`                                    |
-| OTel 指標             | `metric/`                               | `metric.InitMeterProvider()`                               |
-| OTel Tracer           | `metric/`                               | `metric.InitTracerProvider()`                              |
+| 日誌與觀測            | `log/`                                                  | `log.Init()`                                                                                                              |
+| Remote Write 指標     | `metric/`                                               | `NewMetricService()` / `NewVictoriaMetricsService()`                                                                      |
+| Cobra CLI Hook 指標   | `metric/`                                               | `metric.CobraCMDHook()`                                                                                                   |
+| OTel 指標             | `metric/`                                               | `metric.InitMeterProvider()`                                                                                              |
+| OTel Tracer           | `metric/`                                               | `metric.InitTracerProvider()`                                                                                             |
 
 ## 開發指南 (Development Guide)
 
