@@ -25,7 +25,8 @@ gosdk/
 │       │   ├── config.yaml
 │       │   └── LICENSE
 │       └── stringer/        # 增強版 enum stringer 測試工具（非 package main）
-│           └── main.go      # run() 測試入口├── config/                  # 設定管理模組
+│           └── main.go      # run() 測試入口
+├── config/                  # 設定管理模組
 │   ├── config.go            # Config 介面、Default()、GetAppConfigDir()
 │   ├── config_test.go       # 基本設定載入測試
 │   ├── option.go            # ConfigOption：WithAppName / WithDefaultValue
@@ -151,7 +152,7 @@ gosdk/
 ├── .claude-plugin/          # Claude Code plugin manifest
 │   └── plugin.json          # plugin metadata（name=gosdk；version 於 release 時人工對齊 tag）
 ├── plans/                   # 開發計畫文件
-├── skills/                  # Agent skills（9 個：golang-dev、golang-gosdk、golang-mvc、golang-code-quality、golang-dead-code、golang-naming、golang-network、golang-performance-tuning、gosdk-migrate）
+├── skills/                  # Agent skills（9 個：golang-dev、golang-gosdk、golang-mvc、golang-code-quality、golang-dead-code、golang-naming、golang-network、golang-performance-tuning、golang-gosdk-migrate）
 ├── agents/                  # Agent 定義（golang-refactor.md）
 ├── docs/                    # 其他文件（superpowers）
 ├── AGENTS.md                # Agent 入口說明
@@ -195,7 +196,7 @@ gosdk/
 - `Notifier` 介面保持單一方法（`Notify`）：不綁定特定訊息格式，呼叫方自行序列化 summary 字串，使通知器可輕易替換或組合
 - `gosdk/cmd` 定位為「可被宿主應用 `AddCommand()` 的子命令目錄」，不是可執行程式：每個子命令一個檔案、檔名對應命令名（`config.go` → `ConfigCmd`、`major.go` → `MajorCmd`），一律採 package-level var + `init()` 綁 flag，root command 不上提（各 CLI 自己的 `main.go` 組裝）。子子命令以 prefix 命名（`deployLocal.go`）
 - 版本管理改為 SDK 子命令：`cmd.MajorCmd` / `MinorCmd` / `PatchCmd` 操作工作目錄下的純文字 `VERSION` 檔（`major.minor.patch`），不依賴 git tag 或外部服務；`Version` 結構與 `ReadVersion()` / `WriteVersion()` 一併公開於 `cmd/version.go`。原先的獨立 `cmd/versioning` binary 已移除 —— 需要 CLI 的專案自行組 root command
-- `cmd/sample/` 收攏所有可執行程式（cobra hook 範例、`gotmpl`、`stringer`），與 SDK 的子命令目錄分離
+- `cmd/sample/` 收攏範例與測試工具：只有 `cmd/sample/main.go` 是可執行程式，`gotmpl` 與 `stringer` 改由 `_test.go` 呼叫 `run()` 驗證功能，與 SDK 的子命令目錄分離
 - Cobra hook 採極簡設計（無 option、同步送出）：`CobraCMDHook(root)` 在 PreRun 送出 `command_line_trigger{cmd, flag}`（PreRun 而非 PostRun：永遠會送，即使 RunE 失敗）；`cmd` 為完整指令鏈（`cmd.CommandPath()`，root → leaf）；`flag` 收集使用者實際設定的 flags（走訪整條 chain、`seen` map 去重 persistent flag），字母排序後以 `-` 串接；發送走套件層級 `Send()`（全域 `MetricService`，首次使用時以 `METRIC_URL` 建立；測試以 `viper.Set` 覆寫）
 
 ### Remote Write 與 OpenTelemetry 指標發送差異 (Remote Write vs OpenTelemetry Metrics)
@@ -221,8 +222,8 @@ gosdk/
 | 設定管理              | `config/`                               | `config.Default()`                                         |
 | 資料庫連線            | `db/`                                   | `db.InitSQLite()` / `db.InitMySQL()` / `db.InitPostgres()` |
 | HTTP 服務             | `router/`, `mw/`, `main.go`             | `HTTPServer()`                                             |
-| 程式碼產生 — stringer | `cmd/sample/stringer/`, `service/generator.go` | `cmd/sample/stringer/main.go`                        |
-| 程式碼產生 — gotmpl   | `cmd/sample/gotmpl/`                    | `cmd/sample/gotmpl/main.go`                                |
+| 程式碼產生 — stringer | `cmd/sample/stringer/`, `service/generator.go` | `go test ./cmd/sample/stringer -run TestRunGeneratesStringerCode` |
+| 程式碼產生 — gotmpl   | `cmd/sample/gotmpl/`                    | `go test ./cmd/sample/gotmpl -run TestRun`                  |
 | 版本管理              | `cmd/` (`version.go`)                   | `cmd.MajorCmd` / `MinorCmd` / `PatchCmd`, `cmd.ReadVersion()` |
 | 設定檢視/修改 CLI     | `cmd/` (`config.go`)                    | `cmd.ConfigCmd`                                            |
 | Cobra Hook 範例       | `cmd/sample/`                           | `cmd/sample/main.go`                                       |

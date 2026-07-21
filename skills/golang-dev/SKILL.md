@@ -276,7 +276,7 @@ Two viper keys drive it (override with `LOG_LEVEL` / `LOG_FORMAT` env vars under
 - Prefer the structured key–value form (`slog.Info(msg, "key", val)`) over interpolated strings so logs stay machine-parseable.
 - Group repeated attributes with `slog.With(...)` to get a child logger: `l := slog.With("request_id", id); l.Info("...")`.
 
-`Upgrading an older gosdk project?` There is a dedicated `gosdk-migrate` skill covering zap → slog and every other superseded SDK API. Core mapping: `zap.L()`/`zap.S()` → package-level `slog.*`; `zap.String("k", v)` typed fields → plain `"k", v` pairs; `logger.Sugar().Infof(...)` → `slog.Info(msg, attrs...)` (no printf-style formatting — build the message or pass attrs).
+`Upgrading an older gosdk project?` There is a dedicated `golang-gosdk-migrate` skill covering zap → slog and every other superseded SDK API. Core mapping: `zap.L()`/`zap.S()` → package-level `slog.*`; `zap.String("k", v)` typed fields → plain `"k", v` pairs; `logger.Sugar().Infof(...)` → `slog.Info(msg, attrs...)` (no printf-style formatting — build the message or pass attrs).
 
 ### Manual slog fallback (no gosdk)
 

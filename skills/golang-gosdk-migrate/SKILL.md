@@ -1,5 +1,5 @@
 ---
-name: gosdk-migrate
+name: golang-gosdk-migrate
 description: >-
     Use when upgrading a Go project to current github.com/bizshuk/gosdk
     conventions, or when it still uses an API the SDK has since replaced.
@@ -21,7 +21,7 @@ disable-model-invocation: false
 user-invocable: true
 ---
 
-# gosdk-migrate
+# golang-gosdk-migrate
 
 Upgrade a Go project to the current `github.com/bizshuk/gosdk` conventions.
 The SDK has replaced several APIs over time; this skill detects which of them
@@ -37,7 +37,7 @@ deliberately does not duplicate the target-state documentation.
 
 ```text
 Skill(golang-gosdk)   →  what the code should look like
-Skill(gosdk-migrate)  →  how to get there from what it looks like now
+Skill(golang-gosdk-migrate)  →  how to get there from what it looks like now
 ```
 
 ## Migration catalog

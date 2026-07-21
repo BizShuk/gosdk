@@ -346,7 +346,7 @@ func main() {
 > **Do NOT use wrapper functions like `log.Info()`, `log.Errorf()` or printf-style formatting.** Use the package-level `slog.*` functions with key/value attributes. Call `log.Init()` again after config reloads to apply the latest `LOG_LEVEL` / `LOG_FORMAT`. Output is fixed to `os.Stdout`.
 
 > [!NOTE]
-> Upgrading an older project? Use the `gosdk-migrate` skill — it covers zap → slog plus every other superseded SDK API (config schema structs, PROFILE switching, nested `db:` blocks, cobra constructors, the standalone versioning CLI). Core zap mapping: `zap.L()` / `zap.S()` → package-level `slog.*`; typed fields `zap.Int("port", 8080)` → plain pairs `"port", 8080`; `zap.S().Infof("…%s", x)` → build the message or pass attrs (slog has no printf form).
+> Upgrading an older project? Use the `golang-gosdk-migrate` skill — it covers zap → slog plus every other superseded SDK API (config schema structs, PROFILE switching, nested `db:` blocks, cobra constructors, the standalone versioning CLI). Core zap mapping: `zap.L()` / `zap.S()` → package-level `slog.*`; typed fields `zap.Int("port", 8080)` → plain pairs `"port", 8080`; `zap.S().Infof("…%s", x)` → build the message or pass attrs (slog has no printf form).
 
 ### 6. Metrics & Tracing (Remote Write vs OpenTelemetry)
 

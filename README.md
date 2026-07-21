@@ -295,11 +295,11 @@ s.Run("localhost:8080")
 ### 程式碼產生
 
 ```bash
-# stringer: 從常數型別產生輔助方法
-go run ./cmd/sample/stringer -type=MyEnum -output=myenum_string.go -trimprefix=PREFIX_ .
+# stringer：測試 flag parsing、package parsing、程式碼產生與檔案寫入
+go test ./cmd/sample/stringer -run TestRunGeneratesStringerCode -v
 
-# gotmpl: 從 YAML 設定渲染 Go 模板
-go run ./cmd/sample/gotmpl --config config.yaml
+# gotmpl：測試 YAML 設定載入與 Go template 渲染
+go test ./cmd/sample/gotmpl -run TestRun -v
 ```
 
 ### 內建子命令 (Built-in Subcommands)
@@ -409,7 +409,7 @@ metric.CobraCMDHook(rootCmd)
 
 本 repo 已附 `.claude-plugin/plugin.json`，可直接作為 Claude Code plugin 載入，提供下列元件：
 
-- `Skills (9)`：`golang-dev`、`golang-gosdk`、`golang-mvc`、`golang-code-quality`、`golang-dead-code`、`golang-naming`、`golang-network`、`golang-performance-tuning`、`gosdk-migrate`
+- `Skills (9)`：`golang-dev`、`golang-gosdk`、`golang-mvc`、`golang-code-quality`、`golang-dead-code`、`golang-naming`、`golang-network`、`golang-performance-tuning`、`golang-gosdk-migrate`
 - `Agents (1)`：`golang-refactor`
 
 `安裝方式 (Installation):`
@@ -423,7 +423,7 @@ claude --plugin-url https://github.com/bizshuk/gosdk
 
 # 安裝後 skill 透過 plugin 名稱 namespace 觸發
 /gosdk:golang-dev
-/gosdk:gosdk-migrate
+/gosdk:golang-gosdk-migrate
 ```
 
 ---
