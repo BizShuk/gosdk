@@ -73,6 +73,57 @@ func readLocal(t *testing.T, dir string) map[string]any {
 	return m
 }
 
+func TestPublicConfigFunctions(t *testing.T) {
+	dir := fixture(t, map[string]string{
+		"settings.local.json": `{"keep":"old","remove":"value"}`,
+	})
+
+	updateReport, err := RunConfigUpdate([]string{"keep=new"})
+	if err != nil {
+		t.Fatalf("RunConfigUpdate failed: %v", err)
+	}
+	deleteReport, err := RunConfigDelete([]string{"remove"})
+	if err != nil {
+		t.Fatalf("RunConfigDelete failed: %v", err)
+	}
+	entries := RunConfigShow()
+
+	// Each public function exposes its work as data; the CLI layer is
+	// responsible for turning that data into human-readable output, so these
+	// assertions check the structured result, not a formatted string.
+	if len(updateReport.Changes) != 1 {
+		t.Errorf("RunConfigUpdate changes = %+v, want exactly one change", updateReport.Changes)
+	} else {
+		ch := updateReport.Changes[0]
+		if ch.Kind != ChangeUpdated || ch.Key != "keep" || ch.Old != "old" || ch.New != "new" {
+			t.Errorf("RunConfigUpdate change = %+v, want {Update, keep, old, new}", ch)
+		}
+	}
+	if len(deleteReport.Changes) != 1 {
+		t.Errorf("RunConfigDelete changes = %+v, want exactly one change", deleteReport.Changes)
+	} else {
+		ch := deleteReport.Changes[0]
+		if ch.Kind != ChangeDeleted || ch.Key != "remove" || ch.Old != "value" || ch.New != nil {
+			t.Errorf("RunConfigDelete change = %+v, want {Delete, remove, value, nil}", ch)
+		}
+	}
+	var foundKeep bool
+	for _, e := range entries {
+		if e.Key == "keep" && e.Value == "new" {
+			foundKeep = true
+			break
+		}
+	}
+	if !foundKeep {
+		t.Errorf("RunConfigShow did not return updated keep=new entry: %+v", entries)
+	}
+
+	m := readLocal(t, dir)
+	if _, ok := m["remove"]; ok {
+		t.Errorf("RunConfigDelete left removed key in %#v", m)
+	}
+}
+
 func TestShowMergesEveryLayer(t *testing.T) {
 	fixture(t, map[string]string{
 		".env":                "SHARED=1-env\nONLY_ENV=env\n",
@@ -321,6 +372,29 @@ func TestDeleteRejectsMissingKey(t *testing.T) {
 	}
 }
 
+func TestUpdateAndDeleteFailureLeavesFileUntouched(t *testing.T) {
+	const original = `{"keep":"original"}`
+	dir := fixture(t, map[string]string{
+		"settings.local.json": original,
+	})
+
+	out, err := run(t, "--update", "added=value", "--delete", "missing")
+	if err == nil {
+		t.Fatal("expected the missing delete to fail")
+	}
+	if strings.Contains(out, "add    added") || strings.Contains(out, "written to") {
+		t.Errorf("failed changes wrote success output before the adapter returned successfully: %q", out)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, LOCAL_SETTINGS_FILE))
+	if err != nil {
+		t.Fatalf("read %s: %v", LOCAL_SETTINGS_FILE, err)
+	}
+	if string(data) != original {
+		t.Errorf("failed changes rewrote %s:\ngot:  %s\nwant: %s", LOCAL_SETTINGS_FILE, data, original)
+	}
+}
+
 func TestDeleteOnlyTouchesLocalSettings(t *testing.T) {
 	dir := fixture(t, map[string]string{
 		"config.yaml":         "server:\n  host: from-yaml\n",
@@ -349,7 +423,7 @@ func TestDeleteOnlyTouchesLocalSettings(t *testing.T) {
 	}
 }
 
-func TestMutateWarnsWhenEnvVarShadows(t *testing.T) {
+func TestUpdateWarnsWhenEnvVarShadows(t *testing.T) {
 	t.Setenv("APP_LOG_LEVEL", "debug")
 	fixture(t, nil)
 
@@ -362,7 +436,7 @@ func TestMutateWarnsWhenEnvVarShadows(t *testing.T) {
 	}
 }
 
-func TestMutateNoWarningForNestedKey(t *testing.T) {
+func TestUpdateNoWarningForNestedKey(t *testing.T) {
 	// APP_SERVER_HOST maps to the flat key server_host, never to server.host,
 	// because the config package installs no EnvKeyReplacer.
 	t.Setenv("APP_SERVER_HOST", "1.2.3.4")
@@ -377,7 +451,7 @@ func TestMutateNoWarningForNestedKey(t *testing.T) {
 	}
 }
 
-func TestMutatePrefersConfDirWhenPresent(t *testing.T) {
+func TestUpdatePrefersConfDirWhenPresent(t *testing.T) {
 	dir := fixture(t, map[string]string{
 		"conf/settings.json": `{"existing":"value"}`,
 	})
@@ -394,10 +468,10 @@ func TestMutatePrefersConfDirWhenPresent(t *testing.T) {
 	}
 }
 
-// TestMutateReusesLocationFoundByConfigPackage pins the fact that the write
+// TestUpdateReusesLocationFoundByConfigPackage pins the fact that the write
 // target is resolved through config.NewJsonConfig(), not a search path this
 // command maintains itself.
-func TestMutateReusesLocationFoundByConfigPackage(t *testing.T) {
+func TestUpdateReusesLocationFoundByConfigPackage(t *testing.T) {
 	dir := fixture(t, map[string]string{
 		"conf/settings.local.json": `{"existing":"value"}`,
 	})

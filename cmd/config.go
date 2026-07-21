@@ -7,13 +7,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
-	"text/tabwriter"
 
 	"github.com/bizshuk/gosdk/config"
 	"github.com/spf13/cobra"
@@ -38,6 +36,48 @@ var configLayers = []struct {
 	{"env", config.NewEnvConfig},
 	{"yaml", config.NewYamlConfig},
 	{"json", config.NewJsonConfig},
+}
+
+// ChangeKind reports whether a config mutation adds, updates, or deletes a key.
+type ChangeKind string
+
+const (
+	ChangeAdded   ChangeKind = "add"
+	ChangeUpdated ChangeKind = "update"
+	ChangeDeleted ChangeKind = "delete"
+)
+
+// Change is one mutation the command applied to settings.local.json.
+// Old is set on update/delete; New is set on add/update.
+type Change struct {
+	Kind ChangeKind
+	Key  string
+	Old  any
+	New  any
+}
+
+// ChangeReport bundles the mutations a single update or delete call applied,
+// the file they were written to, and any non-fatal notices about them (for
+// example, env vars that still outrank the file).
+type ChangeReport struct {
+	Changes  []Change
+	Path     string
+	Warnings []string
+}
+
+// ShadowedValue is a value lost to a higher-precedence layer.
+type ShadowedValue struct {
+	Value  any
+	Source string
+}
+
+// Entry is one key in the merged view: the winning value plus the values it
+// overrode, listed low precedence first.
+type Entry struct {
+	Key      string
+	Value    any
+	Source   string
+	Shadowed []ShadowedValue
 }
 
 // ConfigCmd is the "config" command for the hosting application to register:
@@ -83,7 +123,7 @@ config file. It does not override an APP_ environment variable.`,
   app config --delete server.host`,
 	Args:         cobra.NoArgs,
 	SilenceUsage: true,
-	RunE:         runConfig,
+	RunE:         RunConfig,
 }
 
 // Flag values bound in init(). They are package-level because ConfigCmd is a
@@ -105,37 +145,141 @@ func init() {
 	f.StringArrayVar(&configDeletes, "delete", nil, "remove a field, as a.b.c (repeatable)")
 }
 
-func runConfig(c *cobra.Command, args []string) error {
+// RunConfig executes ConfigCmd using the values bound to its flags.
+//
+// The CLI layer owns two responsibilities: dispatching to the right public
+// logic function, and rendering its structured result into human-readable
+// output. The logic functions themselves never write to stdout or build
+// display strings, so they can be reused by a future API surface (HTTP, gRPC,
+// library) without dragging the table renderer along.
+func RunConfig(c *cobra.Command, args []string) error {
 	// --add is an alias for --update; concatenating keeps the two flags
 	// independent instead of aliasing one slice variable.
-	mutations := append(append([]string{}, configUpdates...), configAdds...)
-	if len(mutations) > 0 || len(configDeletes) > 0 {
-		return runConfigMutate(c.OutOrStdout(), mutations, configDeletes)
+	updates := append(append([]string{}, configUpdates...), configAdds...)
+
+	output, err := dispatchConfig(configSource, updates, configDeletes)
+	if err != nil {
+		return err
 	}
-	return runConfigShow(c.OutOrStdout(), configSource)
+	_, err = fmt.Fprint(c.OutOrStdout(), output)
+	return err
 }
 
-// --- show ---------------------------------------------------------------
-
-// shadow is a value that lost to a higher-precedence layer.
-type shadow struct {
-	value  any
-	source string
+// dispatchConfig picks the right public logic function for the flags the user
+// passed and renders its result. Errors come from the logic layer; rendering
+// never produces an error here.
+func dispatchConfig(withSource bool, updates, deletes []string) (string, error) {
+	switch {
+	case len(updates) > 0 && len(deletes) > 0:
+		// Keep mixed changes atomic: validate and apply both sets in memory,
+		// then rewrite settings.local.json once.
+		report, err := runConfigChanges(updates, deletes)
+		if err != nil {
+			return "", err
+		}
+		return renderChangeReport(report), nil
+	case len(updates) > 0:
+		report, err := RunConfigUpdate(updates)
+		if err != nil {
+			return "", err
+		}
+		return renderChangeReport(report), nil
+	case len(deletes) > 0:
+		report, err := RunConfigDelete(deletes)
+		if err != nil {
+			return "", err
+		}
+		return renderChangeReport(report), nil
+	default:
+		return renderShowTable(RunConfigShow(), withSource), nil
+	}
 }
 
-// entry is one key in the merged view: the winning value plus everything it
-// overrode, listed low precedence first.
-type entry struct {
-	key      string
-	value    any
-	source   string
-	shadowed []shadow
+// --- public logic -------------------------------------------------------
+
+// RunConfigShow returns the merged configuration entries, sorted by key. Each
+// entry carries the winning value, the layer it came from, and the values it
+// overrode (lowest precedence first); the renderer decides what to display.
+//
+// The returned slice is always non-nil; an empty config yields an empty slice.
+func RunConfigShow() []Entry {
+	return mergedEntries()
+}
+
+// RunConfigUpdate applies every update and rewrites LOCAL_SETTINGS_FILE once.
+// A failed update leaves the file untouched.
+func RunConfigUpdate(updates []string) (ChangeReport, error) {
+	return runConfigChanges(updates, nil)
+}
+
+// RunConfigDelete applies every delete and rewrites LOCAL_SETTINGS_FILE once.
+// A failed delete leaves the file untouched.
+func RunConfigDelete(deletes []string) (ChangeReport, error) {
+	return runConfigChanges(nil, deletes)
+}
+
+// --- shared logic -------------------------------------------------------
+
+// runConfigChanges applies updates and deletes to settings.local.json
+// atomically and returns the resulting report. RunConfig routes update/delete
+// and the combined case through here so the rewrite happens exactly once and
+// the reported path is always the one that was actually written.
+func runConfigChanges(updates, deletes []string) (ChangeReport, error) {
+	path := localSettingsPath()
+	settings, err := readLocalSettings(path)
+	if err != nil {
+		return ChangeReport{}, err
+	}
+
+	var changes []Change
+	for _, spec := range updates {
+		key, raw, ok := strings.Cut(spec, "=")
+		if !ok {
+			return ChangeReport{}, fmt.Errorf("invalid update %q: expected a.b.c=value", spec)
+		}
+		segs, err := splitKey(key)
+		if err != nil {
+			return ChangeReport{}, err
+		}
+		value := parseValue(raw)
+		old, existed := lookupPath(settings, segs)
+		if err := setPath(settings, segs, value); err != nil {
+			return ChangeReport{}, err
+		}
+		if existed {
+			changes = append(changes, Change{Kind: ChangeUpdated, Key: key, Old: old, New: value})
+		} else {
+			changes = append(changes, Change{Kind: ChangeAdded, Key: key, New: value})
+		}
+	}
+
+	for _, key := range deletes {
+		segs, err := splitKey(key)
+		if err != nil {
+			return ChangeReport{}, err
+		}
+		old, _ := lookupPath(settings, segs)
+		if err := deletePath(settings, segs); err != nil {
+			return ChangeReport{}, err
+		}
+		changes = append(changes, Change{Kind: ChangeDeleted, Key: key, Old: old})
+	}
+
+	if err := writeLocalSettings(path, settings); err != nil {
+		return ChangeReport{}, err
+	}
+
+	return ChangeReport{
+		Changes:  changes,
+		Path:     path,
+		Warnings: envShadowWarnings(updates, deletes),
+	}, nil
 }
 
 // mergedEntries merges the config layers exactly as config.Default() does and
 // records where each winning value came from.
-func mergedEntries() []entry {
-	byKey := map[string]*entry{}
+func mergedEntries() []Entry {
+	byKey := map[string]*Entry{}
 
 	for _, layer := range configLayers {
 		flat := map[string]any{}
@@ -143,11 +287,11 @@ func mergedEntries() []entry {
 
 		for k, v := range flat {
 			if prev, seen := byKey[k]; seen {
-				prev.shadowed = append(prev.shadowed, shadow{value: prev.value, source: prev.source})
-				prev.value, prev.source = v, layer.name
+				prev.Shadowed = append(prev.Shadowed, ShadowedValue{Value: prev.Value, Source: prev.Source})
+				prev.Value, prev.Source = v, layer.name
 				continue
 			}
-			byKey[k] = &entry{key: k, value: v, source: layer.name}
+			byKey[k] = &Entry{Key: k, Value: v, Source: layer.name}
 		}
 	}
 
@@ -157,15 +301,15 @@ func mergedEntries() []entry {
 		if !ok {
 			continue
 		}
-		e.shadowed = append(e.shadowed, shadow{value: e.value, source: e.source})
-		e.value, e.source = value, name
+		e.Shadowed = append(e.Shadowed, ShadowedValue{Value: e.Value, Source: e.Source})
+		e.Value, e.Source = value, name
 	}
 
-	entries := make([]entry, 0, len(byKey))
+	entries := make([]Entry, 0, len(byKey))
 	for _, e := range byKey {
 		entries = append(entries, *e)
 	}
-	sort.Slice(entries, func(i, j int) bool { return entries[i].key < entries[j].key })
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Key < entries[j].Key })
 	return entries
 }
 
@@ -198,116 +342,9 @@ func envOverride(key string) (name, value string, ok bool) {
 	return name, value, ok
 }
 
-func runConfigShow(w io.Writer, withSource bool) error {
-	entries := mergedEntries()
-	if len(entries) == 0 {
-		fmt.Fprintln(w, "no configuration found")
-		return nil
-	}
-
-	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	if withSource {
-		fmt.Fprintln(tw, "KEY\tVALUE\tSOURCE")
-	} else {
-		fmt.Fprintln(tw, "KEY\tVALUE")
-	}
-
-	for _, e := range entries {
-		if !withSource {
-			fmt.Fprintf(tw, "%s\t%s\n", e.key, formatValue(e.value))
-			continue
-		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\n", e.key, formatValue(e.value), e.source)
-		// Listed most recent first, so the layer that came closest to winning
-		// is printed directly under the winner.
-		for i := len(e.shadowed) - 1; i >= 0; i-- {
-			s := e.shadowed[i]
-			fmt.Fprintf(tw, "\t%s\t%s (overridden)\n", formatValue(s.value), s.source)
-		}
-	}
-	return tw.Flush()
-}
-
-// formatValue renders a value for the show table. Non-strings go through JSON so
-// numbers, booleans and the empty maps --delete leaves behind stay readable.
-func formatValue(v any) string {
-	switch t := v.(type) {
-	case string:
-		return t
-	case nil:
-		return "<nil>"
-	default:
-		b, err := json.Marshal(t)
-		if err != nil {
-			return fmt.Sprint(v)
-		}
-		return string(b)
-	}
-}
-
-// --- mutate -------------------------------------------------------------
-
-// runConfigMutate applies every update and delete, then rewrites
-// settings.local.json once. A failure leaves the file untouched.
-func runConfigMutate(w io.Writer, updates, deletes []string) error {
-	path := localSettingsPath()
-	settings, err := readLocalSettings(path)
-	if err != nil {
-		return err
-	}
-
-	var report []string
-
-	for _, spec := range updates {
-		key, raw, ok := strings.Cut(spec, "=")
-		if !ok {
-			return fmt.Errorf("invalid update %q: expected a.b.c=value", spec)
-		}
-		segs, err := splitKey(key)
-		if err != nil {
-			return err
-		}
-		value := parseValue(raw)
-		old, existed := lookupPath(settings, segs)
-		if err := setPath(settings, segs, value); err != nil {
-			return err
-		}
-		if existed {
-			report = append(report, fmt.Sprintf("update %s: %s -> %s",
-				key, formatValue(old), formatValue(value)))
-		} else {
-			report = append(report, fmt.Sprintf("add    %s: %s", key, formatValue(value)))
-		}
-	}
-
-	for _, key := range deletes {
-		segs, err := splitKey(key)
-		if err != nil {
-			return err
-		}
-		old, _ := lookupPath(settings, segs)
-		if err := deletePath(settings, segs); err != nil {
-			return err
-		}
-		report = append(report, fmt.Sprintf("delete %s: was %s", key, formatValue(old)))
-	}
-
-	if err := writeLocalSettings(path, settings); err != nil {
-		return err
-	}
-
-	for _, line := range report {
-		fmt.Fprintln(w, line)
-	}
-	fmt.Fprintf(w, "written to %s\n", path)
-
-	warnEnvShadow(w, updates, deletes)
-	return nil
-}
-
-// warnEnvShadow reports keys whose new value will not take effect because an
-// APP_ environment variable outranks every config file.
-func warnEnvShadow(w io.Writer, updates, deletes []string) {
+// envShadowWarnings returns keys whose new value will not take effect because
+// an APP_ environment variable outranks every config file.
+func envShadowWarnings(updates, deletes []string) []string {
 	keys := make([]string, 0, len(updates)+len(deletes))
 	for _, spec := range updates {
 		key, _, _ := strings.Cut(spec, "=")
@@ -315,14 +352,18 @@ func warnEnvShadow(w io.Writer, updates, deletes []string) {
 	}
 	keys = append(keys, deletes...)
 
+	warnings := make([]string, 0, len(keys))
 	for _, key := range keys {
 		name, value, ok := envOverride(strings.ToLower(key))
 		if !ok {
 			continue
 		}
-		fmt.Fprintf(w, "warning: %s is still overridden by %s=%s\n", key, name, value)
+		warnings = append(warnings, fmt.Sprintf("warning: %s is still overridden by %s=%s", key, name, value))
 	}
+	return warnings
 }
+
+// --- file I/O -----------------------------------------------------------
 
 // localSettingsPath resolves the file to write.
 //
@@ -383,6 +424,8 @@ func writeLocalSettings(path string, m map[string]any) error {
 	}
 	return nil
 }
+
+// --- key/value helpers --------------------------------------------------
 
 // splitKey turns "a.b.c" into its path segments. The "." is viper's key
 // delimiter, so each segment is one nesting level in the JSON document.
