@@ -296,20 +296,44 @@ s.Run("localhost:8080")
 
 ```bash
 # stringer: 從常數型別產生輔助方法
-go run ./cmd/stringer -type=MyEnum -output=myenum_string.go -trimprefix=PREFIX_ .
+go run ./cmd/sample/stringer -type=MyEnum -output=myenum_string.go -trimprefix=PREFIX_ .
 
 # gotmpl: 從 YAML 設定渲染 Go 模板
-go run ./cmd/gotmpl --config config.yaml
+go run ./cmd/sample/gotmpl --config config.yaml
 ```
 
-### 版本管理
+### 內建子命令 (Built-in Subcommands)
 
-操作純文字版本檔的獨立 CLI：
+`gosdk/cmd` 是一組現成的 cobra 子命令，由宿主應用自行掛上 root command：
+
+```go
+import (
+    "github.com/bizshuk/gosdk/cmd"
+    "github.com/spf13/cobra"
+)
+
+var rootCmd = &cobra.Command{Use: "myapp"}
+
+func init() {
+    rootCmd.AddCommand(
+        cmd.ConfigCmd,                            // 檢視/修改設定
+        cmd.MajorCmd, cmd.MinorCmd, cmd.PatchCmd, // 操作 VERSION 檔
+    )
+}
+```
+
+`config` 子命令：
 
 ```bash
-go run ./cmd/versioning          # 查看
-go run ./cmd/versioning patch    # 遞增 patch（minor / major 同理）
+myapp config                              # 顯示合併後的設定
+myapp config --source                     # 附帶來源層（env / yaml / json）
+myapp config --update server.host=0.0.0.0 # 寫入 settings.local.json
+myapp config --delete server.host
 ```
+
+key 使用 viper 的點號路徑（`a.b.c` 代表巢狀三層）；`_` 是一般字元，`a_b_c` 是另一個扁平 key。
+
+`major` / `minor` / `patch` 子命令操作工作目錄下的純文字 `VERSION` 檔（格式 `major.minor.patch`），也可直接呼叫 `cmd.ReadVersion()` / `cmd.WriteVersion()`。
 
 ### 通用通知
 
@@ -379,13 +403,13 @@ svc.Send(metric.Metric{
 metric.CobraCMDHook(rootCmd)
 ```
 
-完整可執行範例見 `cmd/cobrasample/`。
+完整可執行範例見 `cmd/sample/`。
 
 ## Claude Code Plugin 安裝
 
 本 repo 已附 `.claude-plugin/plugin.json`，可直接作為 Claude Code plugin 載入，提供下列元件：
 
-- `Skills (9)`：`golang-dev`、`golang-gosdk`、`golang-mvc`、`golang-code-quality`、`golang-dead-code`、`golang-naming`、`golang-network`、`golang-performance-tuning`、`migrate-zap-to-slog`
+- `Skills (9)`：`golang-dev`、`golang-gosdk`、`golang-mvc`、`golang-code-quality`、`golang-dead-code`、`golang-naming`、`golang-network`、`golang-performance-tuning`、`gosdk-migrate`
 - `Agents (1)`：`golang-refactor`
 
 `安裝方式 (Installation):`
@@ -399,7 +423,7 @@ claude --plugin-url https://github.com/bizshuk/gosdk
 
 # 安裝後 skill 透過 plugin 名稱 namespace 觸發
 /gosdk:golang-dev
-/gosdk:migrate-zap-to-slog
+/gosdk:gosdk-migrate
 ```
 
 ---

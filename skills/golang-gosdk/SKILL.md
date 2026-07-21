@@ -30,6 +30,7 @@ A unified reference for using the `github.com/bizshuk/gosdk` library. This SDK p
 - Processing CSV files with automatic archiving and row-based callbacks.
 - Dealing with CJK character encoding conversions (GBK, Big5 to UTF-8).
 - Pushing time-series metrics to a VictoriaMetrics / Mimir / any Prometheus remote-write endpoint.
+- Adding a ready-made `config` or version-bump subcommand to a cobra CLI (`gosdk/cmd`).
 
 ## Quick Reference & Common Patterns
 
@@ -44,7 +45,7 @@ Configuration is globally managed via `viper` — no global config struct. The S
 2. `config.yaml` / `config.local.yaml`
 3. `settings.json` / `settings.local.json`
 
-Environment variables prefixed with `APP_` override config values (`APP_SERVER_PORT` → `server.port`).
+Environment variables prefixed with `APP_` override config values, but only for **flat** keys — `APP_SERVER_PORT` maps to `server_port`, NOT to `server.port`. See "Key Format" below before relying on env overrides.
 
 #### `config.Default()` Options
 
@@ -66,6 +67,32 @@ Every format loader (`.env`, `config.yaml`, `settings.json`) searches the **same
 ```
 
 So a `settings.json` in the working dir shadows one in `~/.config/<appName>`. The app's installed/home config lives in dir 3; project-local overrides live in dirs 1–2.
+
+#### Key Format: `.` is Nesting, `_` is Literal
+
+This is the most commonly misunderstood part of the SDK. `.` is viper's key delimiter; `_` is an ordinary character. **`a.b.c` and `a_b_c` are two different, unrelated keys.**
+
+| Written as | In file | viper key | `Get("a.b.c")` | `Get("a_b_c")` |
+| ---------- | ------- | --------- | -------------- | -------------- |
+| `a:` → `b:` → `c: v` | `config.yaml` | `a.b.c` (nested) | ✅ `v` | ❌ nil |
+| `a_b_c: v` | `config.yaml` | `a_b_c` (flat) | ❌ nil | ✅ `v` |
+| `A.B.C=v` | `.env` | `a.b.c` (nested) | ✅ `v` | ❌ nil |
+| `A_B_C=v` | `.env` | `a_b_c` (flat) | ❌ nil | ✅ `v` |
+
+Two consequences that bite in practice:
+
+1. **dotenv supports `.`** — `A.B.C=v` in a `.env` file is unflattened into `{"a":{"b":{"c":"v"}}}`, exactly matching yaml's nested indentation. It is not a syntax error.
+2. **`APP_` env vars can only reach flat keys.** `config.Default()` calls `SetEnvPrefix("APP")` + `AutomaticEnv()` but installs **no** `SetEnvKeyReplacer`, so viper looks up the literal name `"APP_" + upper(key)`:
+
+   ```text
+   Get("a_b_c") -> APP_A_B_C   ✅ a valid shell variable name, override works
+   Get("a.b.c") -> APP_A.B.C   ❌ no shell can export a name containing "."
+   ```
+
+   So design app-level knobs meant to be overridable from the environment as **flat SCREAMING_SNAKE keys** (`LOG_LEVEL`, `SQLITE_PATH`, `MYSQL_DSN`) — which is exactly why the SDK's own keys use that shape. Reserve nested paths for structured config that only ever comes from files.
+
+> [!NOTE]
+> Executable proof of every row above lives in `config/sample/keymapping_test.go`. Run `go test ./config/sample/ -run TestKey -v` in the gosdk repo.
 
 **Common config in `GetAppConfigDir()` → `settings.json`.** When you ship an app with `WithAppName`, the canonical user-level config file in `~/.config/<appName>/` is `settings.json`, because `WithDefaultValue` bootstraps exactly that file there on first run. `.env` is also searched in the same dir but, by convention, `.env` is the working-dir/dev mechanism (secrets, local overrides) rather than the installed app config.
 
@@ -134,7 +161,16 @@ The override then happens automatically by priority, no extra code:
 ```text
 viper.SetDefault("server.port", 8080)   // 1) fallback = 8080
 # settings.json: { "server": { "port": 9000 } }   → viper.GetInt("server.port") == 9000  (file overrides default)
-# APP_SERVER_PORT=9100 (env)                       → viper.GetInt("server.port") == 9100  (env overrides file)
+# APP_SERVER_PORT=9100 (env)                       → viper.GetInt("server.port") is STILL 9000
+#                                                    ^ APP_SERVER_PORT maps to server_port, not server.port
+```
+
+If you need `server.port` overridable from the environment, declare it as the flat key `SERVER_PORT` instead — then `APP_SERVER_PORT=9100` works:
+
+```text
+viper.SetDefault("SERVER_PORT", 8080)
+# settings.json: { "SERVER_PORT": 9000 }  → viper.GetInt("SERVER_PORT") == 9000
+# APP_SERVER_PORT=9100 (env)              → viper.GetInt("SERVER_PORT") == 9100  ✅
 ```
 
 `Force an override in code` (highest priority of all — beats env and files) with `viper.Set()`; use this for computed/test values, not for normal config:
@@ -310,7 +346,7 @@ func main() {
 > **Do NOT use wrapper functions like `log.Info()`, `log.Errorf()` or printf-style formatting.** Use the package-level `slog.*` functions with key/value attributes. Call `log.Init()` again after config reloads to apply the latest `LOG_LEVEL` / `LOG_FORMAT`. Output is fixed to `os.Stdout`.
 
 > [!NOTE]
-> Migrating from zap? Use the `migrate-zap-to-slog` skill. Core mapping: `zap.L()` / `zap.S()` → package-level `slog.*`; typed fields `zap.Int("port", 8080)` → plain pairs `"port", 8080`; `zap.S().Infof("…%s", x)` → build the message or pass attrs (slog has no printf form).
+> Upgrading an older project? Use the `gosdk-migrate` skill — it covers zap → slog plus every other superseded SDK API (config schema structs, PROFILE switching, nested `db:` blocks, cobra constructors, the standalone versioning CLI). Core zap mapping: `zap.L()` / `zap.S()` → package-level `slog.*`; typed fields `zap.Int("port", 8080)` → plain pairs `"port", 8080`; `zap.S().Infof("…%s", x)` → build the message or pass attrs (slog has no printf form).
 
 ### 6. Metrics & Tracing (Remote Write vs OpenTelemetry)
 
@@ -547,10 +583,69 @@ Key rules:
 - **Silent fallback**: on error, use the original path as-is — unless the caller explicitly needs to handle the error
 - **No-op when safe**: if the path has no `~` prefix, `Expand()` returns it unchanged
 
+### 9. Built-in Subcommands (`gosdk/cmd`)
+
+`github.com/bizshuk/gosdk/cmd` is a catalog of ready-made cobra subcommands, **not an executable**. The host application registers whichever ones it wants on its own root command.
+
+```go
+import (
+    "github.com/bizshuk/gosdk/cmd"
+    "github.com/spf13/cobra"
+)
+
+var RootCmd = &cobra.Command{Use: "myapp"}
+
+func init() {
+    RootCmd.AddCommand(
+        cmd.ConfigCmd,                            // inspect / edit configuration
+        cmd.MajorCmd, cmd.MinorCmd, cmd.PatchCmd, // bump the VERSION file
+    )
+}
+```
+
+| Export | Command | Purpose |
+| ------ | ------- | ------- |
+| `cmd.ConfigCmd` | `config` | Show the merged configuration; edit `settings.local.json` |
+| `cmd.MajorCmd` / `MinorCmd` / `PatchCmd` | `major` / `minor` / `patch` | Bump the plain-text `VERSION` file |
+| `cmd.Version`, `ReadVersion()`, `WriteVersion()`, `ParseVersion()` | — | The `VERSION` file helpers, usable without the commands |
+
+#### The `config` subcommand
+
+```bash
+myapp config                              # merged key/value table
+myapp config --source                     # + which layer each value came from (env / yaml / json / APP_ var)
+myapp config --update server.host=0.0.0.0 # write (--add is an alias)
+myapp config --delete server.host
+```
+
+- Keys use the dotted path syntax from "Key Format" above — `a.b.c` is three nesting levels.
+- Values that parse as JSON keep their type (`8080` → number, `true` → bool). Quote to force a string: `--update build.number='"1234"'`.
+- All writes go to **`settings.local.json` only** — the last file in the merge order, so a written value beats every other file. It does not beat an `APP_` env var, and the command warns when one is shadowing the key you just set.
+- `--delete` removes only the named leaf and **keeps the now-empty parent**. Note that an empty map contributes no key to viper, so `{"a":{"b":{}}}` is visible in the file but invisible to `viper.AllKeys()`.
+
+#### Cobra conventions in this SDK
+
+When adding a command to `gosdk/cmd`, follow the house style:
+
+| Rule | Detail |
+| ---- | ------ |
+| Declaration | Package-level **exported** var (`var ConfigCmd = &cobra.Command{...}`). Never a `NewXxxCmd()` constructor. |
+| Flags | Bound in `func init()`, into package-level vars. Multiple `init()` funcs are fine — put each next to its command. |
+| File name | One file per command, named after it: `config.go` → `ConfigCmd`, `major.go` → `MajorCmd`. |
+| Sub-subcommands | Prefix the file name: `deploy local` → `deployLocal.go`. |
+| Root commands | NOT part of this catalog — each executable assembles its own in its `main.go`. Executables live in `cmd/sample/`. |
+
+> [!WARNING]
+> Because commands are package-level singletons, parsed flag state **survives across `Execute()` calls in one process**: pflag's `stringArrayValue.changed` is private and sticky, so a second `Set` appends instead of replacing. Any test (or REPL) that runs a command more than once must reset the bound vars to `nil` and clear `f.Changed` via `Flags().VisitAll`. See the `run()` helper in `cmd/config_test.go` — removing that reset makes 7 tests fail.
+
 ## Common Mistakes
 
 | Mistake                                         | Correction                                                                                                                                                                   |
 | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Assuming `APP_SERVER_PORT` overrides `server.port` | It does not — there is no `EnvKeyReplacer`. It maps to the flat key `server_port`. Declare env-overridable knobs as flat SCREAMING_SNAKE keys.                            |
+| Treating `a.b.c` and `a_b_c` as the same key    | They are unrelated keys. `.` is viper's nesting delimiter; `_` is a literal character.                                                                                       |
+| Writing `func NewXxxCmd() *cobra.Command`       | Commands in `gosdk/cmd` are package-level exported vars with flags bound in `init()`. Constructors are not used.                                                             |
+| Re-running a `gosdk/cmd` command in one process without resetting flags | pflag slice values append on the second `Set`. Reset the bound vars to `nil` and clear `f.Changed` first.                                             |
 | Using `fmt.Println` or standard `log`           | Import `gosdk/log` for `Init()`, then use package-level `slog.*` (e.g. `slog.Info(msg, "key", val)`) for all logging.                                                        |
 | Using removed `log.Info()` / `log.Errorf()` etc | Wrapper funcs are gone. Use `slog.Info` / `slog.Error` with key/value attrs; no printf form (`slog.Error("notify failed", "err", err)`).                                     |
 | Creating a global config struct                 | Use `viper.Get*()` directly at point of use. No global struct needed — viper IS the global config store.                                                                     |

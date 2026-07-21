@@ -1,6 +1,6 @@
 {
   "name": "gosdk",
-  "description": "Go development toolkit for github.com/bizshuk/gosdk — bundles 9 Go-focused skills (code-quality, dead-code, dev, gosdk, mvc, naming, network, performance-tuning, zap→slog) and the assertive `golang-refactor` agent that auto-invokes eight specialized skills to actively rewrite code breaking SOLID, MVC, naming, error handling, context propagation, or performance conventions (not just report). Triggers: refactor, review, audit, clean up, restructure, improve.",
+  "description": "Go development toolkit for github.com/bizshuk/gosdk — bundles 9 Go-focused skills (code-quality, dead-code, dev, gosdk, mvc, naming, network, performance-tuning, gosdk-migrate) and the assertive `golang-refactor` agent that auto-invokes eight specialized skills to actively rewrite code breaking SOLID, MVC, naming, error handling, context propagation, or performance conventions (not just report). Triggers: refactor, review, audit, clean up, restructure, improve.",
   "version": "1.2.1",
   "author": {
     "name": "shuk",

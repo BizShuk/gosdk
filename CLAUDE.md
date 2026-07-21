@@ -9,22 +9,23 @@ gosdk/
 ├── Makefile                 # build / test / generate / run / clean
 ├── build/
 │   └── dockerfile           # Multi-stage Docker 建置（golang:1.26-alpine）
-├── cmd/
-│   ├── gotmpl/              # Cobra CLI 模板渲染工具
-│   │   ├── main.go
-│   │   ├── config.yaml
-│   │   └── LICENSE
-│   ├── stringer/            # 增強版 enum stringer CLI
-│   │   └── main.go
-│   ├── versioning/          # 語義版本管理 CLI
-│   │   ├── main.go
-│   │   └── cmd/
-│   │       ├── root.go      # Version 結構、ReadVersion()、WriteVersion()
-│   │       ├── major.go     # major 子命令
-│   │       ├── minor.go     # minor 子命令
-│   │       └── patch.go     # patch 子命令
-│   └── cobrasample/         # metric/cobra hook 使用範例（可執行 demo）
-│       └── main.go
+├── cmd/                     # package cmd：可被宿主應用 AddCommand 的子命令目錄
+│   ├── config.go            # ConfigCmd：檢視/修改設定（--source/--update/--add/--delete）
+│   ├── config_test.go
+│   ├── major.go             # MajorCmd：VERSION 主版號 +1
+│   ├── minor.go             # MinorCmd：VERSION 次版號 +1
+│   ├── patch.go             # PatchCmd：VERSION 修訂號 +1
+│   ├── version.go           # Version 結構、ParseVersion()、ReadVersion()、WriteVersion()
+│   ├── version_test.go
+│   └── sample/              # 可執行範例與獨立工具（皆為 package main）
+│       ├── main.go          # metric/cobra hook 使用範例
+│       ├── gotmpl/          # Cobra CLI 模板渲染工具
+│       │   ├── main.go
+│       │   ├── cmd/         # RootCmd + TemplateLoader（保留：含 metadata）
+│       │   ├── config.yaml
+│       │   └── LICENSE
+│       └── stringer/        # 增強版 enum stringer CLI（用 flag，非 cobra）
+│           └── main.go
 ├── config/                  # 設定管理模組
 │   ├── config.go            # Config 介面、Default()、GetAppConfigDir()
 │   ├── config_test.go       # 基本設定載入測試
@@ -151,7 +152,7 @@ gosdk/
 ├── .claude-plugin/          # Claude Code plugin manifest
 │   └── plugin.json          # plugin metadata（name=gosdk；version 於 release 時人工對齊 tag）
 ├── plans/                   # 開發計畫文件
-├── skills/                  # Agent skills（9 個：golang-dev、golang-gosdk、golang-mvc、golang-code-quality、golang-dead-code、golang-naming、golang-network、golang-performance-tuning、migrate-zap-to-slog）
+├── skills/                  # Agent skills（9 個：golang-dev、golang-gosdk、golang-mvc、golang-code-quality、golang-dead-code、golang-naming、golang-network、golang-performance-tuning、gosdk-migrate）
 ├── agents/                  # Agent 定義（golang-refactor.md）
 ├── docs/                    # 其他文件（superpowers）
 ├── AGENTS.md                # Agent 入口說明
@@ -193,7 +194,9 @@ gosdk/
 - Helmet 中介層採用靜態安全標頭：直接在 response header 注入 `X-Content-Type-Options`、`X-Frame-Options`、`CSP` 等，不依賴外部套件
 - 排程器採用極簡設計：`Scheduler` 僅負責按 `Interval` 觸發 `Job.Fn`，錯誤處理、日誌、重試等策略完全由呼叫方透過 `Job.OnError` 自行決定
 - `Notifier` 介面保持單一方法（`Notify`）：不綁定特定訊息格式，呼叫方自行序列化 summary 字串，使通知器可輕易替換或組合
-- `cmd/versioning` 為操作純文字版本檔的獨立 CLI：不依賴 git tag 或外部服務，檔案格式 `major.minor.patch`，供需要檔案式版本號的專案使用
+- `gosdk/cmd` 定位為「可被宿主應用 `AddCommand()` 的子命令目錄」，不是可執行程式：每個子命令一個檔案、檔名對應命令名（`config.go` → `ConfigCmd`、`major.go` → `MajorCmd`），一律採 package-level var + `init()` 綁 flag，root command 不上提（各 CLI 自己的 `main.go` 組裝）。子子命令以 prefix 命名（`deployLocal.go`）
+- 版本管理改為 SDK 子命令：`cmd.MajorCmd` / `MinorCmd` / `PatchCmd` 操作工作目錄下的純文字 `VERSION` 檔（`major.minor.patch`），不依賴 git tag 或外部服務；`Version` 結構與 `ReadVersion()` / `WriteVersion()` 一併公開於 `cmd/version.go`。原先的獨立 `cmd/versioning` binary 已移除 —— 需要 CLI 的專案自行組 root command
+- `cmd/sample/` 收攏所有可執行程式（cobra hook 範例、`gotmpl`、`stringer`），與 SDK 的子命令目錄分離
 - Cobra hook 採極簡設計（無 option、同步送出）：`CobraCMDHook(root)` 在 PreRun 送出 `command_line_trigger{cmd, flag}`（PreRun 而非 PostRun：永遠會送，即使 RunE 失敗）；`cmd` 為完整指令鏈（`cmd.CommandPath()`，root → leaf）；`flag` 收集使用者實際設定的 flags（走訪整條 chain、`seen` map 去重 persistent flag），字母排序後以 `-` 串接；發送走套件層級 `Send()`（全域 `MetricService`，首次使用時以 `METRIC_URL` 建立；測試以 `viper.Set` 覆寫）
 
 ### Remote Write 與 OpenTelemetry 指標發送差異 (Remote Write vs OpenTelemetry Metrics)
@@ -219,10 +222,11 @@ gosdk/
 | 設定管理              | `config/`                               | `config.Default()`                                         |
 | 資料庫連線            | `db/`                                   | `db.InitSQLite()` / `db.InitMySQL()` / `db.InitPostgres()` |
 | HTTP 服務             | `router/`, `mw/`, `main.go`             | `HTTPServer()`                                             |
-| 程式碼產生 — stringer | `cmd/stringer/`, `service/generator.go` | `cmd/stringer/main.go`                                     |
-| 程式碼產生 — gotmpl   | `cmd/gotmpl/`                           | `cmd/gotmpl/main.go`                                       |
-| 版本管理              | `cmd/versioning/`                       | `cmd/versioning/main.go`                                   |
-| Cobra Hook 範例       | `cmd/cobrasample/`                      | `cmd/cobrasample/main.go`                                  |
+| 程式碼產生 — stringer | `cmd/sample/stringer/`, `service/generator.go` | `cmd/sample/stringer/main.go`                        |
+| 程式碼產生 — gotmpl   | `cmd/sample/gotmpl/`                    | `cmd/sample/gotmpl/main.go`                                |
+| 版本管理              | `cmd/` (`version.go`)                   | `cmd.MajorCmd` / `MinorCmd` / `PatchCmd`, `cmd.ReadVersion()` |
+| 設定檢視/修改 CLI     | `cmd/` (`config.go`)                    | `cmd.ConfigCmd`                                            |
+| Cobra Hook 範例       | `cmd/sample/`                           | `cmd/sample/main.go`                                       |
 | 通用通知              | `notify/`                               | 各通知器獨立建構與呼叫                                     |
 | 排程管理              | `scheduler/`                            | `scheduler.New()`                                          |
 | 編碼與資料處理        | `encode/`, `utils/`, `time/`            | 各函式獨立呼叫                                             |
