@@ -1,4 +1,4 @@
-package cmd
+package config
 
 import (
 	"encoding/json"
@@ -65,17 +65,17 @@ func TestFormatValue_FallsBackWhenMarshalFails(t *testing.T) {
 	}
 }
 
-// --- renderShowTable ----------------------------------------------------
+// --- RenderShowTable ----------------------------------------------------
 
 func TestRenderShowTable_EmptyReportsNotice(t *testing.T) {
-	got := renderShowTable(nil, false)
+	got := RenderShowTable(nil, false)
 	if !strings.Contains(got, "no configuration found") {
 		t.Errorf("empty show = %q, want the 'no configuration found' notice", got)
 	}
 }
 
 func TestRenderShowTable_HeaderNoSourceHasOnlyTwoColumns(t *testing.T) {
-	out := renderShowTable([]Entry{{Key: "k", Value: "v"}}, false)
+	out := RenderShowTable([]Entry{{Key: "k", Value: "v"}}, false)
 	// tabwriter pads; what matters is the header text and column count.
 	if !strings.Contains(out, "KEY") || !strings.Contains(out, "VALUE") {
 		t.Errorf("output missing KEY/VALUE header: %q", out)
@@ -86,7 +86,7 @@ func TestRenderShowTable_HeaderNoSourceHasOnlyTwoColumns(t *testing.T) {
 }
 
 func TestRenderShowTable_HeaderWithSourceHasThreeColumns(t *testing.T) {
-	out := renderShowTable([]Entry{{Key: "k", Value: "v", Source: "json"}}, true)
+	out := RenderShowTable([]Entry{{Key: "k", Value: "v", Source: "json"}}, true)
 	for _, want := range []string{"KEY", "VALUE", "SOURCE"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("withSource output missing %q: %q", want, out)
@@ -95,7 +95,7 @@ func TestRenderShowTable_HeaderWithSourceHasThreeColumns(t *testing.T) {
 }
 
 func TestRenderShowTable_RendersEachEntry(t *testing.T) {
-	out := renderShowTable([]Entry{
+	out := RenderShowTable([]Entry{
 		{Key: "a", Value: "1"},
 		{Key: "b", Value: "2"},
 	}, false)
@@ -119,7 +119,7 @@ func TestRenderShowTable_WithSourceListsShadowedMostRecentFirst(t *testing.T) {
 			{Value: "from-env", Source: "env"},   // just below the winner
 		},
 	}
-	out := renderShowTable([]Entry{entry}, true)
+	out := RenderShowTable([]Entry{entry}, true)
 	// The env value must appear above the yaml value in the rendered table.
 	envIdx := strings.Index(out, "from-env")
 	yamlIdx := strings.Index(out, "from-yaml")
@@ -145,7 +145,7 @@ func TestRenderShowTable_NoSourceHidesShadowed(t *testing.T) {
 			{Value: "from-env", Source: "env"},
 		},
 	}
-	out := renderShowTable([]Entry{entry}, false)
+	out := RenderShowTable([]Entry{entry}, false)
 	if strings.Contains(out, "from-env") {
 		t.Errorf("shadowed value leaked without --source: %q", out)
 	}
@@ -154,14 +154,14 @@ func TestRenderShowTable_NoSourceHidesShadowed(t *testing.T) {
 	}
 }
 
-// --- renderChangeReport -------------------------------------------------
+// --- RenderChangeReport -------------------------------------------------
 
 func TestRenderChangeReport_AddedLine(t *testing.T) {
 	report := ChangeReport{
 		Changes: []Change{{Kind: ChangeAdded, Key: "fresh", New: "value"}},
 		Path:    "/tmp/settings.local.json",
 	}
-	out := renderChangeReport(report)
+	out := RenderChangeReport(report)
 	if !strings.Contains(out, "add    fresh") || !strings.Contains(out, "value") {
 		t.Errorf("add line missing or malformed: %q", out)
 	}
@@ -176,7 +176,7 @@ func TestRenderChangeReport_UpdatedLine(t *testing.T) {
 		Changes: []Change{{Kind: ChangeUpdated, Key: "k", Old: "old", New: "new"}},
 		Path:    "/tmp/settings.local.json",
 	}
-	out := renderChangeReport(report)
+	out := RenderChangeReport(report)
 	if !strings.Contains(out, "update k") {
 		t.Errorf("update line missing: %q", out)
 	}
@@ -190,7 +190,7 @@ func TestRenderChangeReport_DeletedLine(t *testing.T) {
 		Changes: []Change{{Kind: ChangeDeleted, Key: "k", Old: "value"}},
 		Path:    "/tmp/settings.local.json",
 	}
-	out := renderChangeReport(report)
+	out := RenderChangeReport(report)
 	if !strings.Contains(out, "delete k") {
 		t.Errorf("delete line missing: %q", out)
 	}
@@ -203,7 +203,7 @@ func TestRenderChangeReport_AlwaysIncludesWrittenToLine(t *testing.T) {
 	report := ChangeReport{
 		Path: "/some/where/settings.local.json",
 	}
-	out := renderChangeReport(report)
+	out := RenderChangeReport(report)
 	if !strings.Contains(out, "written to /some/where/settings.local.json") {
 		t.Errorf("output missing 'written to' line: %q", out)
 	}
@@ -214,7 +214,7 @@ func TestRenderChangeReport_RendersAllWarnings(t *testing.T) {
 		Path:     "/tmp/settings.local.json",
 		Warnings: []string{"warning: a is still overridden by APP_A=1", "warning: b is still overridden by APP_B=2"},
 	}
-	out := renderChangeReport(report)
+	out := RenderChangeReport(report)
 	if !strings.Contains(out, "APP_A=1") {
 		t.Errorf("warning APP_A missing: %q", out)
 	}
@@ -232,7 +232,7 @@ func TestRenderChangeReport_CombinedOutputPreservesOrder(t *testing.T) {
 		Path:     "/p",
 		Warnings: []string{"w1"},
 	}
-	out := renderChangeReport(report)
+	out := RenderChangeReport(report)
 	changeIdx := strings.Index(out, "update k")
 	pathIdx := strings.Index(out, "written to /p")
 	warnIdx := strings.Index(out, "w1")

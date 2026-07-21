@@ -1,4 +1,4 @@
-package cmd
+package config
 
 import (
 	"encoding/json"
@@ -28,10 +28,10 @@ func formatValue(v any) string {
 	}
 }
 
-// renderShowTable formats the merged entries as a tabwriter table. When
+// RenderShowTable formats the merged entries as a tabwriter table. When
 // withSource is true, every key is followed by the values it overrode; the
 // renderer is the single place that decides what the --source flag shows.
-func renderShowTable(entries []Entry, withSource bool) string {
+func RenderShowTable(entries []Entry, withSource bool) string {
 	var out strings.Builder
 	if len(entries) == 0 {
 		fmt.Fprintln(&out, "no configuration found")
@@ -62,9 +62,9 @@ func renderShowTable(entries []Entry, withSource bool) string {
 	return out.String()
 }
 
-// renderChangeReport formats the mutations a single update or delete call
+// RenderChangeReport formats the mutations a single update or delete call
 // applied, the file they were written to, and any non-fatal notices about them.
-func renderChangeReport(report ChangeReport) string {
+func RenderChangeReport(report ChangeReport) string {
 	var out strings.Builder
 	for _, ch := range report.Changes {
 		switch ch.Kind {
@@ -74,6 +74,10 @@ func renderChangeReport(report ChangeReport) string {
 			fmt.Fprintf(&out, "update %s: %s -> %s\n", ch.Key, formatValue(ch.Old), formatValue(ch.New))
 		case ChangeDeleted:
 			fmt.Fprintf(&out, "delete %s: was %s\n", ch.Key, formatValue(ch.Old))
+		case ChangeAppended:
+			fmt.Fprintf(&out, "append %s: %s -> %s\n", ch.Key, formatValue(ch.Old), formatValue(ch.New))
+		case ChangeRemoved:
+			fmt.Fprintf(&out, "remove %s: %s -> %s\n", ch.Key, formatValue(ch.Old), formatValue(ch.New))
 		}
 	}
 	fmt.Fprintf(&out, "written to %s\n", report.Path)
@@ -81,4 +85,51 @@ func renderChangeReport(report ChangeReport) string {
 		fmt.Fprintln(&out, warning)
 	}
 	return out.String()
+}
+
+// RenderDefaultReport formats the outcome of a Default call: what was written
+// or would be written, which keys a merge added, and any notices.
+func RenderDefaultReport(r DefaultReport) string {
+	var b strings.Builder
+
+	if !r.Registered {
+		fmt.Fprintf(&b, "no default configuration registered for %s; nothing to do\n", r.File)
+		// Naming the files that *are* registered turns the most likely cause
+		// — a --file typo — into a one-line diagnosis.
+		if others := RegisteredDefaults(); len(others) > 0 {
+			fmt.Fprintf(&b, "  registered: %s\n", strings.Join(others, ", "))
+		}
+		return b.String()
+	}
+
+	verb := func(done, planned string) string {
+		if r.DryRun {
+			return planned
+		}
+		return done
+	}
+
+	switch {
+	case r.Mode == DefaultModeMerge:
+		if len(r.Changes) == 0 {
+			fmt.Fprintf(&b, "%s is already up to date\n", r.Path)
+			break
+		}
+		noun := "keys"
+		if len(r.Changes) == 1 {
+			noun = "key"
+		}
+		fmt.Fprintf(&b, "%s %d new %s into %s\n",
+			verb("merged", "would merge"), len(r.Changes), noun, r.Path)
+		for _, ch := range r.Changes {
+			fmt.Fprintf(&b, "  + %s\n", ch.Key)
+		}
+	case r.Written || r.DryRun:
+		fmt.Fprintf(&b, "%s %s (%d bytes)\n", verb("wrote", "would write"), r.Path, r.Bytes)
+	}
+
+	for _, w := range r.Warnings {
+		fmt.Fprintf(&b, "warning: %s\n", w)
+	}
+	return b.String()
 }
