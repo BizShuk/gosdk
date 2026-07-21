@@ -1,10 +1,11 @@
 /*
 Copyright © 2023 Shuk
 */
-package main
+package gotmpl
 
 import "github.com/bizshuk/gosdk/cmd/sample/gotmpl/cmd"
 
-func main() {
-	cmd.Execute()
+func run(args []string) error {
+	cmd.RootCmd.SetArgs(args)
+	return cmd.RootCmd.Execute()
 }

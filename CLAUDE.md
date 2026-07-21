@@ -17,16 +17,15 @@ gosdk/
 │   ├── patch.go             # PatchCmd：VERSION 修訂號 +1
 │   ├── version.go           # Version 結構、ParseVersion()、ReadVersion()、WriteVersion()
 │   ├── version_test.go
-│   └── sample/              # 可執行範例與獨立工具（皆為 package main）
-│       ├── main.go          # metric/cobra hook 使用範例
-│       ├── gotmpl/          # Cobra CLI 模板渲染工具
-│       │   ├── main.go
+│   └── sample/              # 範例與測試工具（gotmpl/stringer 僅由測試執行）
+│       ├── main.go          # metric/cobra hook 使用範例（可執行）
+│       ├── gotmpl/          # Cobra 模板渲染測試工具（非 package main）
+│       │   ├── main.go      # run() 測試入口
 │       │   ├── cmd/         # RootCmd + TemplateLoader（保留：含 metadata）
 │       │   ├── config.yaml
 │       │   └── LICENSE
-│       └── stringer/        # 增強版 enum stringer CLI（用 flag，非 cobra）
-│           └── main.go
-├── config/                  # 設定管理模組
+│       └── stringer/        # 增強版 enum stringer 測試工具（非 package main）
+│           └── main.go      # run() 測試入口├── config/                  # 設定管理模組
 │   ├── config.go            # Config 介面、Default()、GetAppConfigDir()
 │   ├── config_test.go       # 基本設定載入測試
 │   ├── option.go            # ConfigOption：WithAppName / WithDefaultValue
