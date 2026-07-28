@@ -66,16 +66,49 @@ func TestNewStoreRejectsEmptyDir(t *testing.T) {
 
 func TestSafeName(t *testing.T) {
 	s, _ := NewStore[mockUser](t.TempDir())
-	bad := []string{"", "a/b", `a\b`, "../etc/passwd", ".", "..", ".hidden"}
+	bad := []string{"", "a/b", `a\b`, "../etc/passwd", ".."}
 	for _, n := range bad {
 		if err := s.safeName(n); err == nil {
 			t.Errorf("safeName(%q) 應回錯誤", n)
 		}
 	}
-	for _, n := range []string{"alice", "run-01", "2026-07-29"} {
+	// "." 與其他點開頭的名稱只是隱藏檔,不是路徑穿越,應放行。
+	for _, n := range []string{"alice", "run-01", "2026-07-29", ".", ".hidden"} {
 		if err := s.safeName(n); err != nil {
 			t.Errorf("safeName(%q) = %v, 應通過", n, err)
 		}
+	}
+}
+
+func TestSafeNameContainmentWithEmptyExt(t *testing.T) {
+	// WithExt("") 時 Path(".") 會 Clean 成目錄本身,Path("..") 會變成上層
+	// 目錄。containment 檢查必須擋下這兩者,否則 Delete 會刪錯東西。
+	s, err := NewStore[mockUser](t.TempDir(), WithExt(""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range []string{".", ".."} {
+		if err := s.safeName(n); err == nil {
+			t.Errorf("safeName(%q) 在 WithExt(\"\") 下應被擋掉", n)
+		}
+	}
+	if err := s.safeName("alice"); err != nil {
+		t.Errorf("safeName(\"alice\") = %v, 應通過", err)
+	}
+}
+
+func TestDotNameRoundTripsThroughList(t *testing.T) {
+	// safeName 放行隱藏檔,List 就必須列得出來 —— 否則寫得進去卻看不到。
+	s, _ := NewStore[mockUser](t.TempDir())
+	if err := s.Write(".hidden", mockUser{ID: 1, Name: "Hidden"}); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	names, err := s.List()
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(names) != 1 || names[0] != ".hidden" {
+		t.Errorf("List = %v, want [.hidden]", names)
 	}
 }
 

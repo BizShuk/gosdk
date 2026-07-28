@@ -40,6 +40,10 @@ const (
 	DEFAULT_EXT       string      = ".json"
 )
 
+// TEMP_FILE_PREFIX 是 atomic 寫入產生的暫存檔前綴。List 只跳過帶此前綴
+// 的檔案,而不是所有點開頭的檔案 —— 呼叫端刻意寫入的隱藏檔應該列得出來。
+const TEMP_FILE_PREFIX = ".tmp-"
+
 // Options 是 Store 的可調參數。
 type Options struct {
 	// DirPerm 是建立目錄時的權限。
@@ -132,12 +136,17 @@ func (s *Store[T]) safeName(name string) error {
 	if strings.ContainsAny(name, `/\`) || filepath.Base(name) != name {
 		return fmt.Errorf("file: invalid name: %s", name)
 	}
-	// filepath.Base(".") 是 "."、Base("..") 是 "..",兩者都會通過上面的
-	// 檢查。搭配 WithExt("") 時 Path("..") 會解析到上層目錄,是真的路徑
-	// 穿越。一併擋掉所有點開頭的名稱 —— List 本來就跳過點檔案,允許寫入
-	// 卻列不出來只會造成不對稱。
-	if strings.HasPrefix(name, ".") {
+	// filepath.Base("..") 是 "..",會通過上面的檢查,但它指的是上層目錄 ——
+	// 明確擋掉。"." 與其他點開頭的名稱不受影響:它們只是隱藏檔,不是穿越。
+	if name == ".." {
 		return fmt.Errorf("file: invalid name: %s", name)
+	}
+	// 最終防線:算出實際路徑,確認它的父目錄就是本 Store 的目錄。這道
+	// 檢查不依賴對名稱形狀的枚舉,能擋掉靠副檔名組合出來的邊界情況 ——
+	// 例如 WithExt("") 時 Path(".") 會 Clean 成目錄本身,若放行則
+	// Delete(".") 會刪掉整個 Store 目錄。
+	if filepath.Dir(s.Path(name)) != s.dir {
+		return fmt.Errorf("file: name escapes store directory: %s", name)
 	}
 	return nil
 }

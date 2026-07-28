@@ -87,7 +87,7 @@ func (s *Store[T]) writeBytes(name string, data []byte) error {
 		return nil
 	}
 
-	tmp, err := os.CreateTemp(s.dir, ".tmp-*"+s.opts.Ext)
+	tmp, err := os.CreateTemp(s.dir, TEMP_FILE_PREFIX+"*"+s.opts.Ext)
 	if err != nil {
 		return fmt.Errorf("file: create temp for %s: %w", name, err)
 	}

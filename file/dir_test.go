@@ -25,7 +25,7 @@ func TestListReturnsSortedNames(t *testing.T) {
 	}
 }
 
-func TestListFiltersByExtAndSkipsDirsAndDotfiles(t *testing.T) {
+func TestListFiltersByExtAndSkipsDirsAndTempFiles(t *testing.T) {
 	dir := t.TempDir()
 	s, _ := NewStore[mockUser](dir)
 	_ = s.Write("alice", mockUser{ID: 1, Name: "Alice"})

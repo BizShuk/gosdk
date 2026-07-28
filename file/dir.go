@@ -15,7 +15,8 @@ import (
 // 實務上呼叫端多半希望跳過壞檔而不是整個列表失敗。回名稱列表讓呼叫端
 // 自行 Read + continue,也讓只需要列名的呼叫端不必付解碼成本。
 //
-// 以點開頭的檔案一律跳過 —— atomic 寫入產生的 .tmp-* 暫存檔就長這樣。
+// 只跳過 atomic 寫入產生的 TEMP_FILE_PREFIX 暫存檔,不跳過所有點開頭的
+// 檔案 —— safeName 允許呼叫端寫入隱藏檔,那它就該列得出來。
 func (s *Store[T]) List() ([]string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -31,7 +32,7 @@ func (s *Store[T]) List() ([]string, error) {
 	names := make([]string, 0, len(entries))
 	for _, e := range entries {
 		n := e.Name()
-		if e.IsDir() || strings.HasPrefix(n, ".") {
+		if e.IsDir() || strings.HasPrefix(n, TEMP_FILE_PREFIX) {
 			continue
 		}
 		if s.opts.Ext != "" && !strings.HasSuffix(n, s.opts.Ext) {
