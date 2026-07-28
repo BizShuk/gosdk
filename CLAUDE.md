@@ -46,6 +46,18 @@ gosdk/
 │   ├── sqlite_test.go       # SQLite 單元測試(viper 讀取、singleton 守衛、Service 方法)
 │   ├── mysql_test.go        # MySQL 單元測試(白箱模擬已初始化、驗證守衛)
 │   └── postgres_test.go     # PostgreSQL 單元測試(結構與 MySQL 對稱)
+├── file/                    # 泛型檔案儲存庫(目錄為單位,單檔文件 + JSONL 兩用)
+│   ├── store.go             # Store[T] 型別、Options/Option、NewStore、safeName、Custom
+│   ├── path.go              # unexported resolvePath/isNil(刻意不依賴 utils,避開 gocsv)
+│   ├── document.go          # 單檔文件:Write / Read / ReadOr(atomic temp+rename)
+│   ├── dir.go               # 目錄層:List(回名稱字串) / Delete / Exists / Sub
+│   ├── jsonl.go             # JSONL 基礎層:Append / Scan(交出原始位元組)
+│   ├── query.go             # JSONL 便利層:Find / Filter / Count / TruncateWhile
+│   ├── store_test.go        # 建構、選項、名稱守衛、Custom
+│   ├── document_test.go     # 單檔讀寫、atomic、權限、validator、decode hook
+│   ├── dir_test.go          # 列表、刪除、存在、子目錄
+│   ├── jsonl_test.go        # 追加、掃描、提早中止、長行
+│   └── query_test.go        # 條件查詢、計數、前綴壓縮
 ├── encode/                  # 編碼轉換模組
 │   ├── csv/
 │   │   ├── csv.go           # CSV Decoder 介面
@@ -199,6 +211,7 @@ gosdk/
 - 版本管理改為 SDK 子命令：`cmd.MajorCmd` / `MinorCmd` / `PatchCmd` 操作工作目錄下的純文字 `VERSION` 檔（`major.minor.patch`），不依賴 git tag 或外部服務；`Version` 結構與 `ReadVersion()` / `WriteVersion()` 一併公開於 `cmd/version.go`。原先的獨立 `cmd/versioning` binary 已移除 —— 需要 CLI 的專案自行組 root command
 - `cmd/sample/` 收攏範例與測試工具：只有 `cmd/sample/main.go` 是可執行程式，`gotmpl` 與 `stringer` 改由 `_test.go` 呼叫 `run()` 驗證功能，與 SDK 的子命令目錄分離
 - Cobra hook 採極簡設計（無 option、同步送出）：`CobraCMDHook(root)` 在 PreRun 送出 `command_line_trigger{cmd, flag}`（PreRun 而非 PostRun：永遠會送，即使 RunE 失敗）；`cmd` 為完整指令鏈（`cmd.CommandPath()`，root → leaf）；`flag` 收集使用者實際設定的 flags（走訪整條 chain、`seen` map 去重 persistent flag），字母排序後以 `-` 串接；發送走套件層級 `Send()`（全域 `MetricService`，首次使用時以 `METRIC_URL` 建立；測試以 `viper.Set` 覆寫）
+- `gosdk/file` 的 `Store[T]` 本體是`一個目錄`，檔名一律由呼叫端傳入，同時支援「整檔一份 JSON 文件」與「每行一筆的 JSONL 追加日誌」兩種存取型態 —— 兩種都提供但都不強制使用。JSONL 分兩層：`Scan` 是把原始位元組交給呼叫端的基礎層，因此能處理同一檔案內混有多種記錄型別的情況（例如首行 meta、其餘 turn），也讓不需解碼的呼叫端直接做位元組比對；`Find`/`Filter`/`Count` 是建在其上、會自動解成 `T` 的便利層。`Read` 對缺檔回 `ErrNotFound`，但 JSONL 讀取路徑把「尚未建立」與「空的」視為同一狀態、回空結果與 `nil` —— 對追加日誌而言這兩者確無語意差別。`safeName` 除了擋 `/` 與 `\`，也擋所有點開頭的名稱：`filepath.Base(".")` 是 `"."`、`Base("..")` 是 `".."`，兩者都會通過 `Base(name) != name` 的檢查，搭配 `WithExt("")` 時 `Path("..")` 會解析到上層目錄。`file` 刻意`不 import gosdk/utils`：`utils/file.go` 內含 `gocarina/gocsv`，而 Go 以 package 為單位載入，任何引用都會把 CSV 函式庫拖進相依圖，代價是 `file/path.go` 自帶約 35 行的 `resolvePath`/`isNil`
 
 ### Remote Write 與 OpenTelemetry 指標發送差異 (Remote Write vs OpenTelemetry Metrics)
 
@@ -232,6 +245,7 @@ gosdk/
 | 排程管理              | `scheduler/`                                            | `scheduler.New()`                                                                                                         |
 | 編碼與資料處理        | `encode/`, `utils/`, `time/`                            | 各函式獨立呼叫                                                                                                            |
 | 通用驗證              | `validator/`, `validator/string/`, `validator/numeric/` | `validator.New()` (composite), `string.NewNotEmpty()` / `string.NewEmail()` / `string.NewEqualTo()`, `numeric.NewRange()` |
+| 檔案儲存              | `file/`                                                 | `file.NewStore[T]()`                                                                                                      |
 | 日誌與觀測            | `log/`                                                  | `log.Init()`                                                                                                              |
 | Remote Write 指標     | `metric/`                                               | `NewMetricService()` / `NewVictoriaMetricsService()`                                                                      |
 | Cobra CLI Hook 指標   | `metric/`                                               | `metric.CobraCMDHook()`                                                                                                   |
