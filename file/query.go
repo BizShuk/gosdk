@@ -1,8 +1,11 @@
 package file
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"os"
 )
 
 // Find 回傳第一筆通過所有 predicate 的記錄。找不到時 ok 為 false。
@@ -88,6 +91,66 @@ func (s *Store[T]) decodeLine(raw []byte) (T, error) {
 		return zero, fmt.Errorf("unmarshal line: %w", err)
 	}
 	return v, nil
+}
+
+// TruncateWhile 從檔頭開始丟棄連續符合 drop 的記錄,遇到第一筆不符合
+// (或無法解碼) 的記錄就停止,把剩餘內容整批寫回。
+//
+// 這是前綴丟棄而非全域過濾。用途是壓縮完成後截斷 WAL —— 已壓縮的部分
+// 必然是連續的檔頭區段;若做成全域過濾,一旦中段資料損毀就會悄悄刪掉
+// 不該刪的記錄。
+//
+// 全部行都被丟棄時直接刪除檔案,而不是留一個空檔,如此後續的 Scan 會走
+// 「缺檔即空日誌」那條路徑。檔案不存在時是 no-op。
+func (s *Store[T]) TruncateWhile(name string, drop func(T) bool) error {
+	if err := s.safeName(name); err != nil {
+		return err
+	}
+	if drop == nil {
+		return nil
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	path := s.Path(name)
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return fmt.Errorf("file: read %s for truncate: %w", name, err)
+	}
+
+	pos := 0
+	for pos < len(raw) {
+		nl := bytes.IndexByte(raw[pos:], '\n')
+		end := len(raw)
+		next := len(raw)
+		if nl >= 0 {
+			end = pos + nl
+			next = end + 1
+		}
+		line := bytes.TrimSpace(raw[pos:end])
+		if len(line) > 0 {
+			v, err := s.decodeLine(line)
+			if err != nil || !drop(v) {
+				break
+			}
+		}
+		pos = next
+	}
+
+	if pos >= len(raw) {
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("file: remove %s after truncate: %w", name, err)
+		}
+		return nil
+	}
+	if pos == 0 {
+		return nil
+	}
+	return s.writeBytes(name, raw[pos:])
 }
 
 // matchAll 以 AND 組合所有 predicate。空的 preds 一律通過。

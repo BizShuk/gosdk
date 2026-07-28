@@ -153,3 +153,67 @@ func TestFilterReportsBadLine(t *testing.T) {
 		t.Fatal("壞行應回錯誤")
 	}
 }
+
+func TestTruncateWhileDropsLeadingPrefix(t *testing.T) {
+	s := seededLog(t)
+	err := s.TruncateWhile("run1", func(l logLine) bool { return l.Seq <= 1 })
+	if err != nil {
+		t.Fatalf("TruncateWhile: %v", err)
+	}
+	got, err := s.Filter("run1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("len = %d, want 2 (%+v)", len(got), got)
+	}
+	if got[0].Seq != 2 || got[1].Seq != 3 {
+		t.Errorf("got = %+v, want seq 2,3", got)
+	}
+}
+
+func TestTruncateWhileStopsAtFirstKeeper(t *testing.T) {
+	s := newLogStore(t)
+	// seq 1 要丟、seq 5 要留、seq 2 雖然符合 drop 條件但在 keeper 之後,
+	// 前綴語意下必須保留。
+	_, _ = s.Append("run1", logLine{Seq: 1}, logLine{Seq: 5}, logLine{Seq: 2})
+	if err := s.TruncateWhile("run1", func(l logLine) bool { return l.Seq < 3 }); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := s.Filter("run1")
+	if len(got) != 2 || got[0].Seq != 5 || got[1].Seq != 2 {
+		t.Errorf("got = %+v, want seq 5,2", got)
+	}
+}
+
+func TestTruncateWhileDropsAllRemovesFile(t *testing.T) {
+	s := seededLog(t)
+	if err := s.TruncateWhile("run1", func(logLine) bool { return true }); err != nil {
+		t.Fatal(err)
+	}
+	if s.Exists("run1") {
+		t.Error("全部丟棄後應刪除檔案")
+	}
+	n, err := s.Count("run1")
+	if err != nil || n != 0 {
+		t.Errorf("Count = %d, err = %v, want 0, nil", n, err)
+	}
+}
+
+func TestTruncateWhileKeepsAll(t *testing.T) {
+	s := seededLog(t)
+	if err := s.TruncateWhile("run1", func(logLine) bool { return false }); err != nil {
+		t.Fatal(err)
+	}
+	n, _ := s.Count("run1")
+	if n != 4 {
+		t.Errorf("Count = %d, want 4", n)
+	}
+}
+
+func TestTruncateWhileMissingFileIsNoop(t *testing.T) {
+	s := newLogStore(t)
+	if err := s.TruncateWhile("ghost", func(logLine) bool { return true }); err != nil {
+		t.Errorf("缺檔應是 no-op,實得 %v", err)
+	}
+}
