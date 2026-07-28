@@ -4,8 +4,9 @@ description: >
     Use when writing Go code in a gosdk-based project — building a CLI with
     cobra, configuring apps with viper, adding database connections (SQLite,
     MySQL, or PostgreSQL via gorm), structured logging with slog, test setup
-    with testify, escape analysis for hot paths, or selecting between stdlib
-    and third-party libraries.
+    with testify, escape analysis for hot paths, wiring a registry with
+    init() self-registration for pluggable providers/drivers, or selecting
+    between stdlib and third-party libraries.
 allowed-tools: Bash, Read, Edit, Grep, Glob, AskUserQuestion
 user-invocable: true
 disable-model-invocation: false
@@ -420,7 +421,134 @@ go build -gcflags='-m=2' ./... 2>&1 | grep "escapes to heap"
 
 ---
 
-## 7. Quick Reference
+## 7. Registry + init() Self-Registration
+
+`When to use:` one interface has `N` interchangeable implementations (providers,
+drivers, formats, plugins) and adding one should mean `adding one file` — no
+edits to an existing `switch` or map literal.
+
+`When NOT to use:` only `1`–`2` implementations, or the caller already knows the
+concrete type. A plain constructor is clearer; a registry is just indirection.
+
+This is the `database/sql/driver` / `image` / `crypto` convention: a `registry`
+package owns the `name → Factory` map, implementations register themselves from
+their own `init()`, and the registry imports `no` implementation. Dependency
+direction is always `impl → registry`, never reversed — which is why there is no
+import cycle and why the registry never changes when an implementation is added.
+
+### Layout
+
+```tree
+registry/            # depends only on the interface; imports no implementation
+  registry.go        # Entry, Register, Lookup, Names, New
+impl/<name>/
+  <name>.go          # the implementation + New(...Option)
+  register.go        # exactly one init(), nothing else
+impl/all/all.go      # blank-imports every implementation (optional)
+```
+
+### Registry core
+
+```go
+package registry
+
+// Factory builds one implementation from resolved options.
+type Factory func(Options) (Thing, error)
+
+// Entry is how to build it, plus metadata a `--list` or wizard menu needs.
+type Entry struct {
+    Name  string // canonical, lower-case, matches the directory name
+    Label string // human-facing
+    New   Factory
+}
+
+var (
+    mu      sync.RWMutex
+    entries = map[string]Entry{}
+)
+
+// Register panics on a duplicate name — idiomatic Go for an init()-time
+// contract violation (see database/sql.Register). init() has nowhere to
+// receive an error, so returning one would only get ignored.
+func Register(e Entry) {
+    if e.Name == "" || e.New == nil {
+        panic(fmt.Sprintf("registry: Register requires Name and New (got %+v)", e))
+    }
+    key := strings.ToLower(strings.TrimSpace(e.Name))
+    mu.Lock()
+    defer mu.Unlock()
+    if _, exists := entries[key]; exists {
+        panic(fmt.Sprintf("registry: %q already registered", e.Name))
+    }
+    entries[key] = e
+}
+
+// New builds the named thing. The error lists what IS registered — the single
+// most useful line when a blank import is missing.
+func New(name string, o Options) (Thing, error) {
+    e, ok := Lookup(name)
+    if !ok {
+        return nil, fmt.Errorf("registry: unknown name %q (registered: %s)",
+            name, strings.Join(Names(), ", "))
+    }
+    return e.New(o)
+}
+```
+
+### Self-registration: one file, one init()
+
+Keep registration in its own `register.go`, never mixed into the implementation
+file — the side effect stays visible, and splitting the package into its own
+module later moves exactly one file.
+
+```go
+// impl/minimax/register.go
+package minimax
+
+import "example.com/proj/registry"
+
+func init() {
+    registry.Register(registry.Entry{
+        Name:  "minimax",
+        Label: "MiniMax",
+        New: func(o registry.Options) (registry.Thing, error) {
+            var opts []Option
+            if o.Model != "" {
+                opts = append(opts, WithModel(o.Model))
+            }
+            return New(opts...) // the package's own functional options
+        },
+    })
+}
+```
+
+### Key rules
+
+- The Factory is an `adapter`: it translates the registry's flat `Options` into
+  the implementation's own functional options. The implementation's public API
+  does not change because a registry exists — `minimax.New(WithModel(...))`
+  still works without one.
+- Never pass an empty string through; let the implementation apply its own
+  default. A zero-value `Options` should still build a usable object.
+- `init()` does no I/O — no file reads, no network, no credential resolution.
+  It inserts one map entry in constant time, because `every` binary that
+  blank-imports the package pays that cost.
+- The registered set is a property of the `linking binary`, not the registry
+  package: a full CLI blank-imports `impl/all`, a slim binary imports only the
+  one it needs and the linker drops the rest. Put blank imports in `main.go` or
+  the composition root only — a library that blank-imports `all` forces every
+  downstream consumer to swallow all dependencies.
+- The registry must not import a config framework. If it needs an env lookup,
+  inject it as an `Options` field (`LookupEnv func(string) string`, `nil` means
+  `os.Getenv`); the CLI passes a viper-backed function.
+
+`Full sample:` [references/registry-pattern.md](references/registry-pattern.md) —
+complete registry package, `Options.Resolve` credential precedence, the `all/`
+meta-package, four guard tests, pitfall table, and a per-implementation checklist.
+
+---
+
+## 8. Quick Reference
 
 | Task             | Command                                                        |
 | ---------------- | -------------------------------------------------------------- |
