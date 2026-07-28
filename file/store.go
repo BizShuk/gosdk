@@ -10,6 +10,10 @@
 // 能處理同一個檔案內混有多種記錄型別的情況 (例如首行是 meta、其餘是
 // turn),也能讓不想解碼的呼叫端直接做位元組比對。Find / Filter /
 // Count 是建在 Scan 之上、會自動解成 T 的便利層,適用於同質檔案。
+//
+// 可執行的範例見 file/sample:
+//
+//	go run ./file/sample
 package file
 
 import (
@@ -33,51 +37,9 @@ var ErrNotFound = errors.New("file: not found")
 // 比照 stdlib 的 fs.SkipAll。
 var ErrStopScan = errors.New("file: stop scan")
 
-// 預設值。
-const (
-	DEFAULT_DIR_PERM  os.FileMode = 0o755
-	DEFAULT_FILE_PERM os.FileMode = 0o644
-	DEFAULT_EXT       string      = ".json"
-)
-
 // TEMP_FILE_PREFIX 是 atomic 寫入產生的暫存檔前綴。List 只跳過帶此前綴
 // 的檔案,而不是所有點開頭的檔案 —— 呼叫端刻意寫入的隱藏檔應該列得出來。
 const TEMP_FILE_PREFIX = ".tmp-"
-
-// Options 是 Store 的可調參數。
-type Options struct {
-	// DirPerm 是建立目錄時的權限。
-	DirPerm os.FileMode
-	// FilePerm 是建立檔案時的權限。
-	FilePerm os.FileMode
-	// Ext 是檔名副檔名,含前導點。缺點會自動補上。
-	Ext string
-	// Atomic 決定 Write 是否走 temp + rename。預設開啟。
-	Atomic bool
-	// DecodeHook 在 json.Unmarshal 之前改寫原始位元組,供 schema 遷移使用。
-	DecodeHook func([]byte) ([]byte, error)
-}
-
-// Option 以函式選項模式調整 Options。刻意不帶型別參數,否則呼叫端得寫
-// file.WithDirPerm[Cred](0o700),每個選項都要重複一次型別名。
-type Option func(*Options)
-
-// WithDirPerm 設定目錄權限。
-func WithDirPerm(m os.FileMode) Option { return func(o *Options) { o.DirPerm = m } }
-
-// WithFilePerm 設定檔案權限。
-func WithFilePerm(m os.FileMode) Option { return func(o *Options) { o.FilePerm = m } }
-
-// WithExt 設定副檔名,前導點可省略。
-func WithExt(ext string) Option { return func(o *Options) { o.Ext = ext } }
-
-// WithAtomicWrite 決定 Write 是否走 temp + rename。
-func WithAtomicWrite(on bool) Option { return func(o *Options) { o.Atomic = on } }
-
-// WithDecodeHook 註冊解碼前的位元組改寫函式。
-func WithDecodeHook(fn func([]byte) ([]byte, error)) Option {
-	return func(o *Options) { o.DecodeHook = fn }
-}
 
 // Store 是以目錄為單位的泛型檔案儲存庫。
 type Store[T any] struct {
@@ -92,12 +54,7 @@ func NewStore[T any](dir string, opts ...Option) (*Store[T], error) {
 		return nil, errors.New("file: directory path cannot be empty")
 	}
 
-	cfg := Options{
-		DirPerm:  DEFAULT_DIR_PERM,
-		FilePerm: DEFAULT_FILE_PERM,
-		Ext:      DEFAULT_EXT,
-		Atomic:   true,
-	}
+	cfg := defaultOptions()
 	for _, opt := range opts {
 		opt(&cfg)
 	}

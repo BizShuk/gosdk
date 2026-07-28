@@ -8,6 +8,8 @@ import (
 	"strings"
 )
 
+// 本檔收攏套件內的通用輔助函式:不掛在 Store 上、不碰套件狀態的純函式。
+
 // resolvePath 展開環境變數與 ~ 後回傳絕對路徑。
 //
 // 這裡刻意不呼叫 gosdk/utils.ResolvePath:utils 套件內含
@@ -50,4 +52,15 @@ func isNil(v any) bool {
 	default:
 		return false
 	}
+}
+
+// matchAll 以 AND 組合所有 predicate。空的 preds 一律通過,nil 的個別
+// predicate 視為不設限。
+func matchAll[T any](v T, preds []func(T) bool) bool {
+	for _, p := range preds {
+		if p != nil && !p(v) {
+			return false
+		}
+	}
+	return true
 }

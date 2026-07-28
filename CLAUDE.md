@@ -47,12 +47,17 @@ gosdk/
 │   ├── mysql_test.go        # MySQL 單元測試(白箱模擬已初始化、驗證守衛)
 │   └── postgres_test.go     # PostgreSQL 單元測試(結構與 MySQL 對稱)
 ├── file/                    # 泛型檔案儲存庫(目錄為單位,單檔文件 + JSONL 兩用)
-│   ├── store.go             # Store[T] 型別、Options/Option、NewStore、safeName、Custom
-│   ├── path.go              # unexported resolvePath/isNil(刻意不依賴 utils,避開 gocsv)
+│   ├── store.go             # Store[T] 型別、NewStore、safeName、Path/Dir、Custom
+│   ├── store_options.go     # Options/Option、With* 選項、DEFAULT_* 預設值
+│   ├── utils.go             # 套件內通用純函式:resolvePath / isNil / matchAll
+│   │                        # (刻意不依賴 gosdk/utils,避開 gocsv 相依)
 │   ├── document.go          # 單檔文件:Write / Read / ReadOr(atomic temp+rename)
 │   ├── dir.go               # 目錄層:List(回名稱字串) / Delete / Exists / Sub
 │   ├── jsonl.go             # JSONL 基礎層:Append / Scan(交出原始位元組)
 │   ├── query.go             # JSONL 便利層:Find / Filter / Count / TruncateWhile
+│   ├── sample/
+│   │   └── main.go          # 可執行範例(go run ./file/sample):憑證庫、單一設定檔、
+│   │                        # 事件日誌、混型別日誌、巢狀目錄五個場景
 │   ├── store_test.go        # 建構、選項、名稱守衛、Custom
 │   ├── document_test.go     # 單檔讀寫、atomic、權限、validator、decode hook
 │   ├── dir_test.go          # 列表、刪除、存在、子目錄

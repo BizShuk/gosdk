@@ -152,13 +152,3 @@ func (s *Store[T]) TruncateWhile(name string, drop func(T) bool) error {
 	}
 	return s.writeBytes(name, raw[pos:])
 }
-
-// matchAll 以 AND 組合所有 predicate。空的 preds 一律通過。
-func matchAll[T any](v T, preds []func(T) bool) bool {
-	for _, p := range preds {
-		if p != nil && !p(v) {
-			return false
-		}
-	}
-	return true
-}
