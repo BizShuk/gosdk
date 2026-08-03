@@ -27,8 +27,10 @@ gosdk/
 │       └── stringer/        # 增強版 enum stringer 測試工具（非 package main）
 │           └── main.go      # run() 測試入口
 ├── config/                  # 設定管理模組
-│   ├── config.go            # Config 介面、Default()、GetAppConfigDir()
+│   ├── config.go            # Config 介面、Default()、configBaseDir()/appConfigDirFor()
+│   │                        # GetAppConfigDir() / GetAppDataDir() / GetAppLogsDir()
 │   ├── config_test.go       # 基本設定載入測試
+│   ├── appdir_test.go       # XDG_CONFIG_HOME 解析、空 appName 契約、seed 與讀取同目錄
 │   ├── option.go            # ConfigOption：WithAppName / WithDefaultValue
 │   ├── option_test.go       # option 測試
 │   ├── env.go               # .env dotenv 載入器（雙檔案模式）
@@ -73,6 +75,11 @@ gosdk/
 │       ├── decode_test.go   # GBK/Big5 解碼測試
 │       ├── gbk.go           # GBK 串流解碼器
 │       └── big5.go          # Big5 串流解碼器
+├── http/                    # HTTP client 端輔助（package 名遮蔽 net/http，慣例別名 gohttp）
+│   ├── retry.go             # Retry[T] 泛型重試迴圈、Retryable/IsRetryable 標記、
+│   │                        # RetryPolicy（DEFAULT_MAX_ATTEMPTS=5 指數退避 / Constant）、
+│   │                        # IsRetryableStatus（429 與 5xx）
+│   └── retry_test.go        # 重試預算、permanent 不重試、ctx 取消優先、標記可再包裝
 ├── log/                     # 結構化日誌模組
 │   ├── log.go               # slog 全域 logger 初始化（init() 自動初始化 + Init() 套用 LOG_LEVEL/LOG_FORMAT）
 │   ├── levelSplitHandler.go # slog.Handler 實作，負責將 Warn/Error 與其餘層級日誌分流

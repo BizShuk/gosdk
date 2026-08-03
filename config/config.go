@@ -93,7 +93,8 @@ func Default(opts ...ConfigOption) {
 
 // loadAllConfigs 載入所有設定格式並合併至全域 viper。
 // 合併順序決定跨格式優先權（後者覆蓋前者）：
-//   .env < config.yaml < settings.json （YAML 最低、ENV 最高）
+//
+//	.env < config.yaml < settings.json （YAML 最低、ENV 最高）
 //
 // 供 Default() 首次載入與 watcher reload 共用。
 func loadAllConfigs() error {
@@ -136,15 +137,47 @@ func bindNestedEnv(key string, val any) {
 	_ = viper.BindEnv(key, envName)
 }
 
-func GetAppConfigDir() string {
-	if appName == "" {
-		return ""
+// configBaseDir returns the directory that holds every application's config
+// folder: XDG_CONFIG_HOME when set, otherwise ~/.config. Returns "" when the
+// home directory cannot be determined and XDG_CONFIG_HOME is unset.
+//
+// This is the single place the base is decided — applyOptions resolves the
+// same path when it seeds settings.json, and the two must not drift, or a
+// machine with XDG_CONFIG_HOME set would write its seed file to one
+// directory and read its config from another.
+func configBaseDir() string {
+	if base := strings.TrimSpace(os.Getenv("XDG_CONFIG_HOME")); base != "" {
+		return base
 	}
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return ""
 	}
-	return filepath.Join(homeDir, ".config", appName)
+	return filepath.Join(homeDir, ".config")
+}
+
+// appConfigDirFor returns the config directory for name, or "" when the name
+// is empty or no base directory can be resolved.
+func appConfigDirFor(name string) string {
+	if name == "" {
+		return ""
+	}
+	base := configBaseDir()
+	if base == "" {
+		return ""
+	}
+	return filepath.Join(base, name)
+}
+
+// GetAppConfigDir returns the application config directory:
+// <config-base>/appName, where <config-base> is XDG_CONFIG_HOME when set and
+// ~/.config otherwise.
+//
+// It returns "" when no app name has been registered (Default / SetAppName
+// not called). Callers and tests rely on that empty value meaning "no app
+// directory in the search path" — do not substitute a default here.
+func GetAppConfigDir() string {
+	return appConfigDirFor(appName)
 }
 
 func GetAppName() string {

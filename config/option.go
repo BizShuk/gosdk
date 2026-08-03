@@ -1,7 +1,6 @@
 package config
 
 import (
-	"os"
 	"path/filepath"
 
 	"github.com/bizshuk/gosdk/utils"
@@ -23,18 +22,18 @@ type ConfigOption func(*configOptions)
 // How to set up: Provide a valid JSON string literal. Example for a settings.json
 // with "host" and "port" fields:
 //
-//   // file locaation: config/default_settings.json
-//   ```json
-//   {}
-//   ```
+//	  // file locaation: config/default_settings.json
+//	  ```json
+//	  {}
+//	  ```
 //
-//   //go:embed default_settings.json
-//   var defaultConfigJSON string
+//	  //go:embed default_settings.json
+//	  var defaultConfigJSON string
 //
-//	 config.Default(
-//		  WithAppName("myapp"),
-//		  WithDefaultValue(defaultConfigJSON),
-//	 )
+//		 config.Default(
+//			  WithAppName("myapp"),
+//			  WithDefaultValue(defaultConfigJSON),
+//		 )
 //
 // When the settings.json file does not exist at appConfigDir, it will be created
 // with this JSON content automatically.
@@ -58,12 +57,13 @@ func applyOptions(opts ...ConfigOption) *configOptions {
 		opt(o)
 	}
 
-	// If WithAppName is provided, compute user-specific appConfigDir
-	// Use ${HOME}/.config as base (cross-platform consistent path)
-	if o.appName != "" {
-		if homeDir, err := os.UserHomeDir(); err == nil {
-			o.appConfigDir = filepath.Join(homeDir, ".config", o.appName)
-		}
+	// If WithAppName is provided, compute the user-specific appConfigDir.
+	// Resolution goes through appConfigDirFor so the seed file written below
+	// always lands in the directory GetAppConfigDir() later reads from —
+	// on a machine with XDG_CONFIG_HOME set, computing the base twice would
+	// mean seeding one directory and loading from another.
+	if dir := appConfigDirFor(o.appName); dir != "" {
+		o.appConfigDir = dir
 	}
 
 	// Only automatically create settings.json if it is using the appName config directory
