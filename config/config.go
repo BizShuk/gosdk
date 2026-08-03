@@ -56,7 +56,8 @@ func Default(opts ...ConfigOption) {
 		viper.Set("APP_CONFIG_DIR", o.appConfigDir)
 	}
 
-	slog.Debug("Load Configure...",
+	slog.Debug(
+		"Load Configure...",
 		"APP_CONFIG_DIR", GetAppConfigDir(),
 	)
 
@@ -67,17 +68,15 @@ func Default(opts ...ConfigOption) {
 	}
 
 	// --- 4. 環境變數設定 (Environment Variables) ---
-	// 啟用 AutomaticEnv + bindAllEnvVars 後，每次 viper.Get*() 都會動態查 APP_* 環境變數。
+	// 啟用 AutomaticEnv + bindAllEnvVars 後，每次 viper.Get*() 都會動態查 OS 環境變數。
 	//
-	// ⚠️ viper 行為限制（必須知道）：
-	//   1. 對 flat key（含底線）：env 名稱 = prefix + "_" + UPPER(key)
-	//      viper.Get("app_name")  → 查 APP_APP_NAME（prefix APP + key APP_NAME）
-	//      viper.Get("log_level") → 查 APP_LOG_LEVEL
-	//      （注意：prefix 會跟已有底線的 key 疊加，不是去重）
+	// ⚠️ viper 行為與機制：
+	//   1. 對 flat key（含底線）：env 名稱 = UPPER(key)
+	//      viper.Get("app_name")  → 查 APP_NAME
+	//      viper.Get("log_level") → 查 LOG_LEVEL
 	//   2. 對 nested key（如 "server.port"）：AutomaticEnv 預設不生效。
 	//      bindAllEnvVars() 透過 reflection 走完所有 leaf 並呼叫 BindEnv，
-	//      讓 nested key 也能被 APP_SERVER_PORT 等 OS env 覆寫。
-	viper.SetEnvPrefix("APP")
+	//      讓 nested key 也能被 SERVER_PORT 等 OS env 覆寫。
 	viper.AutomaticEnv()
 	bindAllEnvVars()
 
@@ -123,15 +122,14 @@ func loadAllConfigs() error {
 // for every leaf key. This works around viper's AutomaticEnv limitation where
 // nested keys (e.g. "server.port") are NOT covered, even though flat keys are.
 //
-// Env name composition: "APP_" + UPPER(key with "." → "_")
+// Env name composition: UPPER(key with "." → "_")
 //
-//	"server.port"    → "APP_SERVER_PORT"
-//	"db.mysql.host"  → "APP_DB_MYSQL_HOST"
-//	"log_level"      → "APP_LOG_LEVEL"（與 AutomaticEnv 對 flat key 組出的名稱一致）
+//	"server.port"    → "SERVER_PORT"
+//	"db.mysql.host"  → "DB_MYSQL_HOST"
+//	"log_level"      → "LOG_LEVEL"
 //
-// Side effect: also re-binds flat top-level keys, which is harmless —
-// BindEnv("app_name", "APP_APP_NAME") matches what AutomaticEnv would compute,
-// so we don't change semantics, just guarantee coverage for nested keys.
+// Side effect: also re-binds flat top-level keys, guaranteeing coverage for
+// both flat and nested keys.
 func bindAllEnvVars() {
 	for key, val := range viper.AllSettings() {
 		bindNestedEnv(key, val)
@@ -145,7 +143,7 @@ func bindNestedEnv(key string, val any) {
 		}
 		return
 	}
-	envName := "APP_" + strings.ToUpper(strings.ReplaceAll(key, ".", "_"))
+	envName := strings.ToUpper(strings.ReplaceAll(key, ".", "_"))
 	_ = viper.BindEnv(key, envName)
 }
 

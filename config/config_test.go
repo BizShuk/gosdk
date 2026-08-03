@@ -87,15 +87,7 @@ func TestDefaultRuns(t *testing.T) {
 }
 
 func TestDefault_EnvVarOverridesAllFiles(t *testing.T) {
-	// 驗證 4 層優先權：OS env (APP_*) > .env > settings.json > config.yaml
-	//
-	// ⚠️ viper AutomaticEnv 行為限制（必須用 flat key 測，nested key 不適用）：
-	//   1. 對 flat key：env 名稱 = prefix + "_" + UPPER(key)
-	//      viper.Get("app_name") → 查 APP_APP_NAME（prefix "APP" + key "APP_NAME"）
-	//      → 若 OS env 是 APP_NAME=... 則**不會**被讀到（要 APP_APP_NAME=...）
-	//   2. 對 nested key（如 server.port）：AutomaticEnv 完全不生效，
-	//      必須用 viper.BindEnv("server.port", "APP_SERVER_PORT") 明確綁定才會讀 OS env。
-	//      → 反映在這個測試：我們只驗 flat key（app_name / app_debug），nested key 走檔案鏈。
+	// 驗證 4 層優先權：OS env > .env > settings.json > config.yaml
 	dir := t.TempDir()
 
 	// config.yaml（最低）
@@ -103,7 +95,7 @@ func TestDefault_EnvVarOverridesAllFiles(t *testing.T) {
 	// settings.json（中）
 	jsonContent := `{"app_name":"from-json","app_debug":true}`
 	// .env（檔案層最高）
-	envContent := "APP_NAME=from-env-file\n"
+	envContent := "OTHER_NAME=from-env-file\n"
 
 	if err := os.WriteFile(filepath.Join(dir, "config.yaml"), []byte(yamlContent), 0644); err != nil {
 		t.Fatalf("failed to create config.yaml: %v", err)
@@ -118,13 +110,12 @@ func TestDefault_EnvVarOverridesAllFiles(t *testing.T) {
 	t.Chdir(dir)
 	t.Cleanup(func() { viper.Reset() })
 
-	// OS env 設最高優先權。注意：因為 key 是 app_name（flat with underscore），
-	// viper 組出的 env 名稱是 APP_APP_NAME（prefix APP + key APP_NAME），不是 APP_NAME。
-	t.Setenv("APP_APP_NAME", "from-os-env")
+	// OS env 設最高優先權。
+	t.Setenv("APP_NAME", "from-os-env")
 
 	Default()
 
-	// 1. OS env 最高：覆寫 .env 的 from-env-file
+	// 1. OS env 最高：覆寫 JSON/YAML 的 from-json / from-yaml
 	if got := viper.GetString("app_name"); got != "from-os-env" {
 		t.Errorf("expected app_name=from-os-env (AutomaticEnv wins), got %s", got)
 	}
@@ -137,15 +128,13 @@ func TestDefault_EnvVarOverridesAllFiles(t *testing.T) {
 		t.Errorf("expected server.host=yaml-host (from config.yaml, no override), got %s", got)
 	}
 	// 4. 沒設 OS env 時，server.port 仍由 config.yaml 提供（7000）。
-	//    bindAllEnvVars() 雖對 nested key 做 BindEnv，但沒 OS env 就不會覆寫。
-	//    （見 TestDefault_NestedKeyEnvOverride 驗證 OS env 設了時能覆寫）
 	if got := viper.GetInt("server.port"); got != 7000 {
 		t.Errorf("expected server.port=7000 (no OS env set, config.yaml wins), got %d", got)
 	}
 }
 
 // TestDefault_NestedKeyEnvOverride 驗證 bindAllEnvVars() 透過 reflection BindEnv
-// 所有 leaf 後，OS env 能覆寫 nested key（如 APP_SERVER_PORT → server.port）。
+// 所有 leaf 後，OS env 能覆寫 nested key（如 SERVER_PORT → server.port）。
 // 這是對 viper AutomaticEnv 不覆蓋 nested key 的 workaround。
 func TestDefault_NestedKeyEnvOverride(t *testing.T) {
 	dir := t.TempDir()
@@ -159,22 +148,22 @@ func TestDefault_NestedKeyEnvOverride(t *testing.T) {
 	t.Cleanup(func() { viper.Reset() })
 
 	// 三個不同深度的 nested key，驗證 reflection 確實走完整棵樹
-	t.Setenv("APP_SERVER_PORT", "9090")             // depth 2
-	t.Setenv("APP_SERVER_HOST", "env-host")         // depth 2
-	t.Setenv("APP_SERVER_DB_MYSQL_HOST", "env-db")  // depth 4
+	t.Setenv("SERVER_PORT", "9090")             // depth 2
+	t.Setenv("SERVER_HOST", "env-host")         // depth 2
+	t.Setenv("SERVER_DB_MYSQL_HOST", "env-db")  // depth 4
 
 	Default()
 
 	// depth-2 nested key 覆寫
 	if got := viper.GetInt("server.port"); got != 9090 {
-		t.Errorf("expected server.port=9090 (from APP_SERVER_PORT via BindEnv), got %d", got)
+		t.Errorf("expected server.port=9090 (from SERVER_PORT via BindEnv), got %d", got)
 	}
 	if got := viper.GetString("server.host"); got != "env-host" {
-		t.Errorf("expected server.host=env-host (from APP_SERVER_HOST via BindEnv), got %s", got)
+		t.Errorf("expected server.host=env-host (from SERVER_HOST via BindEnv), got %s", got)
 	}
 	// depth-4 nested key 覆寫（reflection 必須遞迴到深層）
 	if got := viper.GetString("server.db.mysql.host"); got != "env-db" {
-		t.Errorf("expected server.db.mysql.host=env-db (from APP_SERVER_DB_MYSQL_HOST via BindEnv), got %s", got)
+		t.Errorf("expected server.db.mysql.host=env-db (from SERVER_DB_MYSQL_HOST via BindEnv), got %s", got)
 	}
 	// 沒被 OS env 覆寫的同層 leaf 仍由 config.yaml 提供
 	if got := viper.GetInt("server.db.mysql.port"); got != 3306 {

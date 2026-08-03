@@ -124,51 +124,37 @@ func TestKeyLookupIsCaseInsensitive(t *testing.T) {
 	assertGet(t, "SeRvEr.HoSt", "localhost")
 }
 
-// TestKeyAppEnvOverridesFlatKeyOnly 是本檔案最重要的一則。
-//
-// config.Default() 只呼叫 SetEnvPrefix("APP") + AutomaticEnv()，並未呼叫
-// SetEnvKeyReplacer。viper 因此把 Get(key) 對應到環境變數 "APP_" + upper(key)：
-//
-//	Get("a_b_c") -> APP_A_B_C   ✅ 合法的環境變數名，覆蓋成立
-//	Get("a.b.c") -> APP_A.B.C   ❌ shell 無法 export 含 "." 的變數名
-//
-// 結論：扁平 key 可被 APP_ 環境變數覆蓋，巢狀 key 不行。這正是「app 層預設值
-// 用扁平 key、由 APP_ 環境變數客製」這個用法能成立的原因。
-func TestKeyAppEnvOverridesFlatKeyOnly(t *testing.T) {
-	t.Setenv("APP_A_B_C", "from-APP-envvar")
+// TestKeyEnvOverridesFlatAndNestedKeys 驗證 OS 環境變數（如 A_B_C / SERVER_PORT）
+// 可同時覆蓋扁平 key 與巢狀 key（由 bindAllEnvVars 進行 BindEnv）。
+func TestKeyEnvOverridesFlatAndNestedKeys(t *testing.T) {
+	t.Setenv("A_B_C", "from-envvar")
 
 	loadFixture(t, map[string]string{
 		"settings.local.json": `{"a_b_c":"from-file","a":{"b":{"c":"nested-from-file"}}}`,
 	})
 
-	// 扁平 key：環境變數贏過設定檔。
-	assertGet(t, "a_b_c", "from-APP-envvar")
-
-	// 巢狀 key：同一個環境變數碰不到它，檔案值原封不動。
-	assertGet(t, "a.b.c", "nested-from-file")
+	// 扁平 key 與巢狀 key：環境變數覆蓋皆生效。
+	assertGet(t, "a_b_c", "from-envvar")
+	assertGet(t, "a.b.c", "from-envvar")
 }
 
 // TestKeySourcePrecedence 釘住六個設定檔的合併順序。
 //
-// 後載入者覆蓋先載入者：
+// 跨格式設定優先權（後載入者覆蓋先載入者）：
 //
-//	.env < .env.local < config.yaml < config.local.yaml
-//	     < settings.json < settings.local.json < APP_ 環境變數
-//
-// 這也是 cmd/config.go 只寫 settings.local.json 的理由 —— 它是檔案層的最後一關，
-// 寫進去必定生效（除非有 APP_ 環境變數壓在上面）。
+//	config.yaml < config.local.yaml < settings.json < settings.local.json < .env < .env.local < OS 環境變數
 func TestKeySourcePrecedence(t *testing.T) {
 	loadFixture(t, map[string]string{
-		".env":                "SHARED=1-env\nONLY_ENV=env\n",
-		".env.local":          "SHARED=2-env-local\n",
 		"config.yaml":         "shared: 3-yaml\nonly_yaml: yaml\n",
 		"config.local.yaml":   "shared: 4-yaml-local\n",
 		"settings.json":       `{"shared":"5-json","only_json":"json"}`,
 		"settings.local.json": `{"shared":"6-json-local","only_json_local":"jsonlocal"}`,
+		".env":                "SHARED=1-env\nONLY_ENV=env\n",
+		".env.local":          "SHARED=2-env-local\n",
 	})
 
-	// settings.local.json 是最後一關，勝出。
-	assertGet(t, "shared", "6-json-local")
+	// .env.local 是檔案層的最後一關，勝出。
+	assertGet(t, "shared", "2-env-local")
 
 	// 各來源獨有的 key 都仍在，證明六個檔案確實都被載入了。
 	assertGet(t, "only_env", "env")
@@ -177,17 +163,16 @@ func TestKeySourcePrecedence(t *testing.T) {
 	assertGet(t, "only_json_local", "jsonlocal")
 }
 
-// TestKeySettingsLocalJsonWinsOverEveryFile 單獨釘住 settings.local.json 的地位，
-// 因為 cmd/config.go 的 --update / --delete 完全依賴這個前提。
-func TestKeySettingsLocalJsonWinsOverEveryFile(t *testing.T) {
+// TestKeyEnvFileWinsOverOtherFiles 單獨釘住 .env.local / .env 檔案層最高優先權。
+func TestKeyEnvFileWinsOverOtherFiles(t *testing.T) {
 	loadFixture(t, map[string]string{
-		".env":                "SERVER.HOST=from-env\n",
 		"config.local.yaml":   "server:\n  host: from-yaml-local\n",
 		"settings.json":       `{"server":{"host":"from-json"}}`,
 		"settings.local.json": `{"server":{"host":"from-json-local"}}`,
+		".env.local":          "SERVER.HOST=from-env-local\n",
 	})
 
-	assertGet(t, "server.host", "from-json-local")
+	assertGet(t, "server.host", "from-env-local")
 }
 
 // TestKeyEmptyParentIsInvisibleToViper 記錄一個 --delete 的副作用。
