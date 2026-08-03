@@ -447,3 +447,25 @@ func TestConfigDefaultMergeSupportsEnvAndYaml(t *testing.T) {
 		t.Errorf("yaml merge discarded the operator's host: %s", yamlBody)
 	}
 }
+
+// --merge on a missing file creates it. The report has to say so: an installer
+// that runs "config default --merge" unconditionally would otherwise be told
+// "already up to date" on the very run that produced the file.
+func TestConfigDefaultMergeReportsCreation(t *testing.T) {
+	dir := appDirFixture(t, "seedapp")
+	MustRegisterDefault("settings.json", []byte(`{"a":1}`))
+
+	out, err := runDefault(t, "--merge")
+	if err != nil {
+		t.Fatalf("merge: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "settings.json")); err != nil {
+		t.Fatalf("settings.json was not created: %v", err)
+	}
+	if !strings.Contains(out, "wrote") {
+		t.Fatalf("creation reported as something other than a write:\n%s", out)
+	}
+	if strings.Contains(out, "already up to date") {
+		t.Fatalf("a file that was just created is reported as unchanged:\n%s", out)
+	}
+}

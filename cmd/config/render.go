@@ -109,7 +109,14 @@ func RenderDefaultReport(r DefaultReport) string {
 		return done
 	}
 
+	// Bytes is only set when the seed was written wholesale — a file that did
+	// not exist yet, or one replaced by --force. That case is checked first
+	// because it can happen *in merge mode*: a first run with --merge creates
+	// the file, and reporting that as "already up to date" would tell an
+	// installer nothing happened on the one run where everything did.
 	switch {
+	case r.Bytes > 0:
+		fmt.Fprintf(&b, "%s %s (%d bytes)\n", verb("wrote", "would write"), r.Path, r.Bytes)
 	case r.Mode == DefaultModeMerge:
 		if len(r.Changes) == 0 {
 			fmt.Fprintf(&b, "%s is already up to date\n", r.Path)

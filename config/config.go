@@ -18,10 +18,14 @@ type Config interface {
 
 var appName string
 
+// forcedConfigDir is the directory installed by WithConfigDir. Empty means
+// "derive from appName", which is the default behaviour.
+var forcedConfigDir string
+
 // ExpandHome 將路徑中的 "~" 或 "~/..." 展開為使用者家目錄。
 // 如果路徑不以 "~" 開頭，則原樣返回。
 func ExpandHome(path string) string {
-	if path == "~" || (len(path) > 2 && path[:2] == "~/") {
+	if path == "~" || strings.HasPrefix(path, "~/") {
 		homeDir, _ := os.UserHomeDir()
 		return filepath.Join(homeDir, path[1:])
 	}
@@ -39,6 +43,14 @@ func Default(opts ...ConfigOption) {
 	if o.appName != "" {
 		appName = o.appName
 	}
+
+	// WithConfigDir is installed before anything reads GetAppConfigDir(): the
+	// loaders below take it as a search path, and cmd/config resolves every
+	// write target through it. Calling Default() without the option clears a
+	// previous override — Default() decides the config location outright, so a
+	// forced directory surviving a call that did not ask for one would be a
+	// setting no call site admits to.
+	SetConfigDir(o.configDir)
 
 	if o.appConfigDir != "" {
 		viper.Set("APP_CONFIG_DIR", o.appConfigDir)
@@ -173,10 +185,18 @@ func appConfigDirFor(name string) string {
 // <config-base>/appName, where <config-base> is XDG_CONFIG_HOME when set and
 // ~/.config otherwise.
 //
+// WithConfigDir / SetConfigDir override that derivation wholesale, app name
+// and environment included — the override is the single answer to "where does
+// this application keep its config", which is why it is checked first.
+//
 // It returns "" when no app name has been registered (Default / SetAppName
-// not called). Callers and tests rely on that empty value meaning "no app
-// directory in the search path" — do not substitute a default here.
+// not called) and no directory was forced. Callers and tests rely on that
+// empty value meaning "no app directory in the search path" — do not
+// substitute a default here.
 func GetAppConfigDir() string {
+	if forcedConfigDir != "" {
+		return forcedConfigDir
+	}
 	return appConfigDirFor(appName)
 }
 
@@ -196,4 +216,24 @@ func GetAppDataDir() string {
 
 func SetAppName(name string) {
 	appName = name
+}
+
+// GetConfigDir returns the directory forced by WithConfigDir / SetConfigDir,
+// or "" when the config directory is still derived from the app name. Use
+// GetAppConfigDir to ask where config actually lives; this one answers the
+// narrower question of whether the location was overridden.
+func GetConfigDir() string {
+	return forcedConfigDir
+}
+
+// SetConfigDir forces the application config directory, the imperative
+// counterpart of WithConfigDir. A leading "~" is expanded; an empty string
+// clears the override and restores the appName-derived path.
+func SetConfigDir(dir string) {
+	dir = strings.TrimSpace(dir)
+	if dir == "" {
+		forcedConfigDir = ""
+		return
+	}
+	forcedConfigDir = ExpandHome(dir)
 }

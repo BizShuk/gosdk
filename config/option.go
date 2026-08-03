@@ -2,6 +2,7 @@ package config
 
 import (
 	"path/filepath"
+	"strings"
 
 	"github.com/bizshuk/gosdk/utils"
 )
@@ -9,6 +10,7 @@ import (
 type configOptions struct {
 	defaultValue string
 	appName      string
+	configDir    string
 	appConfigDir string
 	watch        bool
 }
@@ -50,6 +52,30 @@ func WithAppName(appName string) ConfigOption {
 	}
 }
 
+// WithConfigDir forces the application config directory to dir, overriding the
+// path WithAppName derives (<XDG_CONFIG_HOME or ~/.config>/<appName>). A
+// leading "~" is expanded to the user's home directory.
+//
+//	config.Default(
+//		config.WithAppName("myapp"),
+//		config.WithConfigDir("~/.config/myapp"),  // home, whatever XDG says
+//	)
+//
+// The app name is untouched: GetAppName() keeps reporting it, so log lines and
+// anything else keyed by name stay the same — only the directory moves. Use
+// this when the application must own its config location rather than inherit
+// it from the environment: a machine that exports XDG_CONFIG_HOME for some
+// other tool would otherwise silently relocate this application's settings.
+//
+// Everything derived from the config directory follows: GetAppDataDir,
+// GetAppLogsDir, the loader search path, and the settings.json seeded by
+// WithDefaultValue.
+func WithConfigDir(dir string) ConfigOption {
+	return func(o *configOptions) {
+		o.configDir = dir
+	}
+}
+
 // applyOptions processes the functional options.
 func applyOptions(opts ...ConfigOption) *configOptions {
 	o := &configOptions{}
@@ -64,6 +90,13 @@ func applyOptions(opts ...ConfigOption) *configOptions {
 	// mean seeding one directory and loading from another.
 	if dir := appConfigDirFor(o.appName); dir != "" {
 		o.appConfigDir = dir
+	}
+
+	// WithConfigDir wins over the derived path — that is the whole point of
+	// the option. It is applied here, before the seed is written, so the file
+	// lands in the directory Default() then installs as GetAppConfigDir().
+	if dir := strings.TrimSpace(o.configDir); dir != "" {
+		o.appConfigDir = ExpandHome(dir)
 	}
 
 	// Only automatically create settings.json if it is using the appName config directory

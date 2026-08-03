@@ -55,6 +55,7 @@ Environment variables prefixed with `APP_` override config values, but only for 
 | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `WithAppName("myapp")`      | Sets the app name and enables the user config dir `~/.config/myapp` (`GetAppConfigDir()`). Required for `WithDefaultValue` and the app dir helpers. |
 | `WithDefaultValue(jsonStr)` | Auto-creates `settings.json` in `GetAppConfigDir()` on first run if it does not exist. **No-op unless `WithAppName` is also set.**                  |
+| `WithConfigDir(dir)`        | Forces the app config dir to `dir` (`~` expanded), overriding both the derived `<appName>` path and `XDG_CONFIG_HOME`. The app name is untouched — only the directory moves, and `GetAppDataDir()` / `GetAppLogsDir()` follow it. Use it when the app must own its config location instead of inheriting it from the environment. |
 
 #### Where `config.Default()` Loads From
 
@@ -64,6 +65,7 @@ Every format loader (`.env`, `config.yaml`, `settings.json`) searches the **same
 1. .                       # current working dir
 2. ./conf                  # conf/ subdir of cwd
 3. ~/.config/<appName>     # GetAppConfigDir() — EMPTY unless WithAppName is set
+                          # (or exactly the dir passed to WithConfigDir)
 ```
 
 So a `settings.json` in the working dir shadows one in `~/.config/<appName>`. The app's installed/home config lives in dir 3; project-local overrides live in dirs 1–2.

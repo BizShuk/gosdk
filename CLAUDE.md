@@ -29,9 +29,11 @@ gosdk/
 ├── config/                  # 設定管理模組
 │   ├── config.go            # Config 介面、Default()、configBaseDir()/appConfigDirFor()
 │   │                        # GetAppConfigDir() / GetAppDataDir() / GetAppLogsDir()
+│   │                        # GetConfigDir() / SetConfigDir()（WithConfigDir 的命令式版本）
 │   ├── config_test.go       # 基本設定載入測試
 │   ├── appdir_test.go       # XDG_CONFIG_HOME 解析、空 appName 契約、seed 與讀取同目錄
-│   ├── option.go            # ConfigOption：WithAppName / WithDefaultValue
+│   │                        # WithConfigDir 覆寫（含 ~ 展開、data/logs 跟隨、Default 清除）
+│   ├── option.go            # ConfigOption：WithAppName / WithConfigDir / WithDefaultValue
 │   ├── option_test.go       # option 測試
 │   ├── env.go               # .env dotenv 載入器（雙檔案模式）
 │   ├── env_test.go          # env 載入器測試
@@ -344,4 +346,4 @@ GitHub Actions workflow 定義於 `.github/workflows/ci.yml`，於 push/PR 至 `
 - Error handling: 使用 `fmt.Errorf("...: %w", err)` 進行 error wrapping；設定載入失敗區分 `ConfigFileNotFoundError`（允許 fallback）與其他錯誤（`log.Warn` 或 `log.Fatal` 終止）
 - Logging: `gosdk/log` 在 `init()` 自動初始化、並提供 `Init()` 套用 `LOG_LEVEL` / `LOG_FORMAT`；所有日誌記錄統一使用 stdlib 套件層級 `slog.*`（結構化 key/value），不使用 wrapper 函式
 - Testing: 測試檔案與被測檔案放在同一 package 內（白盒測試）；使用 `testing.T` 標準庫；測試前透過 `viper.Set()` 或 `os.Setenv()` 注入設定
-- Configuration: 設定檔搜尋路徑固定為 `.`、`./conf`、`~/.config/<appName>`（需 `WithAppName`）；雙檔案模式（base + `.local`）自動載入；`APP_` 前綴環境變數自動覆蓋設定
+- Configuration: 設定檔搜尋路徑固定為 `.`、`./conf`、`~/.config/<appName>`（需 `WithAppName`）；第三個目錄可用 `WithConfigDir(dir)` 強制覆寫（`~` 會展開，優先於 appName 與 `XDG_CONFIG_HOME`，`GetAppDataDir` / `GetAppLogsDir` 一併跟隨）；雙檔案模式（base + `.local`）自動載入；`APP_` 前綴環境變數自動覆蓋設定

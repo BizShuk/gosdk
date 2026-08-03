@@ -12,7 +12,7 @@ Go 語言通用開發工具包 (Shared SDK)，提供設定管理、HTTP 服務�
 
 `領域流程 (Domain Flow):`
 
-1. 呼叫 `config.Default()`（可加 `WithAppName("myapp")` 等 option）啟動設定載入；搜尋目錄固定為 `.`、`./conf`、`~/.config/<appName>`
+1. 呼叫 `config.Default()`（可加 `WithAppName("myapp")` 等 option）啟動設定載入；搜尋目錄固定為 `.`、`./conf`、`~/.config/<appName>`；app 目錄可用 `WithConfigDir("~/.config/myapp")` 強制指定，`XDG_CONFIG_HOME` 因此不再左右設定位置
 2. `EnvConfig.Load()` 讀取 `.env` → `.env.local` 並合併至全域 Viper
 3. `YamlConfig.Load()` 讀取 `config.yaml` → `config.local.yaml` 並合併至全域 Viper
 4. `JsonConfig.Load()` 讀取 `settings.json` → `settings.local.json` 並合併至全域 Viper
@@ -21,7 +21,7 @@ Go 語言通用開發工具包 (Shared SDK)，提供設定管理、HTTP 服務�
 
 `核心實體 (Key Entities):` `Config` 介面, `EnvConfig`, `YamlConfig`, `JsonConfig`, `FSConfig`
 
-`相關處理器 (Related Handlers):` `config.Default()`, `GetAppConfigDir()`, `WithAppName()`, `WithDefaultValue()`, `NewEnvConfig()`, `NewYamlConfig()`, `NewJsonConfig()`, `NewFSConfig()`
+`相關處理器 (Related Handlers):` `config.Default()`, `GetAppConfigDir()`, `WithAppName()`, `WithConfigDir()`, `WithDefaultValue()`, `SetConfigDir()`, `NewEnvConfig()`, `NewYamlConfig()`, `NewJsonConfig()`, `NewFSConfig()`
 
 ---
 
@@ -249,6 +249,15 @@ config.Default(config.WithAppName("myapp"))
 config.Default(
     config.WithAppName("myapp"),
     config.WithDefaultValue(defaultJSON),
+)
+
+// 方式 4：強制指定設定目錄（"~" 會展開為家目錄）。
+// app 名稱不變，只有目錄被釘住 —— 別的工具設了 XDG_CONFIG_HOME
+// 也不會讓這個應用程式的設定跟著搬家。
+// data/ 與 logs/（GetAppDataDir / GetAppLogsDir）一併跟著移動。
+config.Default(
+    config.WithAppName("myapp"),
+    config.WithConfigDir("~/.config/myapp"),
 )
 ```
 
