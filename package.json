@@ -1,0 +1,15 @@
+{
+    "name": "gosdk",
+    "version": "0.0.0",
+    "private": true,
+    "description": "Go 語言通用開發工具包 (Shared SDK)：設定管理、HTTP 服務骨架、程式碼產生器、版本管理、通知與編碼轉換模組",
+    "scripts": {
+        "dev": "go run .",
+        "test": "go test -v ./...",
+        "build": "go build -o bin/server main.go",
+        "lint": "gofmt -l . && go vet ./...",
+        "clean": "rm -rf bin",
+        "run:generate": "go generate ./...",
+        "ci": "npm run lint && npm run test && npm run build"
+    }
+}
