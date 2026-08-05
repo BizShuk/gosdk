@@ -2,6 +2,8 @@ package config
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -74,23 +76,39 @@ func TestRenderShowTable_EmptyReportsNotice(t *testing.T) {
 	}
 }
 
-func TestRenderShowTable_HeaderNoSourceHasOnlyTwoColumns(t *testing.T) {
-	out := RenderShowTable([]Entry{{Key: "k", Value: "v"}}, false)
-	// tabwriter pads; what matters is the header text and column count.
-	if !strings.Contains(out, "KEY") || !strings.Contains(out, "VALUE") {
-		t.Errorf("output missing KEY/VALUE header: %q", out)
-	}
-	if strings.Contains(out, "SOURCE") {
-		t.Errorf("output without --source should not show SOURCE column: %q", out)
+// The source column is unconditional — the whole point of the merged view is
+// that a value never appears without saying where it came from.
+func TestRenderShowTable_AlwaysShowsSourceColumn(t *testing.T) {
+	out := RenderShowTable([]Entry{
+		{Key: "k", Value: "v", Layer: "json", Source: "/etc/app/settings.json"},
+	}, false)
+	for _, want := range []string{"KEY", "VALUE", "SOURCE", "/etc/app/settings.json"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q: %q", want, out)
+		}
 	}
 }
 
-func TestRenderShowTable_HeaderWithSourceHasThreeColumns(t *testing.T) {
-	out := RenderShowTable([]Entry{{Key: "k", Value: "v", Source: "json"}}, true)
-	for _, want := range []string{"KEY", "VALUE", "SOURCE"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("withSource output missing %q: %q", want, out)
-		}
+// A path under the home directory is shortened; everything else is printed
+// whole, because the directory is what tells two same-named files apart.
+func TestRenderShowTable_ShortensHomeInSourcePath(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("no home directory on this machine")
+	}
+	path := filepath.Join(home, ".config", "app", "settings.json")
+	out := RenderShowTable([]Entry{{Key: "k", Value: "v", Layer: "json", Source: path}}, false)
+	if !strings.Contains(out, "~/.config/app/settings.json") {
+		t.Errorf("home not shortened in %q", out)
+	}
+}
+
+func TestRenderShowTable_EnvSourceRendersAsVariable(t *testing.T) {
+	out := RenderShowTable([]Entry{
+		{Key: "log_level", Value: "debug", Layer: LAYER_OS_ENV, Source: "LOG_LEVEL"},
+	}, false)
+	if !strings.Contains(out, "$LOG_LEVEL") {
+		t.Errorf("env source not rendered as $LOG_LEVEL: %q", out)
 	}
 }
 

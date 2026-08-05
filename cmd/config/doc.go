@@ -5,7 +5,7 @@
 // they own the flags, call one function here, and render the structured
 // result it returns. Everything else lives in this package:
 //
-//	Show                      the merged view across every config layer
+//	Show                      the merged view, each value carrying its source file
 //	Update / Delete           key-level mutations of a target file
 //	Append / RemoveFrom       element-level mutations of an array field
 //	Apply                     all of the above, applied atomically
@@ -15,8 +15,14 @@
 // Nothing here writes to stdout or builds display strings, so a second front
 // end — an HTTP handler, a library caller, a TUI — can reuse the same
 // functions without dragging the table renderer along. The renderers are
-// exported too (RenderShowTable, RenderChangeReport, RenderDefaultReport) for
-// callers that do want the CLI's exact output.
+// exported too (RenderShowTable, RenderSourceTable, RenderChangeReport,
+// RenderDefaultReport) for callers that do want the CLI's exact output.
+//
+// Where a value came from is resolved by the SDK's config package, not here:
+// sdkconfig.Sources() enumerates the files the loader chain reads, in merge
+// order, with the path each resolved to, and sdkconfig.LoadFile reads one of
+// them at a time. Keeping both there is what stops this package's answer from
+// drifting from what a running application actually loads.
 //
 // The import of the SDK's own configuration package is aliased to sdkconfig
 // throughout, because this package is also called config and the two are

@@ -2,6 +2,8 @@ package config
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -45,8 +47,22 @@ func TestShow_SortedByKey(t *testing.T) {
 	}
 }
 
+// entryFor returns the merged entry for key, failing the test when absent.
+func entryFor(t *testing.T, entries []Entry, key string) Entry {
+	t.Helper()
+	for _, e := range entries {
+		if e.Key == key {
+			return e
+		}
+	}
+	t.Fatalf("entry %q not found: %+v", key, entries)
+	return Entry{}
+}
+
 func TestShow_LayerPriority(t *testing.T) {
-	// Higher-precedence layers override lower: json > yaml > env.
+	// The merged view must report the same winner the running application
+	// sees, and config.loadAllConfigs merges yaml, then json, then env — so
+	// env wins, not json.
 	fixture(t, map[string]string{
 		".env":          "shared=from-env\nonly_env=env\n",
 		"config.yaml":   "shared: from-yaml\nonly_yaml: yaml\n",
@@ -55,7 +71,6 @@ func TestShow_LayerPriority(t *testing.T) {
 
 	entries := Show()
 	byKey := make(map[string]string, len(entries))
-	sourceByKey := make(map[string]string, len(entries))
 	for _, e := range entries {
 		s, ok := e.Value.(string)
 		if !ok {
@@ -63,13 +78,13 @@ func TestShow_LayerPriority(t *testing.T) {
 			continue
 		}
 		byKey[e.Key] = s
-		sourceByKey[e.Key] = e.Source
 	}
-	if byKey["shared"] != "from-json" {
-		t.Errorf("shared = %q, want from-json (json beats yaml + env)", byKey["shared"])
+	if byKey["shared"] != "from-env" {
+		t.Errorf("shared = %q, want from-env (.env is merged last)", byKey["shared"])
 	}
-	if sourceByKey["shared"] != "json" {
-		t.Errorf("shared source = %q, want json", sourceByKey["shared"])
+	shared := entryFor(t, entries, "shared")
+	if shared.Layer != "env" {
+		t.Errorf("shared layer = %q, want env", shared.Layer)
 	}
 	// Each layer's sole-sourced key must still surface.
 	for _, k := range []string{"only_env", "only_yaml", "only_json"} {
@@ -79,34 +94,83 @@ func TestShow_LayerPriority(t *testing.T) {
 	}
 }
 
+// The winning value must name the file it was read from, not just its layer:
+// two settings.json in different search directories are the case the layer
+// name cannot distinguish.
+func TestShow_SourceIsTheResolvedFilePath(t *testing.T) {
+	dir := fixture(t, map[string]string{
+		"settings.json":       `{"shared":"from-base"}`,
+		"settings.local.json": `{"shared":"from-local"}`,
+	})
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+
+	shared := entryFor(t, Show(), "shared")
+	if shared.Value != "from-local" {
+		t.Errorf("shared = %v, want from-local (.local is merged after the base file)", shared.Value)
+	}
+	if want := filepath.Join(wd, LOCAL_SETTINGS_FILE); shared.Source != want {
+		t.Errorf("shared source = %q, want %q (fixture dir %s)", shared.Source, want, dir)
+	}
+	if len(shared.Shadowed) != 1 {
+		t.Fatalf("shared shadowed = %+v, want the base settings.json", shared.Shadowed)
+	}
+	if want := filepath.Join(wd, DEFAULT_CONFIG_FILE); shared.Shadowed[0].Source != want {
+		t.Errorf("shadowed source = %q, want %q", shared.Shadowed[0].Source, want)
+	}
+}
+
 func TestShow_EnvOverrideCapturedAsShadowed(t *testing.T) {
+	// config.Default binds keys unprefixed, so the variable that actually
+	// overrides "shared" at runtime is SHARED — not APP_SHARED.
+	t.Setenv("SHARED", "from-envvar")
+	fixture(t, map[string]string{
+		"settings.json": `{"shared":"from-json"}`,
+	})
+
+	found := entryFor(t, Show(), "shared")
+	if found.Value != "from-envvar" {
+		t.Errorf("shared value = %v, want from-envvar", found.Value)
+	}
+	if found.Layer != LAYER_OS_ENV || found.Source != "SHARED" {
+		t.Errorf("shared source = %q/%q, want os-env/SHARED", found.Layer, found.Source)
+	}
+	if len(found.Shadowed) != 1 {
+		t.Fatalf("shared shadowed = %+v, want exactly one (the json value)", found.Shadowed)
+	}
+	if found.Shadowed[0].Value != "from-json" || found.Shadowed[0].Layer != "json" {
+		t.Errorf("shared shadowed[0] = %+v, want {from-json, json}", found.Shadowed[0])
+	}
+}
+
+// bindAllEnvVars binds nested keys too (server.port -> SERVER_PORT), so the
+// merged view has to compose the same name or it reports a value the
+// application will not use.
+func TestShow_NestedKeyEnvOverride(t *testing.T) {
+	t.Setenv("SERVER_PORT", "9999")
+	fixture(t, map[string]string{
+		"settings.json": `{"server":{"port":8080}}`,
+	})
+
+	found := entryFor(t, Show(), "server.port")
+	if found.Value != "9999" || found.Source != "SERVER_PORT" {
+		t.Errorf("server.port = %v from %q, want 9999 from SERVER_PORT", found.Value, found.Source)
+	}
+}
+
+// An APP_-prefixed variable no longer overrides anything: the prefix was
+// dropped from the binding, and the view must not claim otherwise.
+func TestShow_AppPrefixedEnvVarIsNotAnOverride(t *testing.T) {
 	t.Setenv("APP_SHARED", "from-envvar")
 	fixture(t, map[string]string{
 		"settings.json": `{"shared":"from-json"}`,
 	})
 
-	entries := Show()
-	var found *Entry
-	for i := range entries {
-		if entries[i].Key == "shared" {
-			found = &entries[i]
-			break
-		}
-	}
-	if found == nil {
-		t.Fatalf("shared entry not found: %+v", entries)
-	}
-	if found.Value != "from-envvar" {
-		t.Errorf("shared value = %v, want from-envvar", found.Value)
-	}
-	if found.Source != "APP_SHARED" {
-		t.Errorf("shared source = %q, want APP_SHARED", found.Source)
-	}
-	if len(found.Shadowed) != 1 {
-		t.Fatalf("shared shadowed = %+v, want exactly one (the json value)", found.Shadowed)
-	}
-	if found.Shadowed[0].Value != "from-json" || found.Shadowed[0].Source != "json" {
-		t.Errorf("shared shadowed[0] = %+v, want {from-json, json}", found.Shadowed[0])
+	found := entryFor(t, Show(), "shared")
+	if found.Value != "from-json" {
+		t.Errorf("shared = %v, want from-json (APP_SHARED is not bound)", found.Value)
 	}
 }
 
@@ -209,9 +273,9 @@ func TestUpdate_FailsWhenScalarBlocksPath(t *testing.T) {
 }
 
 func TestUpdate_CollectsEnvShadowWarnings(t *testing.T) {
-	// APP_LOG_LEVEL shadows the flat key log_level; the report must surface
-	// this so the CLI can print a warning after the change is applied.
-	t.Setenv("APP_LOG_LEVEL", "debug")
+	// LOG_LEVEL shadows the flat key log_level; the report must surface this
+	// so the CLI can print a warning after the change is applied.
+	t.Setenv("LOG_LEVEL", "debug")
 	fixture(t, nil)
 
 	report, err := Update([]string{"log_level=info"}, WriteOptions{})
@@ -219,11 +283,11 @@ func TestUpdate_CollectsEnvShadowWarnings(t *testing.T) {
 		t.Fatalf("Update failed: %v", err)
 	}
 	if len(report.Warnings) != 1 {
-		t.Fatalf("Warnings = %+v, want exactly one (APP_LOG_LEVEL shadows log_level)", report.Warnings)
+		t.Fatalf("Warnings = %+v, want exactly one (LOG_LEVEL shadows log_level)", report.Warnings)
 	}
 	w := report.Warnings[0]
-	if !containsAll(w, "log_level", "APP_LOG_LEVEL", "warning") {
-		t.Errorf("warning %q does not name the key, the env var, or the prefix", w)
+	if !containsAll(w, "log_level", "LOG_LEVEL", "warning") {
+		t.Errorf("warning %q does not name the key or the env var", w)
 	}
 }
 

@@ -52,6 +52,7 @@ func run(t *testing.T, args ...string) (string, error) {
 	t.Helper()
 
 	configSource = false
+	configFiles = false
 	configUpdates = nil
 	configAdds = nil
 	configDeletes = nil
@@ -107,24 +108,75 @@ func TestShowRendersMergedTable(t *testing.T) {
 	}
 }
 
-// --source adds the third column; without it the table stays two-wide.
-func TestShowSourceFlagAddsColumn(t *testing.T) {
+// The SOURCE column is unconditional: the file a value was read from is part
+// of the merged view, not an opt-in. --source adds the overridden values.
+func TestShowAlwaysNamesTheSourceFile(t *testing.T) {
 	fixture(t, map[string]string{"settings.json": `{"a":1}`})
+	// Resolve the working directory the same way the renderer does; on macOS
+	// the temp dir is reachable under two paths and only one of them matches.
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
 
 	plain, err := run(t)
 	if err != nil {
 		t.Fatalf("config: %v", err)
 	}
-	if strings.Contains(plain, "SOURCE") {
-		t.Errorf("SOURCE column shown without --source:\n%s", plain)
+	if !strings.Contains(plain, "SOURCE") {
+		t.Errorf("SOURCE column missing without --source:\n%s", plain)
+	}
+	if want := filepath.Join(wd, "settings.json"); !strings.Contains(plain, want) {
+		t.Errorf("show output does not name %s:\n%s", want, plain)
+	}
+}
+
+func TestShowSourceFlagListsOverriddenValues(t *testing.T) {
+	fixture(t, map[string]string{
+		"settings.json": `{"a":"from-json"}`,
+		".env":          "a=from-env\n",
+	})
+
+	plain, err := run(t)
+	if err != nil {
+		t.Fatalf("config: %v", err)
+	}
+	if strings.Contains(plain, "from-json") {
+		t.Errorf("overridden value leaked without --source:\n%s", plain)
 	}
 
 	sourced, err := run(t, "--source")
 	if err != nil {
 		t.Fatalf("config --source: %v", err)
 	}
-	if !strings.Contains(sourced, "SOURCE") {
-		t.Errorf("--source did not reach the renderer:\n%s", sourced)
+	if !strings.Contains(sourced, "from-json") || !strings.Contains(sourced, "overridden") {
+		t.Errorf("--source did not list the overridden json value:\n%s", sourced)
+	}
+}
+
+// --files answers "where does this application read config from" without
+// needing a key to exist first: every file in the chain, found or not.
+func TestFilesFlagListsSearchedFiles(t *testing.T) {
+	fixture(t, map[string]string{"settings.json": `{"a":1}`})
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+
+	out, err := run(t, "--files")
+	if err != nil {
+		t.Fatalf("config --files: %v", err)
+	}
+	if !strings.Contains(out, filepath.Join(wd, "settings.json")) {
+		t.Errorf("--files does not resolve settings.json under %s:\n%s", wd, out)
+	}
+	for _, name := range []string{"config.yaml", "settings.local.json", ".env.local"} {
+		if !strings.Contains(out, name) {
+			t.Errorf("--files omits %q from the searched set:\n%s", name, out)
+		}
+	}
+	if !strings.Contains(out, "(not found)") {
+		t.Errorf("--files does not mark the missing files:\n%s", out)
 	}
 }
 

@@ -258,7 +258,7 @@ func FilePath(fileName string, local bool) string {
 }
 
 // envShadowWarnings returns keys whose new value will not take effect because
-// an APP_ environment variable outranks every config file.
+// an OS environment variable outranks every config file.
 func envShadowWarnings(updates, deletes, appends, removes []string) []string {
 	keys := make([]string, 0, len(updates)+len(deletes)+len(appends)+len(removes))
 	for _, spec := range updates {

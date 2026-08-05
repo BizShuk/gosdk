@@ -10,8 +10,10 @@ gosdk/
 ├── build/
 │   └── dockerfile           # Multi-stage Docker 建置（golang:1.26-alpine）
 ├── cmd/                     # package cmd：可被宿主應用 AddCommand 的子命令目錄
-│   ├── config.go            # ConfigCmd：檢視/修改設定（--source/--update/--add/--delete）
+│   ├── config.go            # ConfigCmd：檢視/修改設定（--files/--source/--update/--add/--delete）
 │   ├── config_test.go
+│   ├── config/              # ConfigCmd 的邏輯層（不含 cobra）：Show/Apply/Default + Render*
+│   │                        # show.go 依 sdkconfig.Sources() 逐檔合併，每個 key 帶實際來源路徑
 │   ├── major.go             # MajorCmd：VERSION 主版號 +1
 │   ├── minor.go             # MinorCmd：VERSION 次版號 +1
 │   ├── patch.go             # PatchCmd：VERSION 修訂號 +1
@@ -35,6 +37,9 @@ gosdk/
 │   │                        # WithConfigDir 覆寫（含 ~ 展開、data/logs 跟隨、Default 清除）
 │   ├── option.go            # ConfigOption：WithAppName / WithConfigDir / WithDefaultValue
 │   ├── option_test.go       # option 測試
+│   ├── sources.go           # SearchPaths() / Sources()（6 個設定檔依 merge 順序解析出實際路徑）
+│   │                        # LoadFile(path, layer)：單檔載入，key 正規化與 loader 一致
+│   ├── sources_test.go      # 搜尋順序、base/.local 各自解析、.yml 別名、forced dir、dotenv 解析
 │   ├── env.go               # .env dotenv 載入器（雙檔案模式）
 │   ├── env_test.go          # env 載入器測試
 │   ├── yaml.go              # YAML 設定載入器（雙檔案模式）
@@ -213,6 +218,7 @@ gosdk/
 - 使用 Viper 全域單例管理設定：所有設定來源（.env、YAML、JSON、環境變數）合併至單一 `viper` 實例，簡化跨模組存取，但犧牲了可測試性
 - 雙檔案載入模式：各設定格式固定載入 base 檔案 + `.local` 覆寫檔（`.env` + `.env.local`、`config.yaml` + `config.local.yaml`、`settings.json` + `settings.local.json`），不再依賴 `PROFILE` 環境變數切換
 - 跨格式設定優先權（4 層）：`OS env` > `.env` > `settings.json` > `config.yaml`（高者覆蓋低者）。`config.Default()` 內 `loadAllConfigs()` 依序 merge `yaml → json → env`（後者覆蓋前者），最後呼叫 `viper.AutomaticEnv()` + `bindAllEnvVars()` 啟用 OS env 動態查詢。`bindAllEnvVars()` 透過 reflection 走完 `viper.AllSettings()` 並對每個 leaf 呼叫 `viper.BindEnv(key, UPPER(key))`，確保 flat key 與 nested key（如 `server.port` $\rightarrow$ `SERVER_PORT`）都能直接被對應名稱的 OS env 覆寫（驗證見 [config_test.go:TestDefault_EnvVarOverridesAllFiles](file:///Users/shuk/projects/platform/gosdk/config/config_test.go) + `TestDefault_NestedKeyEnvOverride`）。
+- 設定來源可追溯（provenance）：`config.Sources()` 依 merge 順序（低到高）列出 6 個設定檔並解析出實際絕對路徑，`config.LoadFile(path, layer)` 單檔載入且 key 正規化與 loader 一致。目錄搜尋順序為 `.` → `./conf` → app config dir，且`同一檔名只有第一個命中的目錄生效`（fallback chain，非跨目錄 merge）；base 與 `.local` 各自獨立解析，可分別落在不同目錄。`cmd/config.Show()` 建在這兩者之上，因此 CLI 顯示的來源與 runtime 實際載入不會分歧；`app config --files` 直接列出搜尋結果與缺檔
 - 扁平 viper key 直讀：`config.Default()` 載入設定後透過 `viper.Get*()` 取值；不再維護強型別 `ConfigSchema` / `ServerConfig` / `DBConfig` 等聚合結構（2026-06 重構後 `config/common` 已廢除）
 - 儲存型態採 per-service singleton：每種儲存是一個獨立 service（`db.SQLite` / `db.MySQL` / `db.Postgres`），各自有 `DefaultSQLite` / `DefaultMySQL` / `DefaultPostgres` 全域 singleton 與扁平 viper key（`SQLITE_PATH` / `MYSQL_DSN` / `POSTGRES_DSN`），守護函式 `InitSQLite()` / `InitMySQL()` / `InitPostgres()` 拒絕重複初始化以落實「micro-service: 同型態不可有兩個 instance」；MySQL 與 PostgreSQL 採單一 DSN 字串欄位而非拆 `HOST`/`PORT`/`USER`/`PASSWORD`，簡化設定並與舊 `url` 對齊(PostgreSQL 接受 URL 形式 `postgres://...` 或 keyword/value 形式 `host=... user=...`)
 - `stringer` 以 `GeneratorEx` 組合模式擴充標準庫 `stringer`：嵌入 `service.Generator`，額外產生 `List()`、`ValueList()`、`Map()`、`ValueMap()` 四個輔助函式
