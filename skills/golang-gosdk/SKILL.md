@@ -109,22 +109,27 @@ Sibling app dirs derived from `GetAppConfigDir()` (all require `WithAppName`):
 > [!IMPORTANT]
 > These dirs are a fixed convention — do NOT add options to redirect config into the data dir or vice versa.
 
-#### Optional: Embed Default JSON
+#### Embedded Seed Default Registration (`RegisterDefault` / `MustRegisterDefault`)
 
-If you want a `settings.json` auto-created in `~/.config/<app_name>/` on first run:
+When an application or library packages an embedded default config template (using `go:embed`), register it via `cmd/config`:
 
 ```go
-//go:embed default_settings.json
-var defaultSettingJSON string
+import (
+    _ "embed"
+    "github.com/bizshuk/gosdk/cmd/config"
+)
 
-func Init() {
-    config.Default(
-        config.WithAppName("<app_name>"),
-        config.WithDefaultValue(defaultSettingJSON),
-    )
-    // viper.SetDefault(...) for additional keys
+//go:embed settings.example.json
+var defaultSettings []byte
+
+func init() {
+    config.MustRegisterDefault("settings.json", defaultSettings)
 }
 ```
+
+- **`RegisterDefault(file, content)`**: Registers seed content for a specific target config file. Returns an error if the file was already registered by another package to prevent silent registration conflicts.
+- **`MustRegisterDefault(file, content)`**: Convenience wrapper for `init()`, panicking if registration fails.
+- **`SetDefault(file, content)` / `MustSetDefault(file, content)`**: Overrides a previously registered seed file deliberately when a host application needs to override a dependency's seed.
 
 #### Priority Order (highest → lowest)
 
@@ -652,6 +657,7 @@ When adding a command to `gosdk/cmd`, follow the house style:
 | Using removed `log.Info()` / `log.Errorf()` etc | Wrapper funcs are gone. Use `slog.Info` / `slog.Error` with key/value attrs; no printf form (`slog.Error("notify failed", "err", err)`).                                     |
 | Creating a global config struct                 | Use `viper.Get*()` directly at point of use. No global struct needed — viper IS the global config store.                                                                     |
 | Setting defaults before `config.Default()`      | Call `viper.SetDefault()` AFTER `config.Default()` so file-loaded values take precedence over defaults.                                                                      |
+| Calling `RegisterDefault()` twice for same file | `RegisterDefault()` errors on duplicate registrations. Use `config.SetDefault()` when deliberately overriding a dependency's seed default.                                   |
 | Hardcoding `viper` keys for DB                  | Use `db.InitSQLite()` / `db.InitMySQL()` which read flat `SQLITE_PATH` / `MYSQL_DSN` from viper, open a connection, and set the corresponding `Default<Storage>` singleton.  |
 | Re-implementing security headers                | Use `mw.Helmet()` instead of manually writing headers. It contains up-to-date best practices (e.g., `Permissions-Policy`, `Cross-Origin-Opener-Policy`).                     |
 | Manual CSV opening and iteration                | Use `csv.ProcessCSVFile` which handles skipping headers, filtering empty rows, and `.archived` marker generation.                                                            |
