@@ -44,7 +44,7 @@ gosdk/
 │   ├── env_test.go          # env 載入器測試
 │   ├── yaml.go              # YAML 設定載入器（雙檔案模式）
 │   ├── yaml_test.go         # yaml 載入器測試
-│   ├── json.go              # JSON 設定載入器（雙檔案模式）
+│   ├── json.go              # JSON 設定載入器（雙檔案模式；讀取經 encode.JSONCCodec）
 │   ├── embedFS.go           # embed.FS 設定載入器
 │   └── sample/              # config 套件使用範例 (含 conf/ 設定檔及 SQLite 範例)
 ├── db/                      # 資料庫連線服務模組(per-storage singleton + flat viper keys)
@@ -73,6 +73,8 @@ gosdk/
 │   ├── jsonl_test.go        # 追加、掃描、提早中止、長行
 │   └── query_test.go        # 條件查詢、計數、前綴壓縮
 ├── encode/                  # 編碼轉換模組
+│   ├── jsonc.go             # JSONCCodec + ToJSON（JSON with comments / trailing commas）
+│   ├── jsonc_test.go
 │   ├── csv/
 │   │   ├── csv.go           # CSV Decoder 介面
 │   │   ├── processor.go     # CSV RecordProcessor 與歸檔邏輯
@@ -201,7 +203,7 @@ gosdk/
 - Framework: `gin-gonic/gin` v1.11.0 (HTTP)
 - Build tool: `Makefile` + `go build`
 - Key dependencies:
-    - `spf13/viper` v1.17.0 — 階層式設定管理
+    - `spf13/viper` v1.21.0 — 階層式設定管理（CodecRegistry + JSONC for json）
     - `spf13/cobra` v1.9.1 — CLI 框架（gotmpl、versioning）
     - `log/slog` (stdlib) — 結構化日誌（取代 zap）
     - `gorm.io/gorm` v1.31.1 — ORM（MySQL + SQLite + PostgreSQL，driver 各 v1.6.0）
@@ -217,6 +219,7 @@ gosdk/
 
 - 使用 Viper 全域單例管理設定：所有設定來源（.env、YAML、JSON、環境變數）合併至單一 `viper` 實例，簡化跨模組存取，但犧牲了可測試性
 - 雙檔案載入模式：各設定格式固定載入 base 檔案 + `.local` 覆寫檔（`.env` + `.env.local`、`config.yaml` + `config.local.yaml`、`settings.json` + `settings.local.json`），不再依賴 `PROFILE` 環境變數切換
+- JSON 讀取接受 JSONC：codec 在 `encode/jsonc.go`（`encode.JSONCCodec`），僅 `JsonConfig` / `LoadFile(json)` / `ParseJSON` 使用；yaml/env/embed 仍 `viper.New()`。檔名維持 `.json`；寫回 strict JSON
 - 跨格式設定優先權（4 層）：`OS env` > `.env` > `settings.json` > `config.yaml`（高者覆蓋低者）。`config.Default()` 內 `loadAllConfigs()` 依序 merge `yaml → json → env`（後者覆蓋前者），最後呼叫 `viper.AutomaticEnv()` + `bindAllEnvVars()` 啟用 OS env 動態查詢。`bindAllEnvVars()` 透過 reflection 走完 `viper.AllSettings()` 並對每個 leaf 呼叫 `viper.BindEnv(key, UPPER(key))`，確保 flat key 與 nested key（如 `server.port` $\rightarrow$ `SERVER_PORT`）都能直接被對應名稱的 OS env 覆寫（驗證見 [config_test.go:TestDefault_EnvVarOverridesAllFiles](file:///Users/shuk/projects/platform/gosdk/config/config_test.go) + `TestDefault_NestedKeyEnvOverride`）。
 - 設定來源可追溯（provenance）：`config.Sources()` 依 merge 順序（低到高）列出 6 個設定檔並解析出實際絕對路徑，`config.LoadFile(path, layer)` 單檔載入且 key 正規化與 loader 一致。目錄搜尋順序為 `.` → `./conf` → app config dir，且`同一檔名只有第一個命中的目錄生效`（fallback chain，非跨目錄 merge）；base 與 `.local` 各自獨立解析，可分別落在不同目錄。`cmd/config.Show()` 建在這兩者之上，因此 CLI 顯示的來源與 runtime 實際載入不會分歧；`app config --files` 直接列出搜尋結果與缺檔
 - 扁平 viper key 直讀：`config.Default()` 載入設定後透過 `viper.Get*()` 取值；不再維護強型別 `ConfigSchema` / `ServerConfig` / `DBConfig` 等聚合結構（2026-06 重構後 `config/common` 已廢除）

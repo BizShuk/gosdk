@@ -196,3 +196,23 @@ func TestLoadFile_MalformedFileReportsError(t *testing.T) {
 		t.Error("LoadFile on a truncated document returned no error")
 	}
 }
+
+func TestLoadFile_JSONC(t *testing.T) {
+	wd, _ := sourceFixture(t, "")
+	path := writeFile(t, wd, "settings.json", `{
+		// provenance path must accept JSONC too
+		"app_name": "from-jsonc",
+		"port": 42,
+	}`)
+
+	v, err := LoadFile(path, "json")
+	if err != nil {
+		t.Fatalf("LoadFile(jsonc): %v", err)
+	}
+	if got := v.GetString("app_name"); got != "from-jsonc" {
+		t.Errorf("app_name = %q, want from-jsonc", got)
+	}
+	if got := v.GetInt("port"); got != 42 {
+		t.Errorf("port = %d, want 42", got)
+	}
+}

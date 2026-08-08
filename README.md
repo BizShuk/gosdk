@@ -8,7 +8,7 @@ Go 語言通用開發工具包 (Shared SDK)，提供設定管理、HTTP 服務�
 
 ### 設定管理 (Configuration Management)
 
-統一管理應用程式設定來源，支援 `.env`、YAML、JSON 及 `embed.FS` 四種格式，透過 Viper 實現階層式設定合併。各格式採用雙檔案載入模式：固定讀取 base 檔案（`.env`、`config.yaml`、`settings.json`），再合併同名 `.local` 覆寫檔（`.env.local`、`config.local.yaml`、`settings.local.json`），不再依賴 `PROFILE` 環境變數。同時支援 `APP_` 前綴環境變數自動綁定。DB 連線另由獨立的 `db` 套件負責（見下一節），不在 `config/` 範圍。
+統一管理應用程式設定來源，支援 `.env`、YAML、JSON（讀取接受 JSONC：註解與 trailing commas；檔名仍為 `.json`）及 `embed.FS` 四種格式，透過 Viper 實現階層式設定合併。各格式採用雙檔案載入模式：固定讀取 base 檔案（`.env`、`config.yaml`、`settings.json`），再合併同名 `.local` 覆寫檔（`.env.local`、`config.local.yaml`、`settings.local.json`），不再依賴 `PROFILE` 環境變數。同時支援 `APP_` 前綴環境變數自動綁定。DB 連線另由獨立的 `db` 套件負責（見下一節），不在 `config/` 範圍。寫回 `settings.json` 時仍輸出標準 JSON（註解不會被保留）。
 
 `領域流程 (Domain Flow):`
 

@@ -121,8 +121,14 @@ func findInSearchPath(dirs, names []string) string {
 // identical to the loaders' — lowercased keys, "." nesting — so a caller can
 // attribute a value in the merged view to the exact file it came from without
 // the two views disagreeing about what the key is called.
+//
+// The json layer uses newJSONViper (JSONC), matching JsonConfig.Load. Other
+// layers use plain viper.New().
 func LoadFile(path, layer string) (*viper.Viper, error) {
 	v := viper.New()
+	if layer == "json" {
+		v = viper.NewWithOptions(viper.WithCodecRegistry(codecRegistry))
+	}
 	v.SetConfigFile(path)
 	if t, ok := configTypes[layer]; ok {
 		v.SetConfigType(t)

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -146,3 +147,80 @@ func TestJsonConfig_NoProfileDependency(t *testing.T) {
 		t.Errorf("expected name=local-override from settings.local.json (not profile-based), got %s", v.GetString("name"))
 	}
 }
+
+func TestJsonConfig_LoadAcceptsJSONC(t *testing.T) {
+	dir := t.TempDir()
+
+	// File extension stays .json; content may use JSONC (comments + trailing commas).
+	baseContent := `{
+		// app identity
+		"name": "jsonc-app",
+		/* nested server block */
+		"server": {
+			"port": 8080,
+		},
+	}`
+	if err := os.WriteFile(filepath.Join(dir, "settings.json"), []byte(baseContent), 0644); err != nil {
+		t.Fatalf("failed to create settings.json: %v", err)
+	}
+
+	localContent := `{
+		"server": {
+			"port": 9090, // override base
+		},
+		"debug": true,
+	}`
+	if err := os.WriteFile(filepath.Join(dir, "settings.local.json"), []byte(localContent), 0644); err != nil {
+		t.Fatalf("failed to create settings.local.json: %v", err)
+	}
+
+	setupConfigDir(t, dir)
+
+	v := JsonConfig{}.Load()
+
+	if v.GetString("name") != "jsonc-app" {
+		t.Errorf("name = %q, want jsonc-app", v.GetString("name"))
+	}
+	if v.GetInt("server.port") != 9090 {
+		t.Errorf("server.port = %d, want 9090", v.GetInt("server.port"))
+	}
+	if !v.GetBool("debug") {
+		t.Error("expected debug=true from JSONC local file")
+	}
+}
+
+func TestParseJSON_AcceptsJSONC(t *testing.T) {
+	data := []byte(`{
+		// comment
+		"host": "localhost",
+		"port": 8080, /* inline */
+		"tags": ["a", "b",],
+	}`)
+
+	m, err := ParseJSON(data)
+	if err != nil {
+		t.Fatalf("ParseJSON: %v", err)
+	}
+	if m["host"] != "localhost" {
+		t.Errorf("host = %v, want localhost", m["host"])
+	}
+	if got := fmt.Sprint(m["port"]); got != "8080" {
+		t.Errorf("port = %v, want 8080", m["port"])
+	}
+	tags, ok := m["tags"].([]any)
+	if !ok || len(tags) != 2 {
+		t.Fatalf("tags = %v, want [a b]", m["tags"])
+	}
+}
+
+func TestParseJSON_StrictJSONStillWorks(t *testing.T) {
+	m, err := ParseJSON([]byte(`{"a":1,"b":"x"}`))
+	if err != nil {
+		t.Fatalf("ParseJSON: %v", err)
+	}
+	if m["b"] != "x" {
+		t.Errorf("b = %v, want x", m["b"])
+	}
+}
+
+

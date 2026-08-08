@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"sync"
 
+	"github.com/bizshuk/gosdk/encode"
 	"github.com/spf13/viper"
 )
 
@@ -16,9 +18,10 @@ func NewJsonConfig() Config {
 	return JsonConfig{}
 }
 
-// Load reads settings.json and merges settings.local.json
+// Load reads settings.json and merges settings.local.json.
+// Parsing uses encode.JSONCCodec (comments and trailing commas); file names stay .json.
 func (c JsonConfig) Load() *viper.Viper {
-	v := viper.New()
+	v := viper.NewWithOptions(viper.WithCodecRegistry(codecRegistry))
 	v.AddConfigPath(".")
 	v.AddConfigPath("conf")
 	v.AddConfigPath(GetAppConfigDir())
@@ -59,14 +62,15 @@ func (c JsonConfig) GetConfigName() string {
 // empty document, not an error — an operator truncating a file is a normal
 // state, not a corruption.
 //
-// Numbers are decoded as json.Number so a decode/encode round trip never turns
-// an integer into scientific notation.
+// Input may be JSONC (// and /* */ comments, trailing commas), matching
+// encode.JSONCCodec used by Load. Numbers are decoded as json.Number so a
+// decode/encode round trip never turns an integer into scientific notation.
 func ParseJSON(data []byte) (map[string]any, error) {
 	if len(bytes.TrimSpace(data)) == 0 {
 		return map[string]any{}, nil
 	}
 	m := map[string]any{}
-	dec := json.NewDecoder(bytes.NewReader(data))
+	dec := json.NewDecoder(bytes.NewReader(encode.ToJSON(data)))
 	dec.UseNumber()
 	if err := dec.Decode(&m); err != nil {
 		return nil, err
@@ -78,8 +82,8 @@ func ParseJSON(data []byte) (map[string]any, error) {
 // and a trailing newline, matching the style of a hand-written settings.json.
 //
 // Go maps have no order, so the output is key-sorted by encoding/json. A
-// rewrite therefore normalises key order — acceptable for JSON, which has no
-// comments to lose either way.
+// rewrite therefore normalises key order and drops any JSONC comments from
+// the prior read — write always emits strict JSON.
 func WriteJSON(path string, m map[string]any) error {
 	data, err := json.MarshalIndent(m, "", "    ")
 	if err != nil {
@@ -89,4 +93,22 @@ func WriteJSON(path string, m map[string]any) error {
 		return fmt.Errorf("write %s: %w", path, err)
 	}
 	return nil
+}
+
+// --- viper wiring (JSON only) ---------------------------------------------
+
+var (
+	codecRegistryOnce sync.Once
+	codecRegistry     *viper.DefaultCodecRegistry
+)
+
+// viperCodecRegistry returns the process-wide codec registry with JSONC
+// registered for the "json" format. Built-in codecs cover yaml/toml/dotenv
+// when a format is not overridden.
+func init() {
+	codecRegistryOnce.Do(func() {
+		r := viper.NewCodecRegistry()
+		_ = r.RegisterCodec("json", encode.JSONCCodec{})
+		codecRegistry = r
+	})
 }
