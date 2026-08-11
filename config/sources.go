@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -22,7 +23,7 @@ import (
 // still worth listing: "nowhere" is a legitimate answer to "where would this
 // value come from".
 type Source struct {
-	Layer string // env | yaml | json — the loader that reads this file
+	Layer string // env | yaml | json | vault — the loader that reads this file
 	Name  string // file name as searched, e.g. "settings.local.json"
 	Path  string // resolved absolute path, "" when the file was not found
 }
@@ -37,6 +38,8 @@ var sourceCatalog = []Source{
 	{Layer: "yaml", Name: "config.local.yaml"},
 	{Layer: "json", Name: "settings.json"},
 	{Layer: "json", Name: "settings.local.json"},
+	{Layer: "vault", Name: VAULT_FILE},
+	{Layer: "vault", Name: VAULT_LOCAL_FILE},
 	{Layer: "env", Name: ".env"},
 	{Layer: "env", Name: ".env.local"},
 }
@@ -52,9 +55,10 @@ var sourceAlternates = map[string]string{
 // configTypes maps a layer to the viper parser that reads it. dotenv is spelled
 // differently from the layer name, which is the whole reason for the table.
 var configTypes = map[string]string{
-	"yaml": "yaml",
-	"json": "json",
-	"env":  "dotenv",
+	"yaml":  "yaml",
+	"json":  "json",
+	"env":   "dotenv",
+	"vault": VAULT_FORMAT,
 }
 
 // SearchPaths returns the directories the loaders search, in viper's order:
@@ -94,6 +98,30 @@ func Sources() []Source {
 	return out
 }
 
+// mergeNamedFiles resolves each name against the search path and merges the
+// ones that exist into v, in the order given — later names override earlier
+// ones, which is what "base then .local" means.
+//
+// Resolving exact names is deliberate. Handing viper a config name instead lets
+// it match any supported extension, so a loader asked for ".env" will happily
+// read ".env.vault" once the vault format is registered. The loaders address
+// files, not name stems, and this is where that is enforced.
+func mergeNamedFiles(v *viper.Viper, configType string, names ...string) {
+	dirs := SearchPaths()
+	for _, name := range names {
+		path := findInSearchPath(dirs, []string{name})
+		if path == "" {
+			continue
+		}
+		v.SetConfigFile(path)
+		v.SetConfigType(configType)
+		if err := v.MergeInConfig(); err != nil {
+			slog.Warn("failed to read config file",
+				"file", name, "path", path, "type", configType, "err", err)
+		}
+	}
+}
+
 // findInSearchPath returns the absolute path of the first name that exists,
 // scanning directory by directory so an earlier directory always wins over a
 // later one — viper's own order.
@@ -122,12 +150,19 @@ func findInSearchPath(dirs, names []string) string {
 // attribute a value in the merged view to the exact file it came from without
 // the two views disagreeing about what the key is called.
 //
-// The json layer uses newJSONViper (JSONC), matching JsonConfig.Load. Other
-// layers use plain viper.New().
+// The json layer uses the JSONC codec registry, matching JsonConfig.Load, and
+// the vault layer uses the same credential resolution as VaultConfig.Load
+// (VAULT_TOKEN, else VAULT_PASSWORD) — with no credential the read fails,
+// which is the same outcome the loader chain produces (no values from that
+// file). Other layers use plain viper.New().
 func LoadFile(path, layer string) (*viper.Viper, error) {
 	v := viper.New()
-	if layer == "json" {
+	switch layer {
+	case "json":
 		v = viper.NewWithOptions(viper.WithCodecRegistry(codecRegistry))
+	case "vault":
+		vc, _ := NewVaultConfig().(VaultConfig)
+		v = viper.NewWithOptions(viper.WithCodecRegistry(vc.registry()))
 	}
 	v.SetConfigFile(path)
 	if t, ok := configTypes[layer]; ok {

@@ -105,7 +105,10 @@ func Default(opts ...ConfigOption) {
 // loadAllConfigs 載入所有設定格式並合併至全域 viper。
 // 合併順序決定跨格式優先權（後者覆蓋前者）：
 //
-//	.env < config.yaml < settings.json （YAML 最低、ENV 最高）
+//	config.yaml < settings.json < .env.vault < .env （YAML 最低、ENV 最高）
+//
+// .env.vault 排在 .env 之下：vault 是`可提交`的檔案，代表整個團隊共用的值，
+// 而 .env 是開發者自己機器上的覆寫。已提交的設定不應該蓋掉未提交的本機設定。
 //
 // 供 Default() 首次載入與 watcher reload 共用。
 func loadAllConfigs() error {
@@ -113,8 +116,10 @@ func loadAllConfigs() error {
 	viper.MergeConfigMap(v1.AllSettings())
 	v2 := NewJsonConfig().Load()
 	viper.MergeConfigMap(v2.AllSettings())
-	v3 := NewEnvConfig().Load()
+	v3 := NewVaultConfig().Load()
 	viper.MergeConfigMap(v3.AllSettings())
+	v4 := NewEnvConfig().Load()
+	viper.MergeConfigMap(v4.AllSettings())
 	return nil
 }
 

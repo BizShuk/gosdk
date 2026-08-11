@@ -46,7 +46,7 @@ flat and nested keys can be overridden from the environment: the config package
 binds every key to UPPER(key) with "." replaced by "_", unprefixed, so a.b.c
 reads A_B_C and log_level reads LOG_LEVEL.
 
---update, --add and --delete write to one of the six supported config files.
+--update, --add and --delete write to one of the six writable config files.
 By default the target is ` + config.LOCAL_SETTINGS_FILE + ` — the last file the
 JSON loader merges, so a value written there overrides every JSON and YAML file
 but neither .env nor an environment variable. Pass --file to choose a different
@@ -55,10 +55,14 @@ target from the list the config package actually loads.
 Precedence, lowest to highest:
 
     config.yaml < config.local.yaml < settings.json < settings.local.json
-              < .env < .env.local
+              < .env.vault < .env.local.vault < .env < .env.local
 
 A write to a lower-precedence file is shadowed by every file above it, and the
 report will warn when that happens at runtime.
+
+The vault files are shown and shadow other layers, but cannot be written here:
+changing an encrypted value needs the master password. Use the vault command
+(cmd.VaultCmd) for that.
 
 The target file lives in the app config directory (~/.config/<appName>/) when
 the host application set an app name via config.WithAppName. Pass --local to

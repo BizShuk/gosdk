@@ -20,6 +20,10 @@ const LOCAL_SETTINGS_FILE = "settings.local.json"
 // (ConfigCmd, ConfigDefaultCmd) accept. It mirrors the files the config
 // loaders actually read, so neither command can write a file config.Default()
 // would never open.
+//
+// The vault files are deliberately absent: writing one means encrypting it,
+// which needs a master password this command family never asks for. Use the
+// vault command (cmd.VaultCmd) to change an encrypted value.
 var defaultConfigFiles = []string{
 	".env", ".env.local",
 	"config.yaml", "config.local.yaml",
@@ -33,11 +37,16 @@ var defaultConfigFiles = []string{
 //
 // Keep this in sync with config/config.go:loadAllConfigs and the per-loader
 // MergeInConfig calls — any new file added there needs a slot here.
+// The vault files are listed even though nothing here can write them: they
+// shadow the JSON and YAML layers just the same, and a shadow warning that
+// omitted them would understate what overrides a write.
 var configFilePrecedence = []string{
 	"config.yaml",
 	"config.local.yaml",
 	"settings.json",
 	"settings.local.json",
+	".env.vault",
+	".env.local.vault",
 	".env",
 	".env.local",
 }

@@ -81,7 +81,7 @@ func TestSearchPaths_AppendsAppDirLast(t *testing.T) {
 }
 
 // The order Sources reports is the order values override each other, so it has
-// to match loadAllConfigs: yaml, then json, then env.
+// to match loadAllConfigs: yaml, then json, then vault, then env.
 func TestSources_ListedInMergeOrder(t *testing.T) {
 	sourceFixture(t, "")
 
@@ -92,6 +92,7 @@ func TestSources_ListedInMergeOrder(t *testing.T) {
 	want := []string{
 		"config.yaml", "config.local.yaml",
 		"settings.json", "settings.local.json",
+		".env.vault", ".env.local.vault",
 		".env", ".env.local",
 	}
 	if !slices.Equal(names, want) {

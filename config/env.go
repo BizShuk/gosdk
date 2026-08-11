@@ -3,7 +3,6 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"os"
 	"sort"
 	"strings"
@@ -17,30 +16,15 @@ func NewEnvConfig() Config {
 
 type EnvConfig struct{}
 
-// Load reads .env and merges .env.local
+// Load reads .env and merges .env.local.
+//
+// Both files are resolved by exact name rather than handed to viper as a
+// config name: viper would treat ".env" as a stem and match any supported
+// extension, which since the vault format was registered includes the
+// encrypted ".env.vault" sitting in the same directory.
 func (c EnvConfig) Load() *viper.Viper {
 	v := viper.New()
-	v.AddConfigPath(".")
-	v.AddConfigPath("conf")
-	v.AddConfigPath(GetAppConfigDir())
-
-	// Step 1: Load base .env
-	v.SetConfigName(".env")
-	v.SetConfigType("dotenv")
-	if err := v.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			slog.Debug("Fatal error reading .env", "err", err)
-		}
-	}
-
-	// Step 2: Merge .env.local (local overrides)
-	v.SetConfigName(".env.local")
-	if err := v.MergeInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			slog.Debug("Fatal error reading .env.local", "err", err)
-		}
-	}
-
+	mergeNamedFiles(v, "dotenv", ".env", ".env.local")
 	return v
 }
 

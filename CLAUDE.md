@@ -14,6 +14,16 @@ gosdk/
 │   ├── config_test.go
 │   ├── config/              # ConfigCmd 的邏輯層（不含 cobra）：Show/Apply/Default + Render*
 │   │                        # show.go 依 sdkconfig.Sources() 逐檔合併，每個 key 帶實際來源路徑
+│   ├── vault.go             # VaultCmd：命令樹、憑證取得（VAULT_TOKEN > VAULT_PASSWORD > prompt）
+│   ├── vaultEncrypt.go      # .env -> .env.vault（保留明文檔，刪不刪由呼叫端決定）
+│   ├── vaultDecrypt.go      # .env.vault -> .env（0600），decryptAll 共用helper
+│   ├── vaultShow.go         # 解密後印出，不落地
+│   ├── vaultGet.go          # 只印單一變數的值（供 $(...) 取用）
+│   ├── vaultList.go         # 列出變數名稱（免密碼）
+│   ├── vaultSet.go          # 新增/更新單一變數並寫回
+│   ├── vaultToken.go        # 發出限時 token（--ttl，預設 8h；token 印 stdout、到期印 stderr）
+│   ├── vaultRevoke.go       # 輪換裝置金鑰，一次作廢所有既發 token
+│   ├── vault_test.go        # CLI 接線：預設檔名、輸出去向、免密碼 list、錯密碼失敗
 │   ├── major.go             # MajorCmd：VERSION 主版號 +1
 │   ├── minor.go             # MinorCmd：VERSION 次版號 +1
 │   ├── patch.go             # PatchCmd：VERSION 修訂號 +1
@@ -37,14 +47,29 @@ gosdk/
 │   │                        # WithConfigDir 覆寫（含 ~ 展開、data/logs 跟隨、Default 清除）
 │   ├── option.go            # ConfigOption：WithAppName / WithConfigDir / WithDefaultValue
 │   ├── option_test.go       # option 測試
-│   ├── sources.go           # SearchPaths() / Sources()（6 個設定檔依 merge 順序解析出實際路徑）
+│   ├── sources.go           # SearchPaths() / Sources()（8 個設定檔依 merge 順序解析出實際路徑）
 │   │                        # LoadFile(path, layer)：單檔載入，key 正規化與 loader 一致
+│   │                        # mergeNamedFiles()：以「確切檔名」解析並合併，不交給 viper 猜副檔名
 │   ├── sources_test.go      # 搜尋順序、base/.local 各自解析、.yml 別名、forced dir、dotenv 解析
 │   ├── env.go               # .env dotenv 載入器（雙檔案模式）
 │   ├── env_test.go          # env 載入器測試
 │   ├── yaml.go              # YAML 設定載入器（雙檔案模式）
 │   ├── yaml_test.go         # yaml 載入器測試
 │   ├── json.go              # JSON 設定載入器（雙檔案模式；讀取經 encode.JSONCCodec）
+│   ├── vault.go             # 加密設定載入器（.env.vault + .env.local.vault，經 vault.Codec）
+│   │                        # VAULT_FORMAT / VAULT_PASSWORD_ENV / VAULT_TOKEN_ENV、registerVaultExt()
+│   ├── vault_test.go        # 雙檔載入、缺/錯密碼、不吃明文 .env、跨格式優先權
+│   ├── vault/               # sub-package：祕密保險庫本體（scrypt + AES-256-GCM，KEK/DEK 兩層）
+│   │   ├── vault.go         # Vault 型別：New/Open/OpenFile、Set/Get/Delete、Marshal/SaveFile
+│   │   │                    # KeysOfFile（免密碼列名）、ParseEnv/MarshalEnv；套件註解含檔案格式與安全設計
+│   │   ├── memory.go        # 記憶體衛生：Wipe / GetBytes / Close，含 Go 能與不能保證什麼的說明
+│   │   ├── token.go         # 限時 token：裝置金鑰（Load/Ensure/RotateDeviceKey）、IssueToken
+│   │   │                    # OpenWithToken / TokenExpiry；含威脅模型與三條升級路徑
+│   │   ├── codec.go         # Codec{Password,Token,DeviceKey}：整份 vault ⇄ flat map，對齊 viper.Codec
+│   │   ├── vault_test.go
+│   │   ├── memory_test.go
+│   │   ├── token_test.go
+│   │   └── codec_test.go
 │   ├── embedFS.go           # embed.FS 設定載入器
 │   └── sample/              # config 套件使用範例 (含 conf/ 設定檔及 SQLite 範例)
 ├── db/                      # 資料庫連線服務模組(per-storage singleton + flat viper keys)
@@ -215,6 +240,8 @@ gosdk/
     - `slack-go/slack` v0.23.1 — Slack 通知
     - `golang.org/x/tools` v0.44.0 — Go AST 解析（stringer）
     - `golang.org/x/text` v0.37.0 — CJK 編碼轉換
+    - `golang.org/x/crypto` v0.51.0 — scrypt 金鑰衍生（config/vault）
+    - `golang.org/x/term` v0.45.0 — 終端機密碼輸入不回顯（cmd.VaultCmd）
     - `tavsec/gin-healthcheck` v1.2.2 — Health check 端點
     - `hairyhenderson/gomplate` v4.3.3 — 模板渲染函式
 
@@ -223,8 +250,15 @@ gosdk/
 - 使用 Viper 全域單例管理設定：所有設定來源（.env、YAML、JSON、環境變數）合併至單一 `viper` 實例，簡化跨模組存取，但犧牲了可測試性
 - 雙檔案載入模式：各設定格式固定載入 base 檔案 + `.local` 覆寫檔（`.env` + `.env.local`、`config.yaml` + `config.local.yaml`、`settings.json` + `settings.local.json`），不再依賴 `PROFILE` 環境變數切換
 - JSON 讀取接受 JSONC：codec 在 `encode/jsonc.go`（`encode.JSONCCodec`），僅 `JsonConfig` / `LoadFile(json)` / `ParseJSON` 使用；yaml/env/embed 仍 `viper.New()`。檔名維持 `.json`；寫回 strict JSON
-- 跨格式設定優先權（4 層）：`OS env` > `.env` > `settings.json` > `config.yaml`（高者覆蓋低者）。`config.Default()` 內 `loadAllConfigs()` 依序 merge `yaml → json → env`（後者覆蓋前者），最後呼叫 `viper.AutomaticEnv()` + `bindAllEnvVars()` 啟用 OS env 動態查詢。`bindAllEnvVars()` 透過 reflection 走完 `viper.AllSettings()` 並對每個 leaf 呼叫 `viper.BindEnv(key, UPPER(key))`，確保 flat key 與 nested key（如 `server.port` $\rightarrow$ `SERVER_PORT`）都能直接被對應名稱的 OS env 覆寫（驗證見 [config_test.go:TestDefault_EnvVarOverridesAllFiles](file:///Users/shuk/projects/platform/gosdk/config/config_test.go) + `TestDefault_NestedKeyEnvOverride`）。
+- 跨格式設定優先權（5 層）：`OS env` > `.env` > `.env.vault` > `settings.json` > `config.yaml`（高者覆蓋低者）。`config.Default()` 內 `loadAllConfigs()` 依序 merge `yaml → json → vault → env`（後者覆蓋前者），最後呼叫 `viper.AutomaticEnv()` + `bindAllEnvVars()` 啟用 OS env 動態查詢。`bindAllEnvVars()` 透過 reflection 走完 `viper.AllSettings()` 並對每個 leaf 呼叫 `viper.BindEnv(key, UPPER(key))`，確保 flat key 與 nested key（如 `server.port` $\rightarrow$ `SERVER_PORT`）都能直接被對應名稱的 OS env 覆寫（驗證見 [config_test.go:TestDefault_EnvVarOverridesAllFiles](file:///Users/shuk/projects/platform/gosdk/config/config_test.go) + `TestDefault_NestedKeyEnvOverride`）。
 - 設定來源可追溯（provenance）：`config.Sources()` 依 merge 順序（低到高）列出 6 個設定檔並解析出實際絕對路徑，`config.LoadFile(path, layer)` 單檔載入且 key 正規化與 loader 一致。目錄搜尋順序為 `.` → `./conf` → app config dir，且`同一檔名只有第一個命中的目錄生效`（fallback chain，非跨目錄 merge）；base 與 `.local` 各自獨立解析，可分別落在不同目錄。`cmd/config.Show()` 建在這兩者之上，因此 CLI 顯示的來源與 runtime 實際載入不會分歧；`app config --files` 直接列出搜尋結果與缺檔
+- 加密設定是`一種 viper 格式`而非一支解密工具：`config/vault` 這個 sub-package 只做加解密與檔案格式，`Codec` 實作 `Decode/Encode`（方法組合對齊 `viper.Codec`，本身不 import viper），上一層的 `config/vault.go` 把它註冊成 `vault` 格式並載入 `.env.vault` + `.env.local.vault`。切法與 `cmd/config.go` + `cmd/config/` 相同：外層是接線，內層是本體。因此祕密不需要先解密成 `.env` 落地，直接是 `viper.GetString()` 的一個來源。三個相關決定：(1) 憑證`只`從 OS 環境變數讀（`VAULT_TOKEN` 優先於 `VAULT_PASSWORD`），不從 viper 讀——viper 裡的東西不是明文檔案就是環境變數，從它取鑰匙等於把鑰匙放進要保護的箱子；(2) codec registry `per-load` 建立而非行程共用，因為 registry 會持有密碼，共用等於讓密碼活到行程結束，也讓「兩個不同密碼的 vault」無法表達；(3) 缺密碼時整層跳過且不報錯，沒在用保險庫的應用程式不需要為此設定任何東西
+- `兩層金鑰（KEK/DEK）`：主密碼經 scrypt 衍生的 KEK `不`直接加密資料，只用來包裹一把隨機 DEK，真正加密每個值的是 DEK。多這一層換到兩件事：(1) 限時 token 可以是 DEK 的`另一個包裹`，不必碰主密碼；(2) 被包裹的 DEK 本身就是密碼驗證器，因此 v1 的 `verifier` 欄位直接刪除。檔案格式為 `ENV-VAULT-2`，`不`保留 v1 讀取路徑，也因此`不再與 Python 版 vault.py 互通`
+- `限時 token 的能力邊界`：純時間戳（TOTP 那類）在密碼學上無法解密資料——能解密就代表 token 帶著金鑰，而金鑰若能由時間推導則人人可推。實作採「金鑰包裹 + 時間視窗金鑰」：`tokenKey = HKDF(deviceKey, info=TOKEN_INFO|exp)`，`token = base64url(exp ‖ nonce ‖ AES-GCM(tokenKey, DEK, AAD=exp))`。exp 同時進 info 與 AAD，改長到期時間就解不開（已驗證）。`威脅模型`：單機無硬體支援時過期是`軟性防護`——同時拿到 token 與 deviceKey 者可繞過檢查，它防的是 token 單獨外洩後被長期利用。升級路徑：`vault revoke` 輪換裝置金鑰（已實作）、TPM/Keychain/KMS 託管 DEK、ssh-agent 式常駐程序（後兩者需本層以外的元件）
+- `token 不能生 token`：`vault token` 只接受主密碼，不吃 `VAULT_TOKEN`。否則持有者可無限延長期限，過期形同虛設
+- `記憶體衛生做到「可清除範圍最大化」而非「絕對清除」`：密碼全程 `[]byte`（`term.ReadPassword` 本來就回 bytes），衍生完 KEK 立刻 `Wipe`；`GetBytes` 讓只取一兩個值的呼叫端拿到可清除的位元組；`Close` 清 DEK 並釋放 aead。三個限制寫在 `memory.go`：string 不可變、GC 會留副本、AES round key 已展開。`刻意不引入` mlock/memguard——明文終究會進 viper 與環境變數，那層複雜度買到的有限
+- 自訂 viper 格式必須同時登記副檔名：viper 在查 codec registry 之前會先比對 package-level `viper.SupportedExts`，只註冊 codec 會得到 `Unsupported Config Type`。`registerVaultExt()` 是冪等的，且在`每次` load 時重跑而不只在 `init()`——`viper.Reset()` 會把該清單還原成內建值，一個因為無關的 Reset 就安靜失效的格式極難追查
+- 設定檔一律以`確切檔名`解析（`mergeNamedFiles`）：交給 viper 的 `SetConfigName` 會把名稱當成字根去比對所有支援的副檔名，因此 `.vault` 一登記，原本讀 `.env` 的 dotenv loader 就會改抓同目錄的 `.env.vault` 並解析失敗（實際踩到，非假設）。loader 定址的是`檔案`不是名稱字根
 - 扁平 viper key 直讀：`config.Default()` 載入設定後透過 `viper.Get*()` 取值；不再維護強型別 `ConfigSchema` / `ServerConfig` / `DBConfig` 等聚合結構（2026-06 重構後 `config/common` 已廢除）
 - 儲存型態採 per-service singleton：每種儲存是一個獨立 service（`db.SQLite` / `db.MySQL` / `db.Postgres`），各自有 `DefaultSQLite` / `DefaultMySQL` / `DefaultPostgres` 全域 singleton 與扁平 viper key（`SQLITE_PATH` / `MYSQL_DSN` / `POSTGRES_DSN`），守護函式 `InitSQLite()` / `InitMySQL()` / `InitPostgres()` 拒絕重複初始化以落實「micro-service: 同型態不可有兩個 instance」；MySQL 與 PostgreSQL 採單一 DSN 字串欄位而非拆 `HOST`/`PORT`/`USER`/`PASSWORD`，簡化設定並與舊 `url` 對齊(PostgreSQL 接受 URL 形式 `postgres://...` 或 keyword/value 形式 `host=... user=...`)
 - `stringer` 以 `GeneratorEx` 組合模式擴充標準庫 `stringer`：嵌入 `service.Generator`，額外產生 `List()`、`ValueList()`、`Map()`、`ValueMap()` 四個輔助函式
@@ -260,6 +294,9 @@ gosdk/
 | 業務領域 (Domain)     | 套件/模組 (Package/Module)                              | 進入點 (Entry Point)                                                                                                      |
 | --------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | 設定管理              | `config/`                                               | `config.Default()`                                                                                                        |
+| 加密設定 / 祕密保險庫 | `config/vault/`, `config/vault.go`                      | `config.NewVaultConfig()`, `vault.Codec`, `vault.OpenFile()`                                                              |
+| 限時解密憑證          | `config/vault/token.go`                                 | `vault.IssueToken()` / `vault.OpenWithToken()` / `cmd.VaultTokenCmd`                                                      |
+| 保險庫 CLI            | `cmd/` (`vault*.go`)                                    | `cmd.VaultCmd`                                                                                                            |
 | 資料庫連線            | `db/`                                                   | `db.InitSQLite()` / `db.InitMySQL()` / `db.InitPostgres()`                                                                |
 | HTTP 服務             | `router/`, `mw/`, `main.go`                             | `HTTPServer()`                                                                                                            |
 | 程式碼產生 — stringer | `cmd/sample/stringer/`, `service/generator.go`          | `go test ./cmd/sample/stringer -run TestRunGeneratesStringerCode`                                                         |
