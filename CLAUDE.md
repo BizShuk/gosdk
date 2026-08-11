@@ -215,7 +215,7 @@ gosdk/
 ├── plans/                   # 開發計畫文件
 ├── skills/                  # Agent skills（11 個：golang-dev、golang-gosdk、golang-mvc、golang-code-quality、golang-dead-code、golang-naming、golang-network、golang-performance-tuning、golang-gosdk-migrate、golang-runtime-profiling、golang-tui）
 ├── agents/                  # Agent 定義（golang-refactor.md）
-├── docs/                    # 其他文件（superpowers）
+├── docs/                    # CHANGELOG.md、terminology.md、specs/、memory/、backlog/、tutorials/
 ├── AGENTS.md                # Agent 入口說明
 ├── SPEC.md                  # 規格文件
 ├── .github/

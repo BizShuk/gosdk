@@ -442,6 +442,27 @@ claude --plugin-url https://github.com/bizshuk/gosdk
 Based on codebase analysis:
 
 - [ ] 排程器與通知器整合範例：`scheduler` 與 `notify` 兩個套件設計上可以搭配使用（週期任務完成後推送通知），但目前缺少官方範例或整合測試，建議在 `sample/` 目錄補充完整使用範例
-- [ ] `versioning` CLI 缺少 reset 與 set 子命令：目前只能遞增版本號，若需要直接設定特定版本（如 release hotfix 時跳號）無法支援，建議新增 `set <version>` 子命令
+- [ ] 版本子命令缺少 reset 與 set：`cmd.MajorCmd` / `cmd.MinorCmd` / `cmd.PatchCmd` 目前只能遞增版本號，若需要直接設定特定版本（如 release hotfix 時跳號）無法支援，建議新增 `set <version>` 子命令
 - [ ] `notify.SlackNotifier` 缺少重試機制：Slack API 呼叫若因網路問題失敗，目前直接回傳 error，建議加入指數退避重試或將重試邏輯委托給呼叫方約定
 - [ ] `db` 套件目前支援 SQLite、MySQL、PostgreSQL,若需要 Redis 等 key-value 儲存或 MongoDB 等文件資料庫,因 GORM 慣例不適用,需另開套件(`cache/` / `document/`)並定義新 service 介面
+
+---
+
+## 歷史側記 (Deprecation Notes)
+
+下列 API 與目錄曾出現在既有設計文件中，`目前已不存在於本 repo`。
+歷史脈絡見 [docs/specs/2026-08-12-Summary.md](docs/specs/2026-08-12-Summary.md)、
+[plans/2026-08-12-Refresh.md](plans/2026-08-12-Refresh.md) 與 [docs/CHANGELOG.md](docs/CHANGELOG.md)。
+
+| 已淘汰 (Deprecated) | 現行替代 (Replacement) |
+| --- | --- |
+| `config/common` 套件、`config.ConfigSchema` / `ServerConfig` / `DBConnConfig` | `db/` 套件與扁平 viper key（`SQLITE_PATH` / `MYSQL_DSN` / `POSTGRES_DSN`） |
+| `config.GetProfile()`、`config.GlobalConfig`、`PROFILE` 環境變數 | base + `.local` 雙檔載入（`.env` / `.env.local` 等） |
+| `config.WithConfigPath(path)` | `config.WithConfigDir(dir)` |
+| `config.DefaultWithDir(dir)` | `config.Default(config.WithConfigDir(dir))` |
+| `cmd/versioning` 獨立 CLI、小寫 `version` 檔 | `cmd.MajorCmd` / `cmd.MinorCmd` / `cmd.PatchCmd`，操作 `VERSION` 檔 |
+| `encode/io/` 子目錄（`decode.go` / `gbk.go` / `big5.go`） | 已併入 `encode/` 根目錄，套件名統一為 `encode` |
+| `service/generator.go` | `service/stringer/generator.go`（`package stringer`） |
+| `utils.ProcessCSVFile` / `utils.RecordProcessor` | `encode/csv` 的 `ProcessCSVFile` / `RecordProcessor` |
+| `go.uber.org/zap`、`log.Info` / `log.Infof` / `log.Fatalf` wrapper | 標準 `log/slog` 套件層級函式，`log.Init()` 只負責初始化 |
+| `metric.MimirService` / `metric.NewMimirService()` | `metric.NewMetricService()`（`MIMIR_URL` 相容層仍保留但標記 Deprecated） |
