@@ -4,6 +4,8 @@
 
 ## Config
 
+- [ ] 讓 vault token 的過期具備`強制力`：現行 `config/vault/token.go` 的到期檢查由本程序執行，同時取得 token 與 `~/.config/gosdk/vault-device.key` 者可繞過（威脅模型已寫在該檔註解）。兩條路擇一：(a) `agent 模式`——常駐程序持有 DEK 並設 TTL，CLI 透過 unix socket 請求解密，到期即從記憶體清除，過期因此是真的；(b) `外部託管`——DEK 交給 macOS Keychain / TPM / 雲端 KMS，由外部元件判斷有效期。目前已實作的 `vault revoke`（輪換裝置金鑰）只能一次作廢`全部` token，不是 per-token 的到期。
+
 ## Log
 
 ## DB
