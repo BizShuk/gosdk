@@ -26,8 +26,11 @@ Always use `github.com/spf13/cobra`. Structure:
 ```tree
 cmd/
   root.go      # Root command + global flags
-  serve.go     # Subcommand: serve
-  migrate.go   # Subcommand: migrate
+  monitor.go   # Subcommand: monitor (alias m)
+  logs.go      # Subcommand: logs    (alias log)
+  list.go      # Subcommand: list    (alias l)
+  ps.go        # Subcommand: ps      (only if long-lived processes exist)
+  web.go       # Subcommand: web
 main.go        # Only calls cmd.Execute()
 ```
 
@@ -47,13 +50,15 @@ import (
 
 var cfgFile string
 
-var rootCmd = &cobra.Command{
+// RootCmd is exported so subcommand files (and the SDK's ready-made commands)
+// attach to it from their own init().
+var RootCmd = &cobra.Command{
     Use:   "myapp",
     Short: "Short description of myapp",
 }
 
 func Execute() {
-    if err := rootCmd.Execute(); err != nil {
+    if err := RootCmd.Execute(); err != nil {
         fmt.Fprintln(os.Stderr, err)
         os.Exit(1)
     }
@@ -61,7 +66,7 @@ func Execute() {
 
 func init() {
     cobra.OnInitialize(InitConfig)
-    rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default $HOME/.myapp.yaml)")
+    RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default $HOME/.myapp.yaml)")
 }
 
 func InitConfig() {
@@ -92,8 +97,9 @@ import (
     "github.com/spf13/viper"
 )
 
-var serveCmd = &cobra.Command{
-    Use:   "serve",
+// WebCmd — one file per command, file name matches the command name.
+var WebCmd = &cobra.Command{
+    Use:   "web",
     Short: "Start the HTTP server",
     RunE: func(cmd *cobra.Command, args []string) error {
         port := viper.GetInt("port")
@@ -104,9 +110,9 @@ var serveCmd = &cobra.Command{
 }
 
 func init() {
-    rootCmd.AddCommand(serveCmd)
-    serveCmd.Flags().IntP("port", "p", 8080, "server port")
-    viper.BindPFlag("port", serveCmd.Flags().Lookup("port"))
+    RootCmd.AddCommand(WebCmd)
+    WebCmd.Flags().IntP("port", "p", 8080, "server port")
+    viper.BindPFlag("port", WebCmd.Flags().Lookup("port"))
 }
 ```
 
@@ -124,7 +130,7 @@ If `github.com/bizshuk/gosdk` is available, record every CLI invocation by wirin
 import "github.com/bizshuk/gosdk/metric"
 
 func init() {
-    metric.CobraCMDHook(rootCmd)
+    metric.CobraCMDHook(RootCmd)
 }
 ```
 
@@ -138,9 +144,53 @@ command_line_trigger{cmd="myapp sub leaf", flag="env-verbose"} = 1
 - `flag` — flags the user actually set, collected across the whole chain, alphabetically sorted, joined with `-`; empty string when no flag was set.
 - The hook wraps (does not replace) an existing `PersistentPreRunE` on root. If any subcommand defines its own `PersistentPreRunE`, set `cobra.EnableTraverseRunHooks = true` (once, in `init()`), otherwise cobra skips the root hook and no metric is emitted for that subcommand.
 
-### Monitor subcommand
+### Standard subcommand vocabulary
 
-- `monitor` sub command is used to overall monitoring for the command, with `--merge` is one time fetch and merge into pre defined files
+Every CLI built on gosdk uses the `same name for the same job`, so a user who learns one binary already knows the next. Only implement the ones the app actually has — but when the job exists, it gets this name and this alias, never a synonym (`status`, `tail`, `dashboard`, `serve`, `top` are all wrong).
+
+| Command   | Alias | Kind        | Purpose                                                                        |
+| --------- | ----- | ----------- | ------------------------------------------------------------------------------ |
+| `monitor` | `m`   | interactive | TUI for viewing and operating on live state                                    |
+| `logs`    | `log` | streaming   | Recent process log; `--process` switches to recent processes (default last 20) |
+| `list`    | `l`   | snapshot    | One-shot dump of current process status / stats, then exit                     |
+| `ps`      | —     | snapshot    | Live OS process table with PIDs — only when the app owns long-lived processes  |
+| `config`  | —     | snapshot    | Show and modify configuration — register gosdk's `cmd.ConfigCmd`               |
+| `web`     | —     | server      | Start the web server                                                           |
+
+```go
+// cmd/monitor.go
+package cmd
+
+import "github.com/spf13/cobra"
+
+// MonitorCmd is the interactive view; every other command prints once and exits.
+var MonitorCmd = &cobra.Command{
+    Use:     "monitor",
+    Aliases: []string{"m"},
+    Short:   "Interactive TUI for live process state",
+    RunE: func(cmd *cobra.Command, args []string) error {
+        return monitor.Run(cmd.Context())
+    },
+}
+
+func init() {
+    RootCmd.AddCommand(MonitorCmd)
+}
+```
+
+`Key rules:`
+
+- `monitor` is the `only` interactive command. It owns the TUI (alt screen, key handling, refresh loop) and is the only place a command may take over the terminal or accept an operation on a running process. Everything else writes to stdout and exits so it stays pipeable.
+- `logs` vs `list` is `time-series vs state`: `logs` answers "what happened", `list` answers "what is true right now". Never merge them into one command with a flag.
+- `logs --process` changes the `unit` of the listing, not the format: without it you get the merged recent log across processes, with it you get the recent `processes` themselves. Default limit is `20` for both, overridable with `-n/--limit`.
+- `list` must terminate. No watch loop, no follow — that is `monitor`'s job.
+- `ps` exists `only` if the binary spawns or supervises long-lived OS processes that have a real `PID` — a daemon, a worker pool, a pm2-style supervisor. A CLI that just runs and exits must not ship a `ps`. It prints one row per live process, `PID first`, then the columns that let a user act on it: name, state, uptime, and resource use when cheap to obtain. It reports only; killing or restarting belongs to `monitor`.
+- `ps` vs `list` vs `logs --process` — three different objects, so three different commands: `ps` lists `OS processes` (PID-keyed, live now), `list` lists `domain state` (jobs, tasks, entities the app manages), `logs --process` lists `log records grouped by process` (historical, may include processes that already exited). Do not fold `ps` into `list` behind a flag.
+- `ps` has no alias — the name is already two characters, and every alias added here collides with muscle memory from the system `ps`.
+- Tabular output for `ps` and `list` goes through gosdk's `tui.Table` (`Draw(w, hasTotalRow, highlightLastCol)`), which handles Unicode borders, multi-line cells and ANSI-aware column widths. Do not hand-roll padding with `text/tabwriter` — it counts escape sequences as visible width and misaligns any coloured column.
+- `config` is not hand-rolled: `root.AddCommand(cmd.ConfigCmd)` from `github.com/bizshuk/gosdk/cmd` gives the merged view, provenance and `--update/--add/--delete` for free.
+- `web` only serves. Migrations, seeding and one-off jobs are their own commands — a server start must be safe to run repeatedly.
+- Aliases are `single letters for the interactive/snapshot pair` (`m`, `l`) and the natural singular for `logs` (`log`). Do not invent extra aliases; ambiguity across binaries costs more than the keystrokes saved.
 
 ---
 

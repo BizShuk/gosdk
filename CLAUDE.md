@@ -135,6 +135,9 @@ gosdk/
 │   ├── roc_test.go          # ROC 日期解析測試
 │   ├── sleep.go             # 設定驅動的延遲函式
 │   └── sleep_test.go        # ConfigSleep 測試
+├── tui/                     # 終端輸出渲染
+│   ├── table.go             # Table：Unicode 框線表格（ANSI 色彩、多行 cell、逐欄對齊）
+│   └── table_test.go        # Table 渲染測試
 ├── validator/               # 通用驗證框架（IValidator + composite Validator）
 │   ├── validator.go         # IValidator 介面 + 通用 Validator(struct, 短路回傳第一個錯誤，可遞迴嵌套)
 │   ├── validator_test.go    # composite / 遞迴 / defensive copy 等測試
@@ -185,7 +188,7 @@ gosdk/
 ├── .claude-plugin/          # Claude Code plugin manifest
 │   └── plugin.json          # plugin metadata（name=gosdk；version 於 release 時人工對齊 tag）
 ├── plans/                   # 開發計畫文件
-├── skills/                  # Agent skills（9 個：golang-dev、golang-gosdk、golang-mvc、golang-code-quality、golang-dead-code、golang-naming、golang-network、golang-performance-tuning、golang-gosdk-migrate）
+├── skills/                  # Agent skills（11 個：golang-dev、golang-gosdk、golang-mvc、golang-code-quality、golang-dead-code、golang-naming、golang-network、golang-performance-tuning、golang-gosdk-migrate、golang-runtime-profiling、golang-tui）
 ├── agents/                  # Agent 定義（golang-refactor.md）
 ├── docs/                    # 其他文件（superpowers）
 ├── AGENTS.md                # Agent 入口說明

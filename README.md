@@ -2,7 +2,7 @@
 
 Go 語言通用開發工具包 (Shared SDK)，提供設定管理、HTTP 服務骨架、程式碼產生器、版本管理、通用通知、編碼轉換等可重用模組，作為 Go 專案的基礎函式庫使用。
 
-本 repo 同時是 `Claude Code plugin`：除了作為 Go 函式庫被 `import`，也可安裝為 Claude Code plugin 取得 9 個 Go 專用 skills 與 `golang-refactor` agent。安裝方式見最下方 [Claude Code Plugin](#claude-code-plugin-安裝).
+本 repo 同時是 `Claude Code plugin`：除了作為 Go 函式庫被 `import`，也可安裝為 Claude Code plugin 取得 11 個 Go 專用 skills 與 `golang-refactor` agent。安裝方式見最下方 [Claude Code Plugin](#claude-code-plugin-安裝).
 
 ## 業務領域 (Business Domains)
 
@@ -418,7 +418,7 @@ metric.CobraCMDHook(rootCmd)
 
 本 repo 已附 `.claude-plugin/plugin.json`，可直接作為 Claude Code plugin 載入，提供下列元件：
 
-- `Skills (9)`：`golang-dev`、`golang-gosdk`、`golang-mvc`、`golang-code-quality`、`golang-dead-code`、`golang-naming`、`golang-network`、`golang-performance-tuning`、`golang-gosdk-migrate`
+- `Skills (11)`：`golang-dev`、`golang-gosdk`、`golang-mvc`、`golang-code-quality`、`golang-dead-code`、`golang-naming`、`golang-network`、`golang-performance-tuning`、`golang-gosdk-migrate`、`golang-runtime-profiling`、`golang-tui`
 - `Agents (1)`：`golang-refactor`
 
 `安裝方式 (Installation):`
