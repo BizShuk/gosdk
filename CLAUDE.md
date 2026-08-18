@@ -45,6 +45,8 @@ gosdk/
 │   ├── config_test.go       # 基本設定載入測試
 │   ├── appdir_test.go       # XDG_CONFIG_HOME 解析、空 appName 契約、seed 與讀取同目錄
 │   │                        # WithConfigDir 覆寫（含 ~ 展開、data/logs 跟隨、Default 清除）
+│   ├── profile.go           # PROFILE 執行環境判斷：IsProduction()（production / prod，不分大小寫）
+│   ├── profile_test.go      # 正規化、大小寫、未設定預設非正式環境
 │   ├── option.go            # ConfigOption：WithAppName / WithConfigDir / WithDefaultValue
 │   ├── option_test.go       # option 測試
 │   ├── sources.go           # SearchPaths() / Sources()（8 個設定檔依 merge 順序解析出實際路徑）
