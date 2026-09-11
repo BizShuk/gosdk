@@ -14,7 +14,7 @@ tui/
     width.go format.go      # the only place width is measured
 ```
 
-`View()` snapshots `ViewContext` and calls `RenderLayout`. Views never touch Model.
+`View()` snapshots `ViewContext` and calls `RenderLayout`. Views never touch Model. A single-panel monitor (one table, no tree/logs) collapses the tree to `monitor.go` + `view.go`; `theme/` and `views/` earn their keep at two panels or more.
 
 **Budget.** Header/banner/footer = 1 row each; body gets the rest. Optional panels collapse entirely when the remainder would drop below a usable minimum — never squeeze. Every panel is exact `w×h` (`padLines`). Assert `lipgloss.Height(frame) == ctx.Height`. Seed `width: 100, height: 30` before the first `WindowSizeMsg`. Replace bars (search takes the banner row); never stack. `lipgloss.Width/Height` include padding, not border.
 
@@ -40,7 +40,9 @@ Subsequence: every query rune in order, gaps allowed (`aeg` matches `abcdefg`). 
 
 **Logs.** Bounded chan, non-blocking send, drain bursts, **always re-arm** `waitForLogs`. No `fmt`/`slog` on stdout while alt-screen is up — capture `realStdout`, `WithOutput(realStdout)`, point slog at a file. Ring of raw lines (~2000); 1 log line = 1 screen row. `follow = viewport.AtBottom()`.
 
-**Tests.** Views: feed `ViewContext`, assert `screen.StringWidth(line) == w`. Pin crop/pad with CJK, emoji, ANSI. Layout breakpoints: min, each optional panel collapse, large. Controller: `Update` with synthetic msgs.
+**Library stdout.** Your own code is the easy half; audit every dependency that owns a writer. `db.InitSQLite` opens with `&gorm.Config{}`, so GORM's default logger prints slow queries and errors straight to stdout — silence it once at the seam with `gormDB.Session(&gorm.Session{Logger: logger.Discard})`, not at each call site. Errors already travel up the return value; a logger that also owns the screen is a liability. Same audit for any `http.Client` transport logger, cron runner, or watcher you wire in.
+
+**Tests.** Views: feed `ViewContext`, assert `screen.StringWidth(line) == w`. Pin crop/pad with CJK, emoji, ANSI. Layout breakpoints: min, each optional panel collapse, large. Controller: `Update` with synthetic msgs. Snapshot comparisons strip ANSI (`\x1b\[[0-9;]*m`) — do **not** reach for `lipgloss.SetColorProfile`: profile `0` is TrueColor, not Ascii, and pinning it drags `termenv` in as a direct dependency. Trimming a list to fit the height must not shrink the total row: totals sum every record, only the rows on screen are cut.
 
 | Symptom | Fix |
 | ------- | --- |
@@ -49,6 +51,9 @@ Subsequence: every query rune in order, gaps allowed (`aeg` matches `abcdefg`). 
 | Colored cells misalign | never `text/tabwriter` with ANSI |
 | Header walks off | close height budget exactly |
 | Screen shreds | redirect logs; no stdout |
+| Screen shreds, no `fmt` in your code | a dependency owns stdout (GORM default logger) → `logger.Discard` |
 | Log pane freezes | re-arm `waitForLogs` |
 | Cursor jumps every tick | restore selection after snapshot |
 | Wrong details under row | drop replies whose key no longer matches |
+| Fresh timestamp over stale data | timestamp the reply you accepted, not the moment it arrived |
+| Rows vanish on a short terminal | seed `height` before the first `WindowSizeMsg` |
