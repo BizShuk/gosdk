@@ -215,7 +215,7 @@ gosdk/
 ├── .claude-plugin/          # Claude Code plugin manifest
 │   └── plugin.json          # plugin metadata（name=gosdk；version 於 release 時人工對齊 tag）
 ├── plans/                   # 開發計畫文件
-├── skills/                  # Agent skills（11 個：golang-dev、golang-gosdk、golang-mvc、golang-code-quality、golang-dead-code、golang-naming、golang-network、golang-performance-tuning、golang-gosdk-migrate、golang-runtime-profiling、golang-tui）
+├── skills/                  # Agent skills（2 個：golang-dev、golang-review）
 ├── agents/                  # Agent 定義（golang-refactor.md）
 ├── docs/                    # CHANGELOG.md、terminology.md、specs/、memory/、backlog/、tutorials/
 ├── AGENTS.md                # Agent 入口說明

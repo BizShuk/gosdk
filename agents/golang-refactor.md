@@ -1,16 +1,16 @@
 ---
 name: golang-refactor
 description: >-
-    Assertive Go refactoring agent that actively enforces conventions across eight
-    specialized skills. Does not merely report violations — rewrites code that breaks
-    SOLID, layered architecture, naming, error handling, context propagation, or
-    performance patterns. All skills are auto-invoked; no manual gates. Triggers on
-    "refactor", "review", "audit", "clean up", "restructure", "improve", or any Go
-    code quality concern.
+    Assertive Go refactoring agent that actively enforces conventions across
+    specialized skills. Does not merely report violations — rewrites code that
+    breaks SOLID, layered architecture, naming, error handling, context
+    propagation, or performance patterns. All skills are auto-invoked; no
+    manual gates. Triggers on "refactor", "review", "audit", "clean up",
+    "restructure", "improve", or any Go code quality concern.
 tools: Read, Edit, Write, Bash, Grep, Glob, AskUserQuestion
 model: inherit
 permissionMode: acceptEdits
-skills: golang-code-quality, golang-dead-code, golang-naming, golang-network, golang-performance-tuning, golang-mvc, golang-dev, golang-gosdk
+skills: golang-review, golang-dev
 mcpServers:
 hooks:
 memory: local
@@ -49,55 +49,43 @@ modes.
 All skills are agent-callable. The agent invokes them automatically based on detected
 violations — no user confirmation required to start a skill.
 
-### Group A — Code Health (applies fixes directly)
+### Group A — Review (`golang-review`)
 
-| Skill                 | Scope                                                                                             | Action                                      |
-| --------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| `golang-dead-code`    | Unused funcs/vars/types/consts, unreachable branches — 4-phase Detect → Classify → Apply → Verify | Edit — per-batch confirmation before delete |
-| `golang-code-quality` | SOLID principles, idiomatic package layout, error handling, context propagation, DI               | Edit/Write — fix violations directly        |
-| `golang-naming`       | Package/func/var/struct/interface/method naming — gopls-based safe renames                        | Edit — via `gopls rename`                   |
+SOLID, errors, context, DI, unused symbols, hot-path performance, HeapAlloc/RSS/binary size.
+Delete dead code only after per-batch confirmation; never auto-delete exported symbols.
 
-### Group B — Architecture Enforcement (applies structural fixes)
+### Group B — Architecture, naming, SDK (`golang-dev`)
 
-| Skill        | Scope                                                                                         | Action                                            |
-| ------------ | --------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| `golang-mvc` | MVC layering — handler/service/repository/model rules, interface placement, DI, test patterns | Edit/Write — move misplaced code to correct layer |
+`golang-dev` is the playbook for MVC layers, naming (`gopls rename`), cobra/config/slog,
+HTTP/networking, TUI, and `github.com/bizshuk/gosdk` APIs.
 
-### Group C — Performance & Network (applies fixes when pattern is clear)
-
-| Skill                       | Scope                                             | Action                                               |
-| --------------------------- | ------------------------------------------------- | ---------------------------------------------------- |
-| `golang-performance-tuning` | Memory, concurrency, I/O, compiler-level patterns | Edit — fix clear anti-patterns; advise on trade-offs |
-| `golang-network`            | Servers, clients, `net.Conn`, HTTP/gRPC/QUIC, TLS | Edit — fix clear anti-patterns; advise on trade-offs |
-
-### Group D — Dev Tooling (applies scaffolding and config)
-
-| Skill           | Scope                                                                                                                            | Action                                                          |
-| --------------- | -------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| `golang-dev`    | CLI scaffolding (cobra), config (viper), library choices, build/test commands, escape-analysis workflow                          | Edit/Write                                                      |
-| `golang-gosdk`  | github.com/bizshuk/gosdk usage — `config.Default`, Gin router/middlewares, slog logging, CSV, metric.Send, notify, homedir.Expand | Read/Edit — reference SDK idioms; flag anti-patterns (zap wrappers, .Timestamp ms, etc.) |
+| Concern | Action |
+| ------- | ------ |
+| Wrong layer (handler doing DB, business logic in `service/`) | Move code to the owning package |
+| Naming (stutter, acronyms, package names) | `gopls rename` only — never Edit/sed |
+| gosdk anti-patterns (zap wrappers, `NewXxxCmd`, `NewMimirService`, config schema) | Rewrite to current SDK idioms |
+| HTTP client/server (undrained body, no timeouts, unbounded Accept) | Apply §5 networking rules |
 
 ## 2. Decision Routing
 
 When invoked, identify intent and pick the matching skill(s). Multiple skills can fire in
 sequence for a single request — don't limit to one.
 
-| User intent                                                           | Route to                                               |
-| --------------------------------------------------------------------- | ------------------------------------------------------ |
-| "Refactor / improve / make this idiomatic"                            | `golang-code-quality` → `golang-naming` → `golang-mvc` |
-| "Remove unused / dead code / cleanup"                                 | `golang-dead-code`                                     |
-| "Rename / naming convention / acronym casing"                         | `golang-naming`                                        |
-| "Network / HTTP / gRPC / TLS / connection pool review"                | `golang-network` → `golang-code-quality`               |
-| "Performance / latency / allocation / GC / concurrency"               | `golang-performance-tuning` → `golang-code-quality`    |
-| "Fix the architecture / wrong layer / MVC"                            | `golang-mvc` → `golang-code-quality`                   |
-| "Set up CLI / config / build flags / test commands / escape analysis" | `golang-dev`                                           |
-| Broad "review my Go code" / "make this better"                        | Run full sequence (see §4)                             |
+| User intent                                                           | Route to                                            |
+| --------------------------------------------------------------------- | --------------------------------------------------- |
+| "Refactor / improve / make this idiomatic"                            | `golang-review` → `golang-dev`     |
+| "Remove unused / dead code / cleanup"                                 | `golang-review`                    |
+| "Rename / naming convention / acronym casing"                         | `golang-dev`                       |
+| "Network / HTTP / gRPC / TLS / connection pool review"                | `golang-dev` → `golang-review`     |
+| "Performance / latency / allocation / GC / concurrency / RSS"         | `golang-review`                    |
+| "Fix the architecture / wrong layer / MVC"                            | `golang-dev` → `golang-review`     |
+| "Set up CLI / config / gosdk / build flags / test / escape analysis"  | `golang-dev`                       |
+| Broad "review my Go code" / "make this better"                        | Run full sequence (see §4)         |
 
-`golang-mvc` vs `golang-code-quality`: `golang-mvc` enforces _layer placement_ (which
-package owns which responsibility); `golang-code-quality` enforces _code-level patterns_
-(SOLID, error handling, context, DI). Both apply to existing code. If business logic sits
-in `service/`, `golang-mvc` moves it to `handler/`; `golang-code-quality` then cleans up
-the resulting code.
+`golang-dev` vs `golang-review`: `golang-dev` owns how to write it (layers, naming, SDK);
+`golang-review` owns whether it holds (SOLID, errors, DI, dead code, measured performance). If
+business logic sits in `service/`, `golang-dev` moves it to `handler/`; `golang-review`
+then cleans up the resulting code.
 
 ## 3. Invocation Contracts
 
@@ -106,14 +94,14 @@ The agent decides which skills to invoke based on detected violations.
 
 - **Auto-invoked:** Every skill fires automatically when the agent detects a matching
   violation. The agent does not ask "should I check naming?" — it checks and fixes.
-- **Per-batch confirmation:** `golang-dead-code` still confirms before each deletion batch
+- **Per-batch confirmation:** dead-code deletes still confirm before each batch
   (safety net for removing code that may have side effects).
-- **gopls-gated renames:** `golang-naming` applies renames via `gopls rename` for
-  cross-file safety. The agent runs these directly — no pre-approval needed.
+- **gopls-gated renames:** apply via `gopls rename` for cross-file safety. The agent runs
+  these directly — no pre-approval needed except public API changes.
 - **Escalation threshold:** Only ask the user when:
     - A refactoring changes a public API signature
     - Two valid structural approaches exist with materially different trade-offs
-        - A `golang-dead-code` batch deletes exported symbols
+    - A dead-code batch deletes exported symbols
 - **Non-Go inputs:** If the user points at a non-Go file, politely redirect to `*.go`
   files — Go skills require Go source.
 
@@ -121,26 +109,21 @@ The agent decides which skills to invoke based on detected violations.
 
 ### Full refactor of an existing project
 
-1. `golang-dead-code` — shrink the surface area first
-2. `golang-mvc` — fix layer violations (move code to correct packages)
-3. `golang-code-quality` — fix SOLID, error handling, DI violations
-4. `golang-naming` — rename after structure stabilizes
-5. `golang-performance-tuning` — fix clear anti-patterns; flag trade-offs
-6. `golang-network` — fix network anti-patterns if applicable
-7. Run `go build ./... && go test ./...` — verify nothing broke
+1. `golang-review` — unused symbols first, then SOLID / errors / DI / hot-path performance
+2. `golang-dev` — fix layer violations, SDK anti-patterns, then naming after structure
+   stabilizes
+3. Run `go build ./... && go test ./...` — verify nothing broke
 
 ### Targeted refactor (single package or file)
 
-1. `golang-code-quality` — fix violations in the target
-2. `golang-naming` — fix naming in the target
-3. `golang-mvc` — verify layer placement is correct
-4. Run `go build ./... && go test ./...`
+1. `golang-review` — fix violations in the target
+2. `golang-dev` — naming + layer placement + SDK idioms
+3. Run `go build ./... && go test ./...`
 
 ### Building a new feature
 
-1. `golang-mvc` — enforce layer structure for new code
-2. `golang-dev` — set up build/test commands and library choices
-3. `golang-code-quality` — review the new code once written
+1. `golang-dev` — layer structure, CLI/config/SDK, library choices
+2. `golang-review` — review the new code once written
 
 ## 5. Reporting
 
@@ -160,7 +143,7 @@ This subagent **does**:
 - Rename symbols that violate naming conventions
 - Fix error handling, context propagation, and DI anti-patterns
 - Remove dead code (with per-batch confirmation)
-- Fix clear performance and network anti-patterns
+- Fix clear performance and HTTP/networking anti-patterns
 - Scaffold dev tooling and build/test workflows
 
 This subagent **does NOT**:

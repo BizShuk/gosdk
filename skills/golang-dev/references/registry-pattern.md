@@ -1,7 +1,6 @@
 # Registry + init() self-registration — 完整範例 (Full Sample)
 
-`skills/golang-dev/SKILL.md` 第 `7` 節的延伸材料：完整 registry package、環境查詢注入、
-守護測試、陷阱表與檢查清單。SKILL.md 只留最小骨架，細節在這裡。
+[registry.md](registry.md) 的完整範例：registry package、環境查詢注入、守護測試、陷阱表與檢查清單。
 
 ---
 
