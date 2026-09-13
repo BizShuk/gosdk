@@ -1,30 +1,20 @@
 # TODO
 
+## 設定 (Config)
+
+- [ ] [P1] [feature] 強制 Vault Token 過期機制: 讓 vault token 的過期具備強制力：現行 config/vault/token.go 的到期檢查由本程序執行，同時取得 token 與 ~/.config/gosdk/vault-device.key 者可繞過（威脅模型已寫在該檔註解）。兩條路擇一：(a) agent 模式——常駐程序持有 DEK 並設 TTL，CLI 透過 unix socket 請求解密，到期即從記憶體清除，過期因此是真的；(b) 外部託管——DEK 交給 macOS Keychain / TPM / 雲端 KMS，由外部元件判斷有效期。目前已實作的 vault revoke（輪換裝置金鑰）只能一次作廢全部 token，不是 per-token 的到期。
+
 ## Architecture
 
-## Config
+## Plans
 
-- [ ] 讓 vault token 的過期具備`強制力`：現行 `config/vault/token.go` 的到期檢查由本程序執行，同時取得 token 與 `~/.config/gosdk/vault-device.key` 者可繞過（威脅模型已寫在該檔註解）。兩條路擇一：(a) `agent 模式`——常駐程序持有 DEK 並設 TTL，CLI 透過 unix socket 請求解密，到期即從記憶體清除，過期因此是真的；(b) `外部託管`——DEK 交給 macOS Keychain / TPM / 雲端 KMS，由外部元件判斷有效期。目前已實作的 `vault revoke`（輪換裝置金鑰）只能一次作廢`全部` token，不是 per-token 的到期。
-
-## Log
-
-## DB
-
-## Metric
-
-## Util
-
-## Service
-
-## Server
-
-## CI
+- [file-store-unification](plans/2026-07-29-file-store-unification.md)
 
 ## Archive
 
 已完成且有明確完成時間的條目已搬至 [docs/CHANGELOG.md](docs/CHANGELOG.md)。
 
-- [x] ~~[architecture-gosdk.md](plans/2026-08-12-Refresh.md) §5-1：重構 `config.Default()` 使其可接受 `loaders []Config` 參數，支援外部傳入自訂設定載入器（現行簽章僅接受 `opts ...ConfigOption`）。~~
-- [x] ~~[architecture-gosdk.md](plans/2026-08-12-Refresh.md) §3-1：將 `config/option.go` 中對 `utils.CreateIfNotExist` 的引用替換為 `config` 套件內部私有函式 `createIfNotExist`，解除 `config` 對 `utils` 的直接依賴（`config/option.go` 仍 import `gosdk/utils`）。~~
+- [x] ~~[architecture-gosdk.md](docs/specs/2026-08-12-Refresh.md) §5-1：重構 `config.Default()` 使其可接受 `loaders []Config` 參數，支援外部傳入自訂設定載入器（現行簽章僅接受 `opts ...ConfigOption`）。~~
+- [x] ~~[architecture-gosdk.md](docs/specs/2026-08-12-Refresh.md) §3-1：將 `config/option.go` 中對 `utils.CreateIfNotExist` 的引用替換為 `config` 套件內部私有函式 `createIfNotExist`，解除 `config` 對 `utils` 的直接依賴（`config/option.go` 仍 import `gosdk/utils`）。~~
 - [x] [2026-05-27-config-options.md](docs/specs/2026-08-12-Summary.md)：新增 `ConfigOption` Functional Options 模式，實作 `WithConfigPath`、`WithDefaultValue`（`WithAppName` 擴充）。
 - [x] [2026-05-23-refactor-config-common.md](docs/specs/2026-08-12-Summary.md)：將 `config/db/`、`ConfigSchema`/`ServerConfig`/`DBConnConfig` 移轉至 `config/common`（後續已由 `cryptic-pondering-pie` 規格進一步廢除）。
