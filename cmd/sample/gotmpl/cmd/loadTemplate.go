@@ -1,14 +1,12 @@
 package cmd
 
 import (
-	"context"
 	"log"
 	"os"
 	"strings"
 	"text/template"
 
 	"github.com/bizshuk/gosdk/cmd/sample/gotmpl/tmpl"
-	"github.com/hairyhenderson/gomplate/v4"
 )
 
 type TemplateLoader struct {
@@ -21,7 +19,7 @@ type TemplateLoader struct {
 func (t TemplateLoader) Load() {
 	fs := tmpl.GetTemplateFiles()
 
-	tmplFs, err := template.New("sample.go.tmpl").Funcs(tmplFuncs).ParseFS(fs, "sample.go.tmpl")
+	tmplFs, err := template.New("sample.go.tmpl").Funcs(TmplFuncSample).ParseFS(fs, "sample.go.tmpl")
 	if err != nil {
 		log.Fatalln("Load template failed")
 	}
@@ -33,8 +31,6 @@ func (t TemplateLoader) Load() {
 }
 
 var (
-	tmplFuncs = gomplate.CreateFuncs(context.Background())
-
 	TmplFuncSample = template.FuncMap{
 		"toLower": strings.ToLower,
 		"toUpper": strings.ToUpper,

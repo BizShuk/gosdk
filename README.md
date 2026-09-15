@@ -63,7 +63,7 @@ Go 語言通用開發工具包 (Shared SDK)，提供設定管理、HTTP 服務�
 
 ### 程式碼產生 (Code Generation)
 
-提供兩個 CLI 工具：`stringer` 為增強版常數列舉產生器，從 Go AST 解析常數定義並自動產生 `String()`、`List()`、`ValueList()`、`Map()`、`ValueMap()` 五個方法；`gotmpl` 為模板渲染引擎，透過 Cobra CLI 讀取 YAML 設定，搭配 gomplate 函式庫渲染嵌入的 Go 模板。
+提供兩個 CLI 工具：`stringer` 為增強版常數列舉產生器，從 Go AST 解析常數定義並自動產生 `String()`、`List()`、`ValueList()`、`Map()`、`ValueMap()` 五個方法；`gotmpl` 為模板渲染引擎，透過 Cobra CLI 讀取 YAML 設定，以 stdlib `text/template` 搭配自訂 `FuncMap` 渲染嵌入的 Go 模板。
 
 `領域流程 (Domain Flow) — stringer:`
 
@@ -79,7 +79,7 @@ Go 語言通用開發工具包 (Shared SDK)，提供設定管理、HTTP 服務�
 1. Cobra root command 解析 `--config` 參數，透過 Viper 讀取 YAML 設定
 2. 設定反序列化為 `TemplateLoader` 結構
 3. `TemplateLoader.Load()` 從 `embed.FS` 載入 `.tmpl` 模板
-4. 使用 `gomplate.CreateFuncs` 提供進階模板函式進行渲染，輸出至 `stdout`
+4. 套用 `TmplFuncSample` 提供的模板函式進行渲染，輸出至 `stdout`
 
 `核心實體 (Key Entities):` `Generator`, `GeneratorEx`, `File`, `Package`, `Value`, `TemplateLoader`
 

@@ -245,7 +245,6 @@ gosdk/
     - `golang.org/x/crypto` v0.51.0 — scrypt 金鑰衍生（config/vault）
     - `golang.org/x/term` v0.45.0 — 終端機密碼輸入不回顯（cmd.VaultCmd）
     - `tavsec/gin-healthcheck` v1.2.2 — Health check 端點
-    - `hairyhenderson/gomplate` v4.3.3 — 模板渲染函式
 
 ## 關鍵決策 (Key Decisions)
 
