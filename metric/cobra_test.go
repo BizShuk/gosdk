@@ -8,7 +8,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/golang/snappy"
 	"github.com/prometheus/prometheus/prompb"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -94,22 +93,11 @@ func newTestRootCmd() *cobra.Command {
 
 func decodeLastMetric(t *testing.T, cap *captureServer) *prompb.TimeSeries {
 	t.Helper()
-	body := cap.lastBody()
-	if body == nil {
-		t.Fatal("no metric emitted")
+	series := decodeSeries(t, cap)
+	if len(series) != 1 {
+		t.Fatalf("expected 1 time series, got %d", len(series))
 	}
-	decompressed, err := snappy.Decode(nil, body)
-	if err != nil {
-		t.Fatalf("snappy decode: %v\nbody=%q", err, body)
-	}
-	req := &prompb.WriteRequest{}
-	if err := req.Unmarshal(decompressed); err != nil {
-		t.Fatalf("unmarshal: %v\ndecompressed=%q", err, decompressed)
-	}
-	if len(req.Timeseries) != 1 {
-		t.Fatalf("expected 1 time series, got %d", len(req.Timeseries))
-	}
-	return &req.Timeseries[0]
+	return &series[0]
 }
 
 func labelsToMap(ts *prompb.TimeSeries) map[string]string {

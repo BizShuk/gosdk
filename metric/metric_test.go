@@ -2,8 +2,12 @@ package metric
 
 import (
 	"log/slog"
+	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/golang/snappy"
+	"github.com/prometheus/prometheus/prompb"
 )
 
 // SendTest pushes a small batch of backfilled samples for manual verification.
@@ -35,10 +39,52 @@ func (s *MetricService) SendTest() error {
 	return nil
 }
 
+// decodeSeries decompresses and unmarshals the most recent remote-write
+// body captured by cap, returning every time series it carried.
+func decodeSeries(t *testing.T, cap *captureServer) []prompb.TimeSeries {
+	t.Helper()
+	body := cap.lastBody()
+	if body == nil {
+		t.Fatal("no metric emitted")
+	}
+	decompressed, err := snappy.Decode(nil, body)
+	if err != nil {
+		t.Fatalf("snappy decode: %v\nbody=%q", err, body)
+	}
+	req := &prompb.WriteRequest{}
+	if err := req.Unmarshal(decompressed); err != nil {
+		t.Fatalf("unmarshal: %v\ndecompressed=%q", err, decompressed)
+	}
+	return req.Timeseries
+}
+
 func TestMetricService_SendTest(t *testing.T) {
-	svc := NewMetricService("")
+	cap := &captureServer{}
+	ts := httptest.NewServer(cap.handler())
+	t.Cleanup(ts.Close)
+
+	svc := NewMetricService(ts.URL)
 	if err := svc.SendTest(); err != nil {
-		t.Errorf("SendTest() error = %v", err)
+		t.Fatalf("SendTest() error = %v", err)
+	}
+
+	series := decodeSeries(t, cap)
+	if got, want := len(series), 7; got != want {
+		t.Fatalf("time series: got %d, want %d", got, want)
+	}
+
+	for i, s := range series {
+		labels := labelsToMap(&series[i])
+		// SendMulti replaces "." with "_" to satisfy Prometheus naming.
+		if got, want := labels["__name__"], "stock_analysis_test"; got != want {
+			t.Errorf("series %d name: got %q, want %q", i, got, want)
+		}
+		if got, want := labels["project"], "stock"; got != want {
+			t.Errorf("series %d project label: got %q, want %q", i, got, want)
+		}
+		if len(s.Samples) != 1 {
+			t.Errorf("series %d: got %d samples, want 1", i, len(s.Samples))
+		}
 	}
 }
 
