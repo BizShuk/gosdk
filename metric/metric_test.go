@@ -1,6 +1,7 @@
 package metric
 
 import (
+	"context"
 	"log/slog"
 	"net/http/httptest"
 	"testing"
@@ -122,5 +123,45 @@ func TestToFloat64(t *testing.T) {
 				t.Errorf("toFloat64() got = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestSendMultiContext_TimePrecision(t *testing.T) {
+	cap := &captureServer{}
+	ts := httptest.NewServer(cap.handler())
+	t.Cleanup(ts.Close)
+
+	at := time.UnixMilli(1789776151123)
+	svc := NewMetricService(ts.URL)
+	err := svc.SendMultiContext(context.Background(), []Metric{
+		{Name: "a.ms", Time: at, Timestamp: 1, Value: 1.0},
+		{Name: "a.sec", Timestamp: 1789776151, Value: 2.0},
+	})
+	if err != nil {
+		t.Fatalf("SendMultiContext() error = %v", err)
+	}
+	got := map[string]int64{}
+	series := decodeSeries(t, cap)
+	for i := range series {
+		got[labelsToMap(&series[i])["__name__"]] = series[i].Samples[0].Timestamp
+	}
+	if got["a_ms"] != 1789776151123 {
+		t.Errorf("Time should win with ms precision, got %d", got["a_ms"])
+	}
+	if got["a_sec"] != 1789776151000 {
+		t.Errorf("Timestamp seconds fallback, got %d", got["a_sec"])
+	}
+}
+
+func TestSendMultiContext_Canceled(t *testing.T) {
+	cap := &captureServer{}
+	ts := httptest.NewServer(cap.handler())
+	t.Cleanup(ts.Close)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := NewMetricService(ts.URL).SendMultiContext(ctx, []Metric{{Name: "a.b", Timestamp: 1, Value: 1.0}})
+	if err == nil {
+		t.Fatal("canceled ctx should abort the write")
 	}
 }

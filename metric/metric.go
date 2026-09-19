@@ -90,7 +90,18 @@ func toFloat64(v any) (float64, error) {
 	}
 }
 
+// SendMulti pushes metrics with a 30s timeout detached from any caller context.
+// Prefer SendMultiContext when a context is available.
 func (s *MetricService) SendMulti(metrics []Metric) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	return s.SendMultiContext(ctx, metrics)
+}
+
+// SendMultiContext pushes metrics in one remote-write request bound to ctx:
+// cancellation and deadlines from the caller abort the write. The HTTP client's
+// 30s timeout still caps a ctx without a deadline.
+func (s *MetricService) SendMultiContext(ctx context.Context, metrics []Metric) error {
 	if len(metrics) == 0 {
 		return nil
 	}
@@ -112,14 +123,11 @@ func (s *MetricService) SendMulti(metrics []Metric) error {
 		req.TimeSeries = append(req.TimeSeries, promwrite.TimeSeries{
 			Labels: labels,
 			Sample: promwrite.Sample{
-				Time:  time.Unix(m.Timestamp, 0),
+				Time:  m.sampleTime(),
 				Value: val,
 			},
 		})
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
 
 	if _, err := s.client.Write(ctx, &req); err != nil {
 		return err
