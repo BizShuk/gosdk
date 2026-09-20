@@ -1,6 +1,7 @@
 # CLI (cobra)
 
 ```tree
+main.go        # repo root — cmd.Execute() only; binary name = module's last element
 cmd/
   root.go      # RootCmd + Execute
   monitor.go   # monitor (alias m) — only interactive command
@@ -8,10 +9,37 @@ cmd/
   list.go      # list (alias l)
   ps.go        # ps — only if the app owns long-lived OS processes
   web.go       # web
-main.go        # cmd.Execute() only
 ```
 
-Package-level exported vars, flags in `init()`, one file per command (`deployLocal.go` for sub-subcommands). Never `NewXxxCmd()`. `RunE` not `Run`. Bind flags with `viper.BindPFlag`.
+`main.go` lives at the **repo root** — the repo name is the command name, so `go install .` yields the right binary with no extra path. Only a repo shipping several binaries uses `cmd/<binary>/main.go`, and then `cmd/` holds mains, not commands.
+
+Package-level exported vars, flags in `init()`, one file per command. Never `NewXxxCmd()`. `RunE` not `Run`. Bind flags with `viper.BindPFlag`.
+
+## Two layers
+
+A subcommand that groups others (`app grafana push`) splits across a file and a directory of the same name:
+
+```tree
+main.go            # blank-imports each group: _ ".../cmd/grafana"
+cmd/
+  root.go          # RootCmd + Execute — knows no domain
+  grafana.go       # package cmd — GrafanaCmd, its flags, its viper keys
+  grafana/         # package grafana — the second layer, one file per command
+    service.go     #   shared derivation/config for this group
+    push.go        #   PushCmd; init() { cmd.GrafanaCmd.AddCommand(PushCmd) }
+    list.go
+svc/grafana/       # what the commands actually do
+```
+
+| Layer | File | Answers |
+| ----- | ---- | ------- |
+| root | `cmd/root.go` | which groups exist |
+| first | `cmd/<group>.go` | what the group is, which flags it takes |
+| second | `cmd/<group>/<verb>.go` | what pressing it does |
+
+`cmd` must **not** import `cmd/<group>` — the children import `cmd` to reach the group var, so the arrow points one way and `main.go`'s blank import is what attaches them. Adding a group is one file, one directory, one blank import.
+
+Name collision is expected: `cmd/grafana` and `svc/grafana` are both `package grafana`, so alias the service side (`svc "…/svc/grafana"`). Inside a `RunE`, name the cobra parameter `c`, not `cmd` — it would shadow the imported package.
 
 ```go
 var RootCmd = &cobra.Command{Use: "myapp"}

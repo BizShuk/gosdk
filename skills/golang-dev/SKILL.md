@@ -23,7 +23,7 @@ Load **only** the chapter that matches the task. Do not read the rest.
 
 | Chapter | Load when |
 | ------- | --------- |
-| [cli.md](references/cli.md) | cobra, subcommands, `ConfigCmd`, `CobraCMDHook` |
+| [cli.md](references/cli.md) | cobra, where `main.go` goes, one- and two-layer subcommands, `ConfigCmd`, `CobraCMDHook` |
 | [tui.md](references/tui.md) | `monitor`, bubbletea, columns misalign, flicker |
 | [config.md](references/config.md) | `config.Default`, viper keys, dual-file, SQLite/MySQL/Postgres |
 | [logging.md](references/logging.md) | slog, `LOG_LEVEL`, zap leftovers |
