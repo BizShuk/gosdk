@@ -27,8 +27,8 @@ import (
 // AppConfig 自訂設定結構，對應 yaml 中的所有設定區塊。
 // 此結構用於示範，可根據實際需求調整欄位。
 //
-// 註:DB 設定在新設計下不再統一放在 `db:` 巢狀區塊,而是每個儲存型態
-// 各自有扁平 viper key (例如 SQLITE_PATH),由 db.InitSQLite() 自行讀取。
+// 註:DB 設定不放在 `db:` 巢狀區塊,而是扁平 viper key (DB_DRIVER / DB_DSN),
+// 由 db.Init() 自行讀取。
 type AppConfig struct {
 	Name     string       `mapstructure:"name"`
 	Version  string       `mapstructure:"version"`
@@ -113,13 +113,13 @@ func main() {
 	slog.Debug("unmarshal server", "value", serverConfig)
 
 	// --- 用法 5：透過 db package 從 viper 取出設定並建立 *gorm.DB ---
-	// InitSQLite() 會讀取 SQLITE_PATH,建立 *SQLite service 並設為 DefaultSQLite singleton。
-	if err := db.InitSQLite(); err != nil {
+	// Init() 會讀取 DB_DRIVER / DB_DSN,建立 *db.Service 並設為 db.Default singleton。
+	if err := db.Init(); err != nil {
 		slog.Error("db connect failed", "err", err)
 		return
 	}
-	defer func() { _ = db.DefaultSQLite.Close() }()
-	gormDB := db.DefaultSQLite.DB()
+	defer func() { _ = db.Default.Close() }()
+	gormDB := db.Default.DB()
 	slog.Debug("db driver", "name", gormDB.Name())
 
 	// --- 用法 6：印出所有 key/value，方便除錯 ---

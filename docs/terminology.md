@@ -14,14 +14,15 @@
 | `Search Path` | 設定檔的目錄搜尋順序 `.` → `./conf` → app config dir。`同一檔名只有第一個命中的目錄生效`（fallback chain，非跨目錄 merge）。 |
 | `App Config Dir` | `~/.config/<appName>`，由 `WithAppName` 決定，可被 `WithConfigDir` 強制覆寫。其下固定有 `data/` 與 `logs/`。 |
 | `Provenance` | 「某個 key 的值來自哪一個檔案」的可追溯性。由 `Sources()` + `LoadFile()` 提供，`app config --files` 是其 CLI 出口。 |
-| `Flat Viper Key` | 直接以 `viper.Get*()` 讀取的扁平鍵（如 `SQLITE_PATH`）。取代已廢除的強型別 `ConfigSchema` 聚合結構。 |
+| `Flat Viper Key` | 直接以 `viper.Get*()` 讀取的扁平鍵（如 `DB_DSN`）。取代已廢除的強型別 `ConfigSchema` 聚合結構。 |
 | `JSONC` | 允許註解與 trailing comma 的 JSON。僅`讀取`路徑接受，寫回一律 strict JSON。 |
 
 ## 儲存 (Storage)
 
 | Term | 定義 |
 | --- | --- |
-| `Storage Service` | 一種資料庫型態的連線服務（`db.SQLite` / `db.MySQL` / `db.Postgres`），實作 `DB()` / `Close()`。 |
+| `Storage Service` | 一條由設定決定 driver 的 gorm 連線（`db.Service`），實作 `DB()` / `Driver()` / `Close()`；主連線為 `db.Default`。 |
+| `DB_DRIVER` / `DB_DSN` | 主資料庫的 driver（`mysql` \| `sqlite`）與 DSN；額外連線加 suffix `_<NAME>`（`DB_DSN_<NAME>`，`DB_DRIVER_<NAME>` 未設沿用 `DB_DRIVER`）。 |
 | `Per-storage Singleton` | 每種 Storage Service 全域`只允許一個 instance`；`InitXxx()` 是拒絕重複初始化的守護函式。 |
 | `DSN` | MySQL / PostgreSQL 的單一連線字串欄位。刻意不拆成 HOST / PORT / USER / PASSWORD。 |
 | `Store[T]` | `gosdk/file` 的泛型檔案儲存庫。本體是`一個目錄`，檔名由呼叫端傳入。 |

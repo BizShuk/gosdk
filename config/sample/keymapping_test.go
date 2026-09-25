@@ -93,7 +93,7 @@ func TestKeyDotenvDotBecomesNested(t *testing.T) {
 
 // TestKeyYamlFlatAndNestedCoexist 驗證同一份 yaml 裡，扁平與巢狀是兩個獨立的 key。
 //
-// 這也解釋了為什麼本專案的扁平慣例（SQLITE_PATH、LOG_LEVEL）可以和巢狀的
+// 這也解釋了為什麼本專案的扁平慣例（DB_DSN、LOG_LEVEL）可以和巢狀的
 // server.host 和平共存 —— 它們本來就不在同一個命名空間。
 func TestKeyYamlFlatAndNestedCoexist(t *testing.T) {
 	loadFixture(t, map[string]string{
@@ -102,25 +102,25 @@ func TestKeyYamlFlatAndNestedCoexist(t *testing.T) {
 			"  b:\n" +
 			"    c: nested-yaml\n" +
 			"a_b_c: flat-yaml\n" +
-			"SQLITE_PATH: ./sample.db\n",
+			"DB_DSN: ./sample.db\n",
 	})
 
 	assertGet(t, "a.b.c", "nested-yaml") // 巢狀縮排
 	assertGet(t, "a_b_c", "flat-yaml")   // 扁平單層，與上面互不干擾
-	assertGet(t, "sqlite_path", "./sample.db")
+	assertGet(t, "db_dsn", "./sample.db")
 }
 
 // TestKeyLookupIsCaseInsensitive 驗證 viper 的 key 查詢不分大小寫。
 //
-// 所以設定檔可以維持 SCREAMING_SNAKE_CASE 的可讀性（SQLITE_PATH），
+// 所以設定檔可以維持 SCREAMING_SNAKE_CASE 的可讀性（DB_DSN），
 // 程式端不論用哪種大小寫都讀得到。
 func TestKeyLookupIsCaseInsensitive(t *testing.T) {
 	loadFixture(t, map[string]string{
-		"config.yaml": "SQLITE_PATH: ./sample.db\nServer:\n  Host: localhost\n",
+		"config.yaml": "DB_DSN: ./sample.db\nServer:\n  Host: localhost\n",
 	})
 
-	assertGet(t, "SQLITE_PATH", "./sample.db")
-	assertGet(t, "sqlite_path", "./sample.db")
+	assertGet(t, "DB_DSN", "./sample.db")
+	assertGet(t, "db_dsn", "./sample.db")
 	assertGet(t, "SeRvEr.HoSt", "localhost")
 }
 

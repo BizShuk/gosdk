@@ -27,18 +27,18 @@ Go 語言通用開發工具包 (Shared SDK)，提供設定管理、HTTP 服務�
 
 ### 資料庫連線 (Database Services)
 
-每種儲存型態是一個獨立的 service:有自己的型別、自己的全域 singleton、自己的扁平 viper key (例如 `SQLITE_PATH`、`MYSQL_DSN`、`POSTGRES_DSN`)。micro-service 概念下,一個 process 內不應該存在兩個同型態的 service;`InitSQLite()` / `InitMySQL()` / `InitPostgres()` 在第二次呼叫時會回傳 error,守護 singleton 不變性。
+一個服務連一個資料庫。driver 與位址全由設定決定:`DB_DRIVER` (`mysql` | `sqlite`) 選 driver,`DB_DSN` 給連線字串,程式碼不依「哪個 key 有值」挑 driver。需要額外的資料庫連線時,以 suffix `_<NAME>` 區分:`DB_DSN_<NAME>` 與選填的 `DB_DRIVER_<NAME>`(未設定時沿用 `DB_DRIVER`)。
 
 `領域流程 (Domain Flow):`
 
-1. `config.Default()` 載入設定後,呼叫端用 `viper.IsSet("SQLITE_PATH")` / `viper.IsSet("MYSQL_DSN")` / `viper.IsSet("POSTGRES_DSN")` 判斷是否啟用該儲存
-2. 呼叫 `db.InitSQLite()` / `db.InitMySQL()` / `db.InitPostgres()` 從 viper 讀取設定、開啟連線、設為 singleton
-3. 任何地方透過 `db.DefaultSQLite.DB()` / `db.DefaultMySQL.DB()` / `db.DefaultPostgres.DB()` 取得 `*gorm.DB`
-4. 結束時呼叫 `db.DefaultSQLite.Close()` / `db.DefaultMySQL.Close()` / `db.DefaultPostgres.Close()` 釋放連線
+1. `config.Default()` 載入設定
+2. 呼叫 `db.Init()` 依 `DB_DRIVER` / `DB_DSN` 開啟主資料庫並設為 `db.Default` singleton;重複呼叫回傳 error
+3. sqlite 且 `DB_DSN` 為空時,推導為 `~/.config/<app_name>/data/<app_name>.db`;mysql 的 DSN 必填
+4. 額外連線以 `db.Open("<name>")` 開啟,由呼叫端持有並自行 `Close()`
 
-`核心實體 (Key Entities):` `Service` 介面, `SQLite` struct, `MySQL` struct, `Postgres` struct, `DefaultSQLite` / `DefaultMySQL` / `DefaultPostgres` singleton
+`核心實體 (Key Entities):` `db.Service` struct, `db.Default` singleton, `DB_DRIVER` / `DB_DSN` / `DB_DSN_<NAME>` / `DB_DRIVER_<NAME>` key
 
-`相關處理器 (Related Handlers):` `db.InitSQLite()`, `db.InitMySQL()`, `db.InitPostgres()`, `db.DefaultSQLite.DB()`, `db.DefaultSQLite.Close()`, `db.DefaultMySQL.DB()`, `db.DefaultMySQL.Close()`, `db.DefaultPostgres.DB()`, `db.DefaultPostgres.Close()`
+`相關處理器 (Related Handlers):` `db.Init()`, `db.Open(name)`, `db.Keys(name)`, `db.Default.DB()`, `db.Default.Close()`
 
 ---
 
@@ -268,22 +268,17 @@ import "github.com/bizshuk/gosdk/config"
 import "github.com/bizshuk/gosdk/db"
 import "github.com/spf13/viper"
 
-config.Default()
+config.Default(config.WithAppName("myapp"))
 
-// 僅在對應 viper key 有設定時才初始化
-if viper.IsSet("SQLITE_PATH") {
-    if err := db.InitSQLite(); err != nil { /* 處理錯誤 */ }
-}
-if viper.IsSet("MYSQL_DSN") {
-    if err := db.InitMySQL(); err != nil { /* 處理錯誤 */ }
-}
-if viper.IsSet("POSTGRES_DSN") {
-    if err := db.InitPostgres(); err != nil { /* 處理錯誤 */ }
-}
+// DB_DRIVER=mysql|sqlite, DB_DSN=<dsn>
+if err := db.Init(); err != nil { /* 處理錯誤 */ }
+defer db.Default.Close()
+gormDB := db.Default.DB()
 
-// 之後任何地方透過 singleton 取用 *gorm.DB
-gormDB := db.DefaultSQLite.DB()
-defer db.DefaultSQLite.Close()
+// 額外連線:讀 DB_DSN_TRIFECTA (+ DB_DRIVER_TRIFECTA,未設定沿用 DB_DRIVER)
+trifecta, err := db.Open("trifecta")
+if err != nil { /* 處理錯誤 */ }
+defer trifecta.Close()
 ```
 
 ### HTTP 服務
@@ -455,7 +450,8 @@ Based on codebase analysis:
 
 | 已淘汰 (Deprecated) | 現行替代 (Replacement) |
 | --- | --- |
-| `config/common` 套件、`config.ConfigSchema` / `ServerConfig` / `DBConnConfig` | `db/` 套件與扁平 viper key（`SQLITE_PATH` / `MYSQL_DSN` / `POSTGRES_DSN`） |
+| `config/common` 套件、`config.ConfigSchema` / `ServerConfig` / `DBConnConfig` | `db/` 套件與扁平 viper key（`DB_DRIVER` / `DB_DSN`） |
+| `db.InitSQLite()` / `db.InitMySQL()` / `db.InitPostgres()` 與 `SQLITE_PATH` / `MYSQL_DSN` / `POSTGRES_DSN` | `db.Init()` / `db.Open(name)` 與 `DB_DRIVER` / `DB_DSN[_<NAME>]`；PostgreSQL driver 移除 |
 | `config.GetProfile()`、`config.GlobalConfig`、`PROFILE` 環境變數 | base + `.local` 雙檔載入（`.env` / `.env.local` 等） |
 | `config.WithConfigPath(path)` | `config.WithConfigDir(dir)` |
 | `config.DefaultWithDir(dir)` | `config.Default(config.WithConfigDir(dir))` |

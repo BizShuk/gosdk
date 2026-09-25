@@ -74,14 +74,9 @@ gosdk/
 │   │   └── codec_test.go
 │   ├── embedFS.go           # embed.FS 設定載入器
 │   └── sample/              # config 套件使用範例 (含 conf/ 設定檔及 SQLite 範例)
-├── db/                      # 資料庫連線服務模組(per-storage singleton + flat viper keys)
-│   ├── db.go                # Service 介面(DB() / Close())
-│   ├── sqlite.go            # SQLite type + DefaultSQLite + InitSQLite(SQLITE_PATH)
-│   ├── mysql.go             # MySQL  type + DefaultMySQL  + InitMySQL(MYSQL_DSN)
-│   ├── postgres.go          # Postgres type + DefaultPostgres + InitPostgres(POSTGRES_DSN)
-│   ├── sqlite_test.go       # SQLite 單元測試(viper 讀取、singleton 守衛、Service 方法)
-│   ├── mysql_test.go        # MySQL 單元測試(白箱模擬已初始化、驗證守衛)
-│   └── postgres_test.go     # PostgreSQL 單元測試(結構與 MySQL 對稱)
+├── db/                      # 資料庫連線服務模組(設定決定 driver)
+│   ├── db.go                # Service + Default + Init(DB_DRIVER/DB_DSN) + Open(name → DB_DSN_<NAME>)
+│   └── db_test.go           # driver 選擇、sqlite 路徑推導、suffix key、singleton 守衛
 ├── file/                    # 泛型檔案儲存庫(目錄為單位,單檔文件 + JSONL 兩用)
 │   ├── store.go             # Store[T] 型別、NewStore、safeName、Path/Dir、Custom
 │   ├── store_options.go     # Options/Option、With* 選項、DEFAULT_* 預設值
@@ -236,7 +231,7 @@ gosdk/
     - `spf13/viper` v1.21.0 — 階層式設定管理（CodecRegistry + JSONC for json）
     - `spf13/cobra` v1.9.1 — CLI 框架（gotmpl、versioning）
     - `log/slog` (stdlib) — 結構化日誌（取代 zap）
-    - `gorm.io/gorm` v1.31.1 — ORM（MySQL + SQLite + PostgreSQL，driver 各 v1.6.0）
+    - `gorm.io/gorm` v1.31.1 — ORM（MySQL + SQLite，driver 各 v1.6.0）
     - `castai/promwrite` v0.6.0 — Prometheus remote-write client（MetricService）
     - `go.opentelemetry.io/otel` v1.44.0 — OpenTelemetry SDK（OTLP HTTP metrics/traces）
     - `slack-go/slack` v0.23.1 — Slack 通知
@@ -261,7 +256,7 @@ gosdk/
 - 自訂 viper 格式必須同時登記副檔名：viper 在查 codec registry 之前會先比對 package-level `viper.SupportedExts`，只註冊 codec 會得到 `Unsupported Config Type`。`registerVaultExt()` 是冪等的，且在`每次` load 時重跑而不只在 `init()`——`viper.Reset()` 會把該清單還原成內建值，一個因為無關的 Reset 就安靜失效的格式極難追查
 - 設定檔一律以`確切檔名`解析（`mergeNamedFiles`）：交給 viper 的 `SetConfigName` 會把名稱當成字根去比對所有支援的副檔名，因此 `.vault` 一登記，原本讀 `.env` 的 dotenv loader 就會改抓同目錄的 `.env.vault` 並解析失敗（實際踩到，非假設）。loader 定址的是`檔案`不是名稱字根
 - 扁平 viper key 直讀：`config.Default()` 載入設定後透過 `viper.Get*()` 取值；不再維護強型別 `ConfigSchema` / `ServerConfig` / `DBConfig` 等聚合結構（2026-06 重構後 `config/common` 已廢除）
-- 儲存型態採 per-service singleton：每種儲存是一個獨立 service（`db.SQLite` / `db.MySQL` / `db.Postgres`），各自有 `DefaultSQLite` / `DefaultMySQL` / `DefaultPostgres` 全域 singleton 與扁平 viper key（`SQLITE_PATH` / `MYSQL_DSN` / `POSTGRES_DSN`），守護函式 `InitSQLite()` / `InitMySQL()` / `InitPostgres()` 拒絕重複初始化以落實「micro-service: 同型態不可有兩個 instance」；MySQL 與 PostgreSQL 採單一 DSN 字串欄位而非拆 `HOST`/`PORT`/`USER`/`PASSWORD`，簡化設定並與舊 `url` 對齊(PostgreSQL 接受 URL 形式 `postgres://...` 或 keyword/value 形式 `host=... user=...`)
+- `一個服務一個資料庫，由設定選 driver`：`DB_DRIVER`（`mysql` | `sqlite`）+ `DB_DSN` 單一 DSN 字串，`db.Init()` 設定 `db.Default` 並拒絕重複初始化。取代原本每種儲存一組 key（`SQLITE_PATH` / `MYSQL_DSN` / `POSTGRES_DSN`）的設計——那一版讓服務用「哪個 key 有值」決定 driver，兩者都設時的行為只存在程式碼裡。額外連線是`明確的例外`，以 suffix 區分：`DB_DSN_<NAME>` + 選填 `DB_DRIVER_<NAME>`（未設沿用 `DB_DRIVER`），由 `db.Open(name)` 開啟、呼叫端持有。sqlite 的 DSN 為空時推導 `<app config>/data/<app_name>.db`；PostgreSQL driver 無任何使用者，一併移除
 - `stringer` 以 `GeneratorEx` 組合模式擴充標準庫 `stringer`：嵌入 `service.Generator`，額外產生 `List()`、`ValueList()`、`Map()`、`ValueMap()` 四個輔助函式
 - 日誌模組在 `init()` 時即以預設值初始化 slog 全域 logger：確保任何 import 此套件的模組都能立即使用套件層級 `slog.*`，`log.Init()` 可在設定載入後再次呼叫以套用 `LOG_LEVEL` / `LOG_FORMAT`。不提供 wrapper 函式，消費端直接使用 stdlib `log/slog`
 - CSV 處理使用歸檔標記檔（`.archived`）防止重複處理：以簡單的檔案系統機制取代資料庫或 Redis 的已處理紀錄
@@ -299,7 +294,7 @@ gosdk/
 | 加密設定 / 祕密保險庫 | `config/vault/`, `config/vault.go`                      | `config.NewVaultConfig()`, `vault.Codec`, `vault.OpenFile()`                                                              |
 | 限時解密憑證          | `config/vault/token.go`                                 | `vault.IssueToken()` / `vault.OpenWithToken()` / `cmd.VaultTokenCmd`                                                      |
 | 保險庫 CLI            | `cmd/` (`vault*.go`)                                    | `cmd.VaultCmd`                                                                                                            |
-| 資料庫連線            | `db/`                                                   | `db.InitSQLite()` / `db.InitMySQL()` / `db.InitPostgres()`                                                                |
+| 資料庫連線            | `db/`                                                   | `db.Init()` / `db.Open(name)`                                                                                             |
 | HTTP 服務             | `router/`, `mw/`, `main.go`                             | `HTTPServer()`                                                                                                            |
 | 程式碼產生 — stringer | `cmd/sample/stringer/`, `service/generator.go`          | `go test ./cmd/sample/stringer -run TestRunGeneratesStringerCode`                                                         |
 | 程式碼產生 — gotmpl   | `cmd/sample/gotmpl/`                                    | `go test ./cmd/sample/gotmpl -run TestRun`                                                                                |

@@ -25,14 +25,14 @@ Embed a seed with `cmd/config.MustRegisterDefault("settings.json", bytes)` from 
 
 ## DB
 
-One singleton per storage type. `Init*` refuses a second call.
+One service, one database; configuration picks the driver. `Init` refuses a second call.
 
 ```go
 config.Default(config.WithAppName("myapp"))
-if viper.IsSet("SQLITE_PATH") { _ = db.InitSQLite() }
-if viper.IsSet("MYSQL_DSN") { _ = db.InitMySQL() }
-if viper.IsSet("POSTGRES_DSN") { _ = db.InitPostgres() }
-gormDB := db.DefaultSQLite.DB()
+if err := db.Init(); err != nil { return err } // DB_DRIVER + DB_DSN
+gormDB := db.Default.DB()
+
+extra, err := db.Open("trifecta") // DB_DSN_TRIFECTA (+ DB_DRIVER_TRIFECTA, else DB_DRIVER)
 ```
 
-Keys: `SQLITE_PATH`, `MYSQL_DSN`, `POSTGRES_DSN` (single DSN string, not host/port/user).
+Keys: `DB_DRIVER` (`mysql` | `sqlite`), `DB_DSN` (single DSN string, not host/port/user). Empty `DB_DSN` with sqlite derives `<app config>/data/<app_name>.db`. An extra connection is an explicit decision, never a default.
