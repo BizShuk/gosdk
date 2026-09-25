@@ -22,4 +22,4 @@ Wire concretes only in `main`/`bootstrap`. Inject interfaces everywhere else. �
 
 Wrap at each boundary (`fmt.Errorf("handler.GetUser: %w", err)`). Sentinels in the owning package (`ErrNotFound`). HTTP status mapping and logging only in handler. `ctx` is the first I/O param; never store it on a struct; timeouts from config.
 
-Tests: same package `_test.go`. Handler — mock interfaces + `httptest`. Repository — sqlmock or real test DB. Validation — table-driven.
+Tests: same package `_test.go`. Handler — mock interfaces + `httptest`. Repository — constructor takes `*gorm.DB` (only `main` calls `db.Init()`), so tests hand it a sqlite `:memory:` DB or sqlmock. Validation — table-driven.

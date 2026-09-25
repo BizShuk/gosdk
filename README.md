@@ -27,18 +27,19 @@ Go 語言通用開發工具包 (Shared SDK)，提供設定管理、HTTP 服務�
 
 ### 資料庫連線 (Database Services)
 
-一個服務連一個資料庫。driver 與位址全由設定決定:`DB_DRIVER` (`mysql` | `sqlite`) 選 driver,`DB_DSN` 給連線字串,程式碼不依「哪個 key 有值」挑 driver。需要額外的資料庫連線時,以 suffix `_<NAME>` 區分:`DB_DSN_<NAME>` 與選填的 `DB_DRIVER_<NAME>`(未設定時沿用 `DB_DRIVER`)。
+一個服務連一個資料庫。driver 與位址全由設定決定:`DB_DRIVER` (`mysql` | `sqlite`) 選 driver,`DB_DSN` 給連線字串,程式碼不依「哪個 key 有值」挑 driver。gorm 行為也由設定開關:`DB_LOG`(預設 `false`,丟棄 gorm log)與 `DB_TRANSLATE_ERROR`(預設 `true`,driver 錯誤轉成 `gorm.ErrDuplicatedKey` 等 sentinel)。需要額外的資料庫連線時,以 suffix `_<NAME>` 區分:每個 `<KEY>_<NAME>` 未設定時沿用 `<KEY>`,唯獨 `DB_DSN_<NAME>` 必填。
 
 `領域流程 (Domain Flow):`
 
 1. `config.Default()` 載入設定
 2. 呼叫 `db.Init()` 依 `DB_DRIVER` / `DB_DSN` 開啟主資料庫並設為 `db.Default` singleton;重複呼叫回傳 error
-3. sqlite 且 `DB_DSN` 為空時,推導為 `~/.config/<app_name>/data/<app_name>.db`;mysql 的 DSN 必填
+3. sqlite 且 `DB_DSN` 為空時,推導為 `~/.config/<app_name>/data/default.db`;mysql 的 DSN 必填
 4. 額外連線以 `db.Open("<name>")` 開啟,由呼叫端持有並自行 `Close()`
+5. 啟動 log 用 `Service.Target()` 標示連到哪裡:mysql 遮掉密碼,sqlite 為實際檔案路徑
 
-`核心實體 (Key Entities):` `db.Service` struct, `db.Default` singleton, `DB_DRIVER` / `DB_DSN` / `DB_DSN_<NAME>` / `DB_DRIVER_<NAME>` key
+`核心實體 (Key Entities):` `db.Service` struct, `db.Default` singleton, `DB_DRIVER` / `DB_DSN` / `DB_LOG` / `DB_TRANSLATE_ERROR` key 與其 `_<NAME>` 變體
 
-`相關處理器 (Related Handlers):` `db.Init()`, `db.Open(name)`, `db.Keys(name)`, `db.Default.DB()`, `db.Default.Close()`
+`相關處理器 (Related Handlers):` `db.Init()`, `db.Open(name)`, `db.Key(base, name)`, `db.Default.DB()`, `db.Default.Target()`, `db.Default.Close()`
 
 ---
 
@@ -264,15 +265,16 @@ config.Default(
 ### 資料庫連線
 
 ```go
+import "log/slog"
 import "github.com/bizshuk/gosdk/config"
 import "github.com/bizshuk/gosdk/db"
-import "github.com/spf13/viper"
 
 config.Default(config.WithAppName("myapp"))
 
-// DB_DRIVER=mysql|sqlite, DB_DSN=<dsn>
+// DB_DRIVER=mysql|sqlite, DB_DSN=<dsn>; 選填 DB_LOG / DB_TRANSLATE_ERROR
 if err := db.Init(); err != nil { /* 處理錯誤 */ }
 defer db.Default.Close()
+slog.Info("db connected", "target", db.Default.Target())
 gormDB := db.Default.DB()
 
 // 額外連線:讀 DB_DSN_TRIFECTA (+ DB_DRIVER_TRIFECTA,未設定沿用 DB_DRIVER)

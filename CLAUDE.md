@@ -75,8 +75,8 @@ gosdk/
 │   ├── embedFS.go           # embed.FS 設定載入器
 │   └── sample/              # config 套件使用範例 (含 conf/ 設定檔及 SQLite 範例)
 ├── db/                      # 資料庫連線服務模組(設定決定 driver)
-│   ├── db.go                # Service + Default + Init(DB_DRIVER/DB_DSN) + Open(name → DB_DSN_<NAME>)
-│   └── db_test.go           # driver 選擇、sqlite 路徑推導、suffix key、singleton 守衛
+│   ├── db.go                # Service + Default + Init(DB_DRIVER/DB_DSN/DB_LOG/DB_TRANSLATE_ERROR) + Open(name → *_<NAME>)
+│   └── db_test.go           # driver 選擇、default.db 推導、suffix 沿用、gorm 開關、Target 遮罩、singleton 守衛
 ├── file/                    # 泛型檔案儲存庫(目錄為單位,單檔文件 + JSONL 兩用)
 │   ├── store.go             # Store[T] 型別、NewStore、safeName、Path/Dir、Custom
 │   ├── store_options.go     # Options/Option、With* 選項、DEFAULT_* 預設值
@@ -256,7 +256,7 @@ gosdk/
 - 自訂 viper 格式必須同時登記副檔名：viper 在查 codec registry 之前會先比對 package-level `viper.SupportedExts`，只註冊 codec 會得到 `Unsupported Config Type`。`registerVaultExt()` 是冪等的，且在`每次` load 時重跑而不只在 `init()`——`viper.Reset()` 會把該清單還原成內建值，一個因為無關的 Reset 就安靜失效的格式極難追查
 - 設定檔一律以`確切檔名`解析（`mergeNamedFiles`）：交給 viper 的 `SetConfigName` 會把名稱當成字根去比對所有支援的副檔名，因此 `.vault` 一登記，原本讀 `.env` 的 dotenv loader 就會改抓同目錄的 `.env.vault` 並解析失敗（實際踩到，非假設）。loader 定址的是`檔案`不是名稱字根
 - 扁平 viper key 直讀：`config.Default()` 載入設定後透過 `viper.Get*()` 取值；不再維護強型別 `ConfigSchema` / `ServerConfig` / `DBConfig` 等聚合結構（2026-06 重構後 `config/common` 已廢除）
-- `一個服務一個資料庫，由設定選 driver`：`DB_DRIVER`（`mysql` | `sqlite`）+ `DB_DSN` 單一 DSN 字串，`db.Init()` 設定 `db.Default` 並拒絕重複初始化。取代原本每種儲存一組 key（`SQLITE_PATH` / `MYSQL_DSN` / `POSTGRES_DSN`）的設計——那一版讓服務用「哪個 key 有值」決定 driver，兩者都設時的行為只存在程式碼裡。額外連線是`明確的例外`，以 suffix 區分：`DB_DSN_<NAME>` + 選填 `DB_DRIVER_<NAME>`（未設沿用 `DB_DRIVER`），由 `db.Open(name)` 開啟、呼叫端持有。sqlite 的 DSN 為空時推導 `<app config>/data/<app_name>.db`；PostgreSQL driver 無任何使用者，一併移除
+- `一個服務一個資料庫，由設定選 driver`：`DB_DRIVER`（`mysql` | `sqlite`）+ `DB_DSN` 單一 DSN 字串，`db.Init()` 設定 `db.Default` 並拒絕重複初始化。取代原本每種儲存一組 key（`SQLITE_PATH` / `MYSQL_DSN` / `POSTGRES_DSN`）的設計——那一版讓服務用「哪個 key 有值」決定 driver，兩者都設時的行為只存在程式碼裡。額外連線是`明確的例外`，以 suffix 區分：`DB_DSN_<NAME>` + 選填 `DB_DRIVER_<NAME>`（未設沿用 `DB_DRIVER`），由 `db.Open(name)` 開啟、呼叫端持有。sqlite 的 DSN 為空時推導 `<app config>/data/default.db`——檔名固定而不跟 app name，搬機器或改名都不必改路徑；PostgreSQL driver 無任何使用者，一併移除。gorm 行為也走設定（2026-09-25）：`DB_LOG` 預設 `false`（CLI / TUI 的 stdout 不能讓 gorm 佔用，錯誤本來就由回傳值帶出）、`DB_TRANSLATE_ERROR` 預設 `true`（服務靠 `gorm.ErrDuplicatedKey` 判斷重複，不比對 driver 錯誤碼）。這兩個開關出現之前，identity、datahub、night_market 都為了它們繞過 gosdk 自己 `gorm.Open`。`<KEY>_<NAME>` 一律沿用 `<KEY>`，只有 DSN 例外
 - `stringer` 以 `GeneratorEx` 組合模式擴充標準庫 `stringer`：嵌入 `service.Generator`，額外產生 `List()`、`ValueList()`、`Map()`、`ValueMap()` 四個輔助函式
 - 日誌模組在 `init()` 時即以預設值初始化 slog 全域 logger：確保任何 import 此套件的模組都能立即使用套件層級 `slog.*`，`log.Init()` 可在設定載入後再次呼叫以套用 `LOG_LEVEL` / `LOG_FORMAT`。不提供 wrapper 函式，消費端直接使用 stdlib `log/slog`
 - CSV 處理使用歸檔標記檔（`.archived`）防止重複處理：以簡單的檔案系統機制取代資料庫或 Redis 的已處理紀錄

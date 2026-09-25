@@ -1,7 +1,7 @@
 {
   "name": "gosdk",
   "description": "Go development toolkit for github.com/bizshuk/gosdk — bundles 2 Go-focused skills (dev, review) and the assertive `golang-refactor` agent that auto-invokes them to rewrite code breaking SOLID, MVC, naming, error handling, context propagation, or performance conventions. Triggers: refactor, review, audit, clean up, restructure, improve, profile memory, build a bubbletea TUI.",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "author": {
     "name": "shuk",
     "url": "https://github.com/bizshuk"

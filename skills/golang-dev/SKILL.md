@@ -2,13 +2,15 @@
 name: golang-dev
 description: >
     Use when writing or reviewing Go in a gosdk-based project — cobra CLI,
-    config.Default/viper, SQLite/MySQL/PostgreSQL, slog, MVC layering
+    config.Default/viper, database connection (db.Init, DB_DRIVER + DB_DSN
+    for mysql or sqlite), slog, MVC layering
     (handler/service/repository/model), naming (stutter, acronyms, gopls
     rename), Gin HTTP, bubbletea/lipgloss panel TUI, metrics, notify,
     testify, escape analysis, HTTP client/server, gRPC, TLS, or
     registry/init() providers. Triggers: gosdk, config.Default, MVC,
     rename, slog, cobra, MetricService, TUI, bubbletea, connection
-    pool, timeouts, drain response body.
+    pool, timeouts, drain response body, DB_DSN, DB_DRIVER, gorm,
+    MYSQL_DSN, SQLITE_PATH.
 allowed-tools: Bash, Read, Edit, Grep, Glob, AskUserQuestion
 user-invocable: true
 disable-model-invocation: false
@@ -25,7 +27,7 @@ Load **only** the chapter that matches the task. Do not read the rest.
 | ------- | --------- |
 | [cli.md](references/cli.md) | cobra, where `main.go` goes, one- and two-layer subcommands, `ConfigCmd`, `CobraCMDHook` |
 | [tui.md](references/tui.md) | `monitor`, bubbletea, columns misalign, flicker |
-| [config.md](references/config.md) | `config.Default`, viper keys, dual-file, SQLite/MySQL/Postgres |
+| [config.md](references/config.md) | `config.Default`, viper keys, dual-file; `db.Init` / `db.Open` with `DB_DRIVER` + `DB_DSN`, `DB_LOG`, `DB_TRANSLATE_ERROR`; legacy `MYSQL_DSN` / `SQLITE_PATH` |
 | [logging.md](references/logging.md) | slog, `LOG_LEVEL`, zap leftovers |
 | [http.md](references/http.md) | Gin, client/server timeouts, drain body, TLS, retries |
 | [layers.md](references/layers.md) | handler/service/repository, DI, where interfaces live |

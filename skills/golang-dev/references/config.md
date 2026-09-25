@@ -32,7 +32,11 @@ config.Default(config.WithAppName("myapp"))
 if err := db.Init(); err != nil { return err } // DB_DRIVER + DB_DSN
 gormDB := db.Default.DB()
 
-extra, err := db.Open("trifecta") // DB_DSN_TRIFECTA (+ DB_DRIVER_TRIFECTA, else DB_DRIVER)
+slog.Info("db", "target", db.Default.Target()) // password masked
+
+extra, err := db.Open("trifecta") // DB_DSN_TRIFECTA; other *_TRIFECTA keys fall back to the primary
 ```
 
-Keys: `DB_DRIVER` (`mysql` | `sqlite`), `DB_DSN` (single DSN string, not host/port/user). Empty `DB_DSN` with sqlite derives `<app config>/data/<app_name>.db`. An extra connection is an explicit decision, never a default.
+Keys: `DB_DRIVER` (`mysql` | `sqlite`), `DB_DSN` (single DSN string, not host/port/user). Empty `DB_DSN` with sqlite derives `<app config>/data/default.db`. `DB_LOG` (default `false`, gorm output discarded) and `DB_TRANSLATE_ERROR` (default `true`, `gorm.ErrDuplicatedKey` etc.) switch gorm behaviour — don't `gorm.Open` yourself to get them. An extra connection is an explicit decision, never a default.
+
+Legacy (gone since v1.3.18): `SQLITE_PATH` / `MYSQL_DSN` / `POSTGRES_DSN`, `db.InitSQLite` / `InitMySQL` / `InitPostgres`, `DefaultSQLite` / `DefaultMySQL`, and "whichever key is set picks the driver". Migrating a deployed service: code switches to the new keys in one go (no dual-read); on the host, add `DB_DRIVER` + `DB_DSN` next to the old key, deploy, then delete the old key. A SQLite file moves to `data/default.db` only while the service is stopped — a new binary started first creates an empty `default.db` and serves it silently. Workspace rules (one DB per service, approval for extras) live in `inf-spec` `references/database.md`.
