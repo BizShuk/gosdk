@@ -6,6 +6,8 @@
 
 ## Architecture
 
+- [ ] [P1] [feature] metric 對齊 inf 的 SRE 命名標準: 標準在 `inf/skills/inf-grafana/references/metric-naming.md`，共用 dashboard 與告警只認那份清單。要做的：(a) 每條 metric 帶 `service` label（OTel resource 目前寫死 `service.name="gosdk"`，進 VM 後叫 `service_name`，不算數；`CobraCMDHook` 的 `command_line_trigger` 也沒帶）；(b) 週期性送 `service_build_info{version,commit}` 與 `service_start_time_seconds` 當心跳；(c) Gin middleware 送 `http_server_requests_total{method,route,status_code}` 與 `http_server_request_duration_seconds`（route 用 template path，未命中記 `unmatched`）；(d) `scheduler.Job` 自動送 `task_*`（註冊時先送 `task_last_success_timestamp_seconds` = 啟動時間，並送 `task_interval_seconds`）；(e) 單位由 `ms` 改為 `seconds`，`SPEC.md` 的 `{domain}.{name}.{operation}` 與 `job_name` 慣例退場。
+
 ## Plans
 
 - [file-store-unification](plans/2026-07-29-file-store-unification.md)
