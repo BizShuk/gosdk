@@ -169,9 +169,33 @@ func TestOpen_NamedDriverOverridesDefault(t *testing.T) {
 	}
 }
 
-func TestOpen_NamedEmptyDSNFailsEvenForSQLite(t *testing.T) {
+// 主資料庫是 mysql, 本機 cache 是具名 sqlite 連線: DSN 空值同樣推導 data/default.db。
+func TestOpen_NamedSQLiteEmptyDSNDerivesAppDataPath(t *testing.T) {
+	resetDB(t, "DB_DRIVER_CACHE")
+	dir := t.TempDir()
+	config.SetAppName("dbtest")
+	config.SetConfigDir(dir)
+	t.Cleanup(func() {
+		config.SetAppName("")
+		config.SetConfigDir("")
+	})
+	viper.Set(KEY_DRIVER, DRIVER_MYSQL)
+	viper.Set("DB_DRIVER_CACHE", DRIVER_SQLITE)
+
+	svc, err := Open("cache")
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	t.Cleanup(func() { _ = svc.Close() })
+	want := filepath.Join(dir, "data", DEFAULT_SQLITE_FILE)
+	if svc.Target() != want {
+		t.Errorf("Target() = %q, want %q", svc.Target(), want)
+	}
+}
+
+func TestOpen_NamedMySQLEmptyDSNFails(t *testing.T) {
 	resetDB(t, "DB_DSN_TRIFECTA")
-	viper.Set(KEY_DRIVER, DRIVER_SQLITE)
+	viper.Set(KEY_DRIVER, DRIVER_MYSQL)
 
 	if _, err := Open("trifecta"); err == nil || !strings.Contains(err.Error(), "DB_DSN_TRIFECTA not set") {
 		t.Fatalf("err = %v, want DB_DSN_TRIFECTA not set", err)

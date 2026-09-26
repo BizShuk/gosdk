@@ -22,7 +22,7 @@
 | Term | 定義 |
 | --- | --- |
 | `Storage Service` | 一條由設定決定 driver 的 gorm 連線（`db.Service`），實作 `DB()` / `Driver()` / `Close()`；主連線為 `db.Default`。 |
-| `DB_DRIVER` / `DB_DSN` | 主資料庫的 driver（`mysql` \| `sqlite`）與 DSN；sqlite 空 DSN 推導 `data/default.db`；額外連線加 suffix `_<NAME>`（`DB_DSN_<NAME>` 必填，其餘 key 未設沿用主連線）。 |
+| `DB_DRIVER` / `DB_DSN` | 主資料庫的 driver（`mysql` \| `sqlite`）與 DSN；sqlite 空 DSN 推導 `data/default.db`（具名連線亦同）；額外連線加 suffix `_<NAME>`（`DB_DSN_<NAME>` 不沿用主連線，mysql 必填；其餘 key 未設沿用主連線）。 |
 | `DB_LOG` / `DB_TRANSLATE_ERROR` | gorm 行為開關：log 預設關（`logger.Discard`），錯誤轉譯預設開（`gorm.ErrDuplicatedKey` 等 sentinel）。 |
 | `Per-storage Singleton` | 每種 Storage Service 全域`只允許一個 instance`；`InitXxx()` 是拒絕重複初始化的守護函式。 |
 | `DSN` | MySQL / PostgreSQL 的單一連線字串欄位。刻意不拆成 HOST / PORT / USER / PASSWORD。 |

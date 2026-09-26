@@ -13,7 +13,7 @@
 //
 // 需要額外的資料庫連線時(必須是明確的決定,不是預設),以 suffix _<NAME> 區分。
 // 每個 key 的 <KEY>_<NAME> 未設定時沿用 <KEY>;唯一的例外是 DSN,
-// DB_DSN_<NAME> 必填,不會沿用主連線的位址。
+// DB_DSN_<NAME> 不會沿用主連線的位址:mysql 必填,sqlite 空值推導 data/default.db。
 //
 // 典型用法:
 //
@@ -21,6 +21,7 @@
 //	if err := db.Init(); err != nil { /* 處理錯誤 */ }
 //	gormDB := db.Default.DB()
 //
+//	cache, err := db.Open("cache") // DB_DRIVER_CACHE=sqlite, DSN 空值 → data/default.db
 //	trifecta, err := db.Open("trifecta") // 讀 DB_DSN_TRIFECTA
 package db
 
@@ -120,8 +121,8 @@ func Init() error {
 // 否則讀 <KEY>_<NAME>,除 DSN 外未設定時沿用 <KEY>。
 // NAME 為 name 轉大寫, "-" 換成 "_"。
 //
-// DSN 為空時:主連線且 driver 為 sqlite,推導為 <app config>/data/default.db;
-// 其餘情況一律報錯。
+// DSN 為空時:driver 為 sqlite 則推導為 <app config>/data/default.db
+// (主連線與具名連線相同);mysql 一律報錯。
 func Open(name string) (*Service, error) {
 	driverKey, dsnKey := Key(KEY_DRIVER, name), Key(KEY_DSN, name)
 
@@ -131,7 +132,7 @@ func Open(name string) (*Service, error) {
 	}
 
 	dsn := strings.TrimSpace(viper.GetString(dsnKey))
-	if dsn == "" && name == "" && driver == DRIVER_SQLITE {
+	if dsn == "" && driver == DRIVER_SQLITE {
 		path, err := defaultSQLitePath()
 		if err != nil {
 			return nil, fmt.Errorf("db.Open: %s not set: %w", dsnKey, err)
