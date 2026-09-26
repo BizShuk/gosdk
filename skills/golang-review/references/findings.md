@@ -15,6 +15,6 @@ Fix: <before / after>
 | MED | fat interface, producer-side interface, missing `%w`, boxing on a warm path, no breaker |
 | LOW | long function, magic number, micro-tuning, observability gap |
 
-**Must-fix:** cyclic imports, business logic in `service/`/`model/` (`golang-dev` layers chapter), concrete deps in handlers, `_ = err`, unbounded `go` in Accept/loops.
+**Must-fix:** cyclic imports, business logic in `handler/`/`model/` (`golang-dev` layers chapter), concrete deps in handlers, `_ = err`, unbounded `go` in Accept/loops.
 
 Preserve external behavior when applying a refactor. One principle per change when several exist — let the user prioritize unless they asked to apply all.

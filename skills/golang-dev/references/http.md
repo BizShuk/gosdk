@@ -1,15 +1,6 @@
 # HTTP & networking
 
-```go
-s := gin.Default()
-s.Use(mw.CorrelationID(), mw.Helmet())
-router.Default(s)           // /stats
-router.HealthRouterGroup(s) // /healthz
-router.PingRouterGroup(s)   // /ping
-s.Run(":8080")
-```
-
-Prefer `net/http` unless routing complexity needs gin. Production servers use `http.Server` with every timeout set — `s.Run` is samples only.
+Gin by default. The engine is built in `handler/route` and served from `cmd/web.go` through an `http.Server` with every timeout set — `engine.Run` is samples only. Layout, middleware placement, and wiring: [layers.md](layers.md).
 
 **Client.** Drain then close: `io.Copy(io.Discard, resp.Body)` then `resp.Body.Close()`. Never `http.Get` / `http.DefaultClient` — one `http.Client` per upstream, with `Timeout` and a tuned `Transport` (`MaxIdleConns`, `MaxIdleConnsPerHost`, `MaxConnsPerHost`, `IdleConnTimeout`). Retries via `gosdk/http` (import alias `gohttp`): only idempotent ops, cap + exponential backoff + jitter, honor `Retry-After`, pair with a circuit breaker. A slow dependency must not share a pool with a fast one.
 

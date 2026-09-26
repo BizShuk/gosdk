@@ -61,7 +61,7 @@ HTTP/networking, TUI, and `github.com/bizshuk/gosdk` APIs.
 
 | Concern | Action |
 | ------- | ------ |
-| Wrong layer (handler doing DB, business logic in `service/`) | Move code to the owning package |
+| Wrong layer (handler doing DB or business rules, gin in `svc/`) | Move code to the owning package |
 | Naming (stutter, acronyms, package names) | `gopls rename` only — never Edit/sed |
 | gosdk anti-patterns (zap wrappers, `NewXxxCmd`, `NewMimirService`, config schema) | Rewrite to current SDK idioms |
 | HTTP client/server (undrained body, no timeouts, unbounded Accept) | Apply §5 networking rules |
@@ -84,7 +84,7 @@ sequence for a single request — don't limit to one.
 
 `golang-dev` vs `golang-review`: `golang-dev` owns how to write it (layers, naming, SDK);
 `golang-review` owns whether it holds (SOLID, errors, DI, dead code, measured performance). If
-business logic sits in `service/`, `golang-dev` moves it to `handler/`; `golang-review`
+business logic sits in `handler/<domain>`, `golang-dev` moves it to `svc/<domain>`; `golang-review`
 then cleans up the resulting code.
 
 ## 3. Invocation Contracts

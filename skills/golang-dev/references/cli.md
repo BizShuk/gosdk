@@ -8,7 +8,8 @@ cmd/
   logs.go      # logs (alias log)
   list.go      # list (alias l)
   ps.go        # ps — only if the app owns long-lived OS processes
-  web.go       # web
+  web.go       # web — Gin server trigger (layers.md)
+  web/         # web subcommands (routes, migrate), two-layer rule below
 ```
 
 `main.go` lives at the **repo root** — the repo name is the command name, so `go install .` yields the right binary with no extra path. Only a repo shipping several binaries uses `cmd/<binary>/main.go`, and then `cmd/` holds mains, not commands.
@@ -39,7 +40,7 @@ svc/grafana/       # what the commands actually do
 
 `cmd` must **not** import `cmd/<group>` — the children import `cmd` to reach the group var, so the arrow points one way and `main.go`'s blank import is what attaches them. Adding a group is one file, one directory, one blank import.
 
-Name collision is expected: `cmd/grafana` and `svc/grafana` are both `package grafana`, so alias the service side (`svc "…/svc/grafana"`). Inside a `RunE`, name the cobra parameter `c`, not `cmd` — it would shadow the imported package.
+Name collision is expected: `cmd/grafana` and `svc/grafana` are both `package grafana`, so alias the service side `<domain>svc` (`grafanasvc "…/svc/grafana"`). Inside a `RunE`, name the cobra parameter `c`, not `cmd` — it would shadow the imported package.
 
 ```go
 var RootCmd = &cobra.Command{Use: "myapp"}
@@ -59,14 +60,7 @@ func init() {
 ```
 
 ```go
-var WebCmd = &cobra.Command{
-    Use: "web", Short: "Start the HTTP server",
-    RunE: func(cmd *cobra.Command, args []string) error {
-        fmt.Printf("Listening on :%d\n", viper.GetInt("port"))
-        return nil
-    },
-}
-
+// cmd/web.go — RunE body (wiring + http.Server) lives in layers.md
 func init() {
     RootCmd.AddCommand(WebCmd)
     WebCmd.Flags().IntP("port", "p", 8080, "server port")
