@@ -4,7 +4,7 @@ description: >
     Use when writing or reviewing Go in a gosdk-based project — cobra CLI,
     config.Default/viper, database connection (db.Init, DB_DRIVER + DB_DSN
     for mysql or sqlite), slog, MVC layering
-    (handler/<domain>, handler/route, handler/middleware, svc/<domain>,
+    (handler/<domain>, handler/route, handler/web, handler/middleware, svc/<domain>,
     model, cmd/web.go), naming (stutter, acronyms, gopls
     rename), Gin HTTP, bubbletea/lipgloss panel TUI, metrics, notify,
     testify, escape analysis, HTTP client/server, gRPC, TLS, or
@@ -31,7 +31,7 @@ Load **only** the chapter that matches the task. Do not read the rest.
 | [config.md](references/config.md) | `config.Default`, viper keys, dual-file; `db.Init` / `db.Open` with `DB_DRIVER` + `DB_DSN`, `DB_LOG`, `DB_TRANSLATE_ERROR`; legacy `MYSQL_DSN` / `SQLITE_PATH` |
 | [logging.md](references/logging.md) | slog, `LOG_LEVEL`, zap leftovers |
 | [http.md](references/http.md) | client/server timeouts, drain body, TLS, retries |
-| [layers.md](references/layers.md) | MVC web service on Gin: `handler/<domain>` / `handler/route` / `handler/middleware` / `svc/<domain>` / `model/`, `cmd/web.go` wiring, identity auth middleware (Bearer + cookie), where interfaces live |
+| [layers.md](references/layers.md) | MVC web service on Gin: `handler/<domain>` / `handler/route` (backend router) / `handler/web` (frontend + static server) / `handler/middleware` / `svc/<domain>` / `model/`, `cmd/web.go` wiring, identity auth middleware (Bearer + cookie), where interfaces live |
 | [naming.md](references/naming.md) | stutter, acronyms, `gopls rename` |
 | [metrics.md](references/metrics.md) | `metric.Send`, notify, CSV, `homedir.Expand` |
 | [libraries.md](references/libraries.md) | which library to pick |

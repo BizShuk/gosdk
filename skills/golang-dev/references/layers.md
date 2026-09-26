@@ -11,7 +11,12 @@ cmd/
     routes.go            #   RoutesCmd — print the route table
 handler/
   route/
-    route.go             # package route — New(Handlers) *gin.Engine; the only file that knows URLs
+    route.go             # package route — backend router: New(Handlers) *gin.Engine; the only file that knows URLs
+  web/                   # package web — frontend source + the server that serves its build
+    web.go               #   //go:embed dist; Register(r) mounts assets + SPA fallback
+    package.json         #   frontend toolchain (vite); `npm run build` → dist/
+    src/                 #   frontend source
+    dist/                #   build output, embedded into the binary
   middleware/
     auth.go              # package middleware — project gin.HandlerFunc
   user/                  # package user — one directory per domain
@@ -29,12 +34,13 @@ model/
 | ----- | ------- | ---- | --------------- |
 | Trigger | `cmd/web.go` | `db.Init`, identity verifier, construct svc → handler, `route.New`, run `http.Server` | — (the only place concretes are wired) |
 | Route | `handler/route` | engine, global middleware, gosdk routers, per-group auth / plan gates, `METHOD path → handler` | `svc/`, gorm |
+| Web | `handler/web` | frontend source; embed its build and serve static assets + SPA fallback | `svc/`, `handler/<domain>`, gorm |
 | Middleware | `handler/middleware` | cross-cutting `gin.HandlerFunc`; deps via constructor params | `handler/<domain>`, `svc/` |
 | Handler | `handler/<domain>` | bind + validate request, read claims, call svc, map error → status, render | gorm, DB drivers, viper, `http.Client` |
 | Service | `svc/<domain>` | business rules, persistence, outgoing requests | gin, `handler/`, identity claims |
 | Model | `model/` | structs, JSON (snake_case) + gorm tags | any project package |
 
-Arrows point one way: `cmd → handler/route → handler/<domain> → svc/<domain> → model`. `gosdk/mw` (`CorrelationID`, `Helmet`) and `gosdk/router` (`/healthz`, `/ping`, `/stats`) are used as-is from `route`; `handler/middleware` holds only what the project adds. `model` stays one package unless >30 types, then split by domain.
+Arrows point one way: `cmd → handler/route → handler/web | handler/<domain> → svc/<domain> → model`. `gosdk/mw` (`CorrelationID`, `Helmet`) and `gosdk/router` (`/healthz`, `/ping`, `/stats`) are used as-is from `route`; `handler/middleware` holds only what the project adds. `model` stays one package unless >30 types, then split by domain.
 
 ## Middleware — auth via identity
 
@@ -148,9 +154,41 @@ func New(h Handlers) *gin.Engine {
     api := r.Group("/api/v1", h.Auth)
     api.GET("/me", h.User.Me)
     api.POST("/export", ginmw.RequirePlanOn(model.APP_NAME, "pro"), h.User.Export)
+
+    web.Register(r) // frontend last: NoRoute fallback
     return r
 }
 ```
+
+## Web — frontend and its server
+
+`handler/web` owns the frontend end to end: source, toolchain, and the Go code that serves the build. The frontend talks to the backend only through `/api/v1` — it never shares Go types or reaches into `handler/<domain>`.
+
+```go
+// handler/web/web.go
+package web
+
+//go:embed all:dist
+var dist embed.FS
+
+// Register serves the built frontend; unknown non-API paths fall back to index.html.
+func Register(r *gin.Engine) {
+    files, _ := fs.Sub(dist, "dist")
+    static := http.FileServer(http.FS(files))
+    r.NoRoute(func(c *gin.Context) {
+        if strings.HasPrefix(c.Request.URL.Path, "/api/") {
+            c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+            return
+        }
+        if _, err := fs.Stat(files, strings.TrimPrefix(c.Request.URL.Path, "/")); err != nil {
+            c.Request.URL.Path = "/" // SPA route → index.html
+        }
+        static.ServeHTTP(c.Writer, c.Request)
+    })
+}
+```
+
+`route.New` calls `web.Register(r)` last, after every API group. Build order: `npm --prefix handler/web run build` before `go build` (embed fails on a missing `dist/`); commit a placeholder `dist/index.html` or build it in the Dockerfile's node stage. Dev: run vite with `server.proxy['/api']` pointing at the Go port, so there is no CORS.
 
 ## Trigger
 
