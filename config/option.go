@@ -18,8 +18,10 @@ type configOptions struct {
 // ConfigOption defines the functional option type for config loading.
 type ConfigOption func(*configOptions)
 
-// WithDefaultValue specifies a default JSON configuration string to write
-// if the config file does not exist. This only applies to jsonConfig (settings.json).
+// WithDefaultValue specifies a default JSON configuration string. It is written
+// to settings.json when that file does not exist, and on every Default() call it
+// is also merged as the lowest layer, so keys missing from an older
+// settings.json fall back to their default instead of reading as empty.
 //
 // How to set up: Provide a valid JSON string literal. Example for a settings.json
 // with "host" and "port" fields:

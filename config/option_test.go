@@ -104,3 +104,27 @@ func TestSetGetAppName(t *testing.T) {
 }
 
 
+
+func TestDefaultValueFillsKeysMissingFromExistingSettings(t *testing.T) {
+	viper.Reset()
+	defer viper.Reset()
+
+	dir := t.TempDir()
+	stale := `{"name": "from-file"}`
+	if err := os.WriteFile(filepath.Join(dir, "settings.json"), []byte(stale), 0o600); err != nil {
+		t.Fatalf("write settings.json: %v", err)
+	}
+
+	Default(
+		WithAppName("test-fill-app"),
+		WithConfigDir(dir),
+		WithDefaultValue(`{"name": "from-default", "identity_base_url": "https://identity.example"}`),
+	)
+
+	if got := viper.GetString("name"); got != "from-file" {
+		t.Errorf("file value must win over default: got %q", got)
+	}
+	if got := viper.GetString("identity_base_url"); got != "https://identity.example" {
+		t.Errorf("missing key must fall back to default: got %q", got)
+	}
+}

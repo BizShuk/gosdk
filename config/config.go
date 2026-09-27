@@ -61,6 +61,18 @@ func Default(opts ...ConfigOption) {
 		"APP_CONFIG_DIR", GetAppConfigDir(),
 	)
 
+	// The seed JSON is also the lowest layer on every start, not only the
+	// content of a freshly created settings.json: a key added to the seed after
+	// the file was written still has a value, and every file layer overrides it.
+	if o.defaultValue != "" {
+		defaults, err := ParseJSON([]byte(o.defaultValue))
+		if err != nil {
+			slog.Warn("invalid default config", "app", appName, "err", err, "config_dir", GetAppConfigDir())
+		} else {
+			viper.MergeConfigMap(defaults)
+		}
+	}
+
 	// --- Load & merge all configs ---
 	err := loadAllConfigs()
 	if err != nil {
