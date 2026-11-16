@@ -14,6 +14,8 @@ allowed-tools: Bash, Read, Edit, Grep, Glob, AskUserQuestion
 user-invocable: true
 disable-model-invocation: false
 context: fork
+metadata:
+    source: https://github.com/BizShuk/gosdk
 ---
 
 # golang-review
