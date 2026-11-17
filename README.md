@@ -206,13 +206,13 @@ Go 語言通用開發工具包 (Shared SDK)，提供設定管理、HTTP 服務�
 
 `環境變數 (Config Keys):`
 
-| 變數 | 預設值 | 用途 |
-| --- | --- | --- |
-| `METRIC_URL` | `http://localhost:8428/api/v1/write` | Remote write — 通用後端 |
-| `VICTORIAMETRICS_URL` | `http://localhost:8428/api/v1/write` | Remote write — VictoriaMetrics |
-| `MIMIR_URL` | `http://localhost:9009/api/v1/push` | Remote write — Mimir (compat) |
-| `OTLP_METRIC_URL` | `http://localhost:8428/opentelemetry/v1/metrics` | OTLP metrics 端點 |
-| `OTLP_TRACE_URL` | `""` (空 = OTLP 預設 `localhost:4318`) | OTLP traces 端點 |
+| 變數                  | 預設值                                           | 用途                           |
+| --------------------- | ------------------------------------------------ | ------------------------------ |
+| `METRIC_URL`          | `http://localhost:8428/api/v1/write`             | Remote write — 通用後端        |
+| `VICTORIAMETRICS_URL` | `http://localhost:8428/api/v1/write`             | Remote write — VictoriaMetrics |
+| `MIMIR_URL`           | `http://localhost:9009/api/v1/push`              | Remote write — Mimir (compat)  |
+| `OTLP_METRIC_URL`     | `http://localhost:8428/opentelemetry/v1/metrics` | OTLP metrics 端點              |
+| `OTLP_TRACE_URL`      | `""` (空 = OTLP 預設 `localhost:4318`)           | OTLP traces 端點               |
 
 `領域流程 (Domain Flow) — Remote Write:`
 
@@ -501,16 +501,16 @@ Based on codebase analysis:
 歷史脈絡見 [docs/specs/2026-08-12-Summary.md](docs/specs/2026-08-12-Summary.md)、
 [plans/2026-08-12-Refresh.md](plans/2026-08-12-Refresh.md) 與 [docs/CHANGELOG.md](docs/CHANGELOG.md)。
 
-| 已淘汰 (Deprecated) | 現行替代 (Replacement) |
-| --- | --- |
-| `config/common` 套件、`config.ConfigSchema` / `ServerConfig` / `DBConnConfig` | `db/` 套件與扁平 viper key（`DB_DRIVER` / `DB_DSN`） |
+| 已淘汰 (Deprecated)                                                                                        | 現行替代 (Replacement)                                                                   |
+| ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `config/common` 套件、`config.ConfigSchema` / `ServerConfig` / `DBConnConfig`                              | `db/` 套件與扁平 viper key（`DB_DRIVER` / `DB_DSN`）                                     |
 | `db.InitSQLite()` / `db.InitMySQL()` / `db.InitPostgres()` 與 `SQLITE_PATH` / `MYSQL_DSN` / `POSTGRES_DSN` | `db.Init()` / `db.Open(name)` 與 `DB_DRIVER` / `DB_DSN[_<NAME>]`；PostgreSQL driver 移除 |
-| `config.GetProfile()`、`config.GlobalConfig`、`PROFILE` 環境變數 | base + `.local` 雙檔載入（`.env` / `.env.local` 等） |
-| `config.WithConfigPath(path)` | `config.WithConfigDir(dir)` |
-| `config.DefaultWithDir(dir)` | `config.Default(config.WithConfigDir(dir))` |
-| `cmd/versioning` 獨立 CLI、小寫 `version` 檔 | `cmd.MajorCmd` / `cmd.MinorCmd` / `cmd.PatchCmd`，操作 `VERSION` 檔 |
-| `encode/io/` 子目錄（`decode.go` / `gbk.go` / `big5.go`） | 已併入 `encode/` 根目錄，套件名統一為 `encode` |
-| `service/generator.go` | `service/stringer/generator.go`（`package stringer`） |
-| `utils.ProcessCSVFile` / `utils.RecordProcessor` | `encode/csv` 的 `ProcessCSVFile` / `RecordProcessor` |
-| `go.uber.org/zap`、`log.Info` / `log.Infof` / `log.Fatalf` wrapper | 標準 `log/slog` 套件層級函式，`log.Init()` 只負責初始化 |
-| `metric.MimirService` / `metric.NewMimirService()` | `metric.NewMetricService()`（`MIMIR_URL` 相容層仍保留但標記 Deprecated） |
+| `config.GetProfile()`、`config.GlobalConfig`、`PROFILE` 環境變數                                           | base + `.local` 雙檔載入（`.env` / `.env.local` 等）                                     |
+| `config.WithConfigPath(path)`                                                                              | `config.WithConfigDir(dir)`                                                              |
+| `config.DefaultWithDir(dir)`                                                                               | `config.Default(config.WithConfigDir(dir))`                                              |
+| `cmd/versioning` 獨立 CLI、小寫 `version` 檔                                                               | `cmd.MajorCmd` / `cmd.MinorCmd` / `cmd.PatchCmd`，操作 `VERSION` 檔                      |
+| `encode/io/` 子目錄（`decode.go` / `gbk.go` / `big5.go`）                                                  | 已併入 `encode/` 根目錄，套件名統一為 `encode`                                           |
+| `service/generator.go`                                                                                     | `service/stringer/generator.go`（`package stringer`）                                    |
+| `utils.ProcessCSVFile` / `utils.RecordProcessor`                                                           | `encode/csv` 的 `ProcessCSVFile` / `RecordProcessor`                                     |
+| `go.uber.org/zap`、`log.Info` / `log.Infof` / `log.Fatalf` wrapper                                         | 標準 `log/slog` 套件層級函式，`log.Init()` 只負責初始化                                  |
+| `metric.MimirService` / `metric.NewMimirService()`                                                         | `metric.NewMetricService()`（`MIMIR_URL` 相容層仍保留但標記 Deprecated）                 |
