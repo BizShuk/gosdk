@@ -72,3 +72,19 @@
 | 常數 | `SCREAMING_SNAKE_CASE`（含 unexported 與 block-scoped） | `DEFAULT_MAX_ATTEMPTS`, `TEMP_FILE_PREFIX` |
 | 變數 | MixedCaps | `configBaseDir` |
 | 環境變數 | 對應 viper key 的大寫形式 | `server.port` → `SERVER_PORT` |
+
+## Pipeline 狀態 (Pipeline State)
+
+| Term | 定義 |
+| --- | --- |
+| `Pipeline` | `gosdk/cmd/pstate` 的一組有相依關係的工作，負責執行、記錄狀態並繪製。 |
+| `Node` | pipeline 的一個步驟：一個 `Func` 加上它的 ID、上游與狀態。 |
+| `Func` | 被 `Wrap`（帶參數）或 `Do`（不帶參數）包起來的工作函式；參數在包裝時保存，重試沿用。 |
+| `T` | 傳給工作函式的節點 handle，提供 `Log` / `Error` / `Wait`。 |
+| `Pending` | 工作函式呼叫 `T.Wait` 後停下，等待 `Trigger`（UI 按 enter / 點擊）。與從未開始的 `NotStarted` 不同。 |
+| `Retry` | 讓 `Failed` 節點以原參數重跑；成功後被它擋住的下游接著執行。 |
+| `Stage` | `dependency` 版面中的一欄：相依深度相同的節點。沒有上游的節點在 stage 1。 |
+| `Dummy` | 跨越多欄的連線在中間欄佔用的位置，只畫成一條水平線。 |
+| `Trunk` | 兩欄之間通道中的垂直連線；多來源的目標一條、單一來源的目標沿用來源的。 |
+| `Pan` | 節點圖比畫面寬或高時移動 viewport，以 `shift+wheel` 左右、滾輪上下。 |
+| `Log Pane` | TUI 下方顯示狀態轉換與 `T.Log` / `T.Error` 紀錄的區塊，高度由 `WithLogHeight` 設定。 |

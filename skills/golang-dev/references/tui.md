@@ -57,3 +57,5 @@ Subsequence: every query rune in order, gaps allowed (`aeg` matches `abcdefg`). 
 | Wrong details under row | drop replies whose key no longer matches |
 | Fresh timestamp over stale data | timestamp the reply you accepted, not the moment it arrived |
 | Rows vanish on a short terminal | seed `height` before the first `WindowSizeMsg` |
+| `shift+wheel` / trackpad swipe does nothing (pty test passes) | VS Code-family xterm.js drops `shiftKey` wheel and `deltaX`; also accept `msg.Alt` and offer keys (`<` `>`) |
+| Pipeline / DAG progress screen | don't build one: [pstate.md](pstate.md) |

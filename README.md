@@ -141,6 +141,24 @@ Go 語言通用開發工具包 (Shared SDK)，提供設定管理、HTTP 服務�
 
 ---
 
+### Pipeline 狀態視覺化 (Pipeline State)
+
+把一組有相依關係的工作包起來執行, 並在終端機上即時畫成節點圖. 上層只要用 `Wrap` / `Do` 包住自己的函式並宣告上游, `pstate` 負責依相依順序平行執行, 記錄狀態與 log, 失敗時保留參數供重試.
+
+`領域流程 (Domain Flow):`
+
+1. `pstate.New()` 建立 `Pipeline`, 以 `Add(id, pstate.Wrap(fn, params), pstate.After(deps...))` 登記節點; 上游必須先登記, 因此相依不可能成環
+2. `pstate.Run(ctx, p)` (TUI) 或 `p.Execute(ctx)` (headless) 啟動: 上游全部 `finished` 的節點立刻在各自的 goroutine 執行, 彼此獨立的節點同時跑
+3. 工作函式回傳 nil 為 `finished`, 回傳 error 或 panic 為 `failed`, 其下游維持 `not_started`; 呼叫 `T.Wait` 則進入 `pending`, 等待觸發
+4. TUI 中失敗的節點點兩下 (或選取後按 `r`) 以 `Wrap` 當時保存的參數重跑, 成功後被擋住的下游接著執行; `pending` 節點按 `enter` 觸發
+5. 節點圖依 `dependency` / `priority` 由左到右分欄並以連線相接, 比畫面寬時可左右平移; `timeline` 版面改以甘特圖呈現平行執行
+
+`核心實體 (Key Entities):` `Pipeline`, `Func` (`Wrap` / `Do`), `T` (節點 handle), `Status` (`not_started` / `running` / `pending` / `finished` / `failed`), `Layout`
+
+`相關處理器 (Related Handlers):` `pstate.New()`, `Pipeline.Add()`, `pstate.Wrap()`, `pstate.Run()`, `Pipeline.Execute()`, `Pipeline.Retry()`, `Pipeline.Trigger()`
+
+---
+
 ### 編碼與資料處理 (Encoding & Data Processing)
 
 提供 CJK 字元編碼轉換（GBK ↔ UTF-8、Big5 ↔ UTF-8）、CSV 檔案批次處理與歸檔機制、檔案操作工具、民國曆 (ROC calendar) 日期解析，以及各種型別輔助函式（指標轉換、nil 檢查、隨機字串、時間解析等）。設計為可獨立引用的工具模組。
@@ -230,6 +248,7 @@ Go 語言通用開發工具包 (Shared SDK)，提供設定管理、HTTP 服務�
 - `程式碼產生` 為獨立工具領域，不依賴其他執行時期領域，但產出的程式碼（`*_string.go`）可能被其他領域使用
 - `版本管理` 為獨立 CLI 工具領域，不依賴其他執行時期領域，操作純文字版本檔
 - `編碼與資料處理` 為獨立工具領域，提供底層工具函式給其他領域使用（如 CSV 處理、檔案操作、型別轉換）
+- `Pipeline 狀態視覺化` 是獨立的執行領域：包住呼叫端的函式並依相依順序執行，可被 `排程管理` 的 Job 當成一次執行的內容
 - `日誌與觀測` 被所有需要記錄的領域引用，提供統一的結構化日誌出口
 
 ## 使用方式 (Usage)
@@ -377,6 +396,38 @@ s.Add(scheduler.Job{
 })
 s.Start(ctx)
 ```
+
+### Pipeline 狀態視覺化
+
+```go
+import "github.com/bizshuk/gosdk/cmd/pstate"
+
+type BuildArgs struct{ Target string }
+
+func build(ctx context.Context, t *pstate.T, a BuildArgs) error {
+    t.Logf("building %s", a.Target) // 寫進 log pane
+    return compile(ctx, a.Target)    // 回傳 error = failed, 可在 TUI 上重試
+}
+
+p := pstate.New()
+p.Add("fetch", pstate.Do(fetch))
+p.Add("build", pstate.Wrap(build, BuildArgs{Target: "linux"}), pstate.After("fetch"))
+p.Add("approve", pstate.Do(func(ctx context.Context, t *pstate.T) error {
+    return t.Wait(ctx, "waiting for release manager") // pending, 按 enter 或 p.Trigger 繼續
+}), pstate.After("build"))
+
+err := pstate.Run(ctx, p,
+    pstate.WithTitle("release"),
+    pstate.WithLayout(pstate.LayoutDependency), // LayoutPriority / LayoutTimeline
+    pstate.WithGraphHeight(15),                 // 預設 15 列
+    pstate.WithLogHeight(5),                    // 預設 5 列, 0 = 隱藏
+)
+// CI 等沒有終端機的場合: err := p.Execute(ctx)
+```
+
+按鍵: 方向鍵 / `hjkl` 選取節點 (畫面橫向跟著選取置中), `<` / `>` 或 `shift+←` / `shift+→` 只平移畫面, `r` 重試失敗節點, `enter` 觸發 pending 節點, `tab` 切換版面, `f` 只看選取節點的 log, `[` / `]` 與 `-` / `+` 調整 graph 與 log 高度, `pgup` / `pgdn` 捲動 log, `q` 離開.
+
+滑鼠: 點節點選取, 再點一次重試 (failed) 或觸發 (pending); `option+wheel`, 水平滾輪 / 觸控板左右滑, `shift+wheel` 左右平移節點圖 (VS Code / Antigravity 的 terminal 只會送出 `option+wheel`, 其餘兩種被 xterm.js 丟掉); 圖高度放得下時一般滾輪也是左右平移, 否則上下捲動; 拖曳 graph 下方的資訊列與最下方的說明列調整高度.
 
 ### 編碼與資料處理
 

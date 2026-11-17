@@ -29,8 +29,33 @@ gosdk/
 │   ├── patch.go             # PatchCmd：VERSION 修訂號 +1
 │   ├── version.go           # Version 結構、ParseVersion()、ReadVersion()、WriteVersion()
 │   ├── version_test.go
+│   ├── pstate/                  # Pipeline 執行與視覺化（包住呼叫端函式、依相依平行執行、bubbletea TUI 節點圖）
+│   │   ├── status.go            # Status：not_started / running / pending / finished / failed
+│   │   ├── task.go              # Func（Wrap 保存參數 / Do）、T（Log / Error / Wait）
+│   │   ├── node.go              # node 狀態、NodeOption（After / Priority / Name）
+│   │   ├── pipeline.go          # Pipeline：Add（上游須先登記）、Retry、Trigger、狀態轉換、snapshot、result
+│   │   ├── scheduler.go         # Execute（headless）與 loop：啟動上游皆 finished 的節點、panic 轉 error
+│   │   ├── log.go               # LogEntry + 固定容量 ring（DEFAULT_MAX_LOGS）
+│   │   ├── layout.go            # Layout（dependency / priority / timeline）、分欄、甘特圖排序與時間軸
+│   │   ├── graph.go             # PURE：分層圖排版（dummy、barycenter、座標、主幹通道、hit-test、方向導覽）
+│   │   ├── canvas.go            # 可比畫面大的虛擬畫布：連線位元 → box-drawing 字元、寬字元、viewport 輸出
+│   │   ├── option.go            # Run 的 Option：WithTitle / WithLayout / WithGraphHeight / WithLogHeight / WithOutput / WithSummary
+│   │   ├── run.go               # Run：背景 scheduler + TUI，離開後印出摘要並回傳結果
+│   │   ├── model.go             # bubbletea model：快照、選取保留、平移 / reveal、activate（重試 / 觸發）
+│   │   ├── keys.go              # 按鍵處理與節點導覽
+│   │   ├── mouse.go             # 點擊選取 / 重試、shift+wheel 平移、拖曳調整高度
+│   │   ├── view.go              # PURE：planFrame 高度分配、header、divider（選取節點詳情 + 平移與 log 狀態）
+│   │   ├── view_graph.go        # PURE：節點框與連線畫上 canvas
+│   │   ├── view_timeline.go     # PURE：甘特圖
+│   │   ├── view_logs.go         # PURE：log pane 內容（篩選、多行展開、捲動）
+│   │   ├── theme.go             # 顏色、狀態標記、canvas paint 樣式
+│   │   ├── width.go             # 字串顯示寬度（fit / clip / block）
+│   │   ├── format.go            # 時間長度格式
+│   │   ├── *_test.go            # 執行語意、排版、畫布、畫面尺寸（含 CJK / emoji / 超寬圖）、滑鼠與按鍵
+│   │   └── sample/main.go       # 可執行範例：10+ 節點的 release pipeline，含必定失敗一次與等待核准的節點
 │   └── sample/              # 範例與測試工具（gotmpl/stringer 僅由測試執行）
 │       ├── main.go          # metric/cobra hook 使用範例（可執行）
+│       ├── mousescroll/     # bubbletea 滑鼠/觸控板事件探測（可執行）：wheel-left/right 橫向平移超出視窗的 pane
 │       ├── gotmpl/          # Cobra 模板渲染測試工具（非 package main）
 │       │   ├── main.go      # run() 測試入口
 │       │   ├── cmd/         # RootCmd + TemplateLoader（保留：含 metadata）
@@ -240,6 +265,7 @@ gosdk/
     - `golang.org/x/crypto` v0.51.0 — scrypt 金鑰衍生（config/vault）
     - `golang.org/x/term` v0.45.0 — 終端機密碼輸入不回顯（cmd.VaultCmd）
     - `tavsec/gin-healthcheck` v1.2.2 — Health check 端點
+    - `charmbracelet/bubbletea` v1.3.10 + `lipgloss` v1.1.0 + `x/ansi` v0.10.1 — `pstate` 全螢幕 TUI 與寬度量測
 
 ## 關鍵決策 (Key Decisions)
 
@@ -259,6 +285,9 @@ gosdk/
 - `一個服務一個資料庫，由設定選 driver`：`DB_DRIVER`（`mysql` | `sqlite`）+ `DB_DSN` 單一 DSN 字串，`db.Init()` 設定 `db.Default` 並拒絕重複初始化。取代原本每種儲存一組 key（`SQLITE_PATH` / `MYSQL_DSN` / `POSTGRES_DSN`）的設計——那一版讓服務用「哪個 key 有值」決定 driver，兩者都設時的行為只存在程式碼裡。額外連線是`明確的例外`，以 suffix 區分：`DB_DSN_<NAME>` + 選填 `DB_DRIVER_<NAME>`（未設沿用 `DB_DRIVER`），由 `db.Open(name)` 開啟、呼叫端持有。sqlite 的 DSN 為空時推導 `<app config>/data/default.db`——檔名固定而不跟 app name，搬機器或改名都不必改路徑；PostgreSQL driver 無任何使用者，一併移除。gorm 行為也走設定（2026-09-25）：`DB_LOG` 預設 `false`（CLI / TUI 的 stdout 不能讓 gorm 佔用，錯誤本來就由回傳值帶出）、`DB_TRANSLATE_ERROR` 預設 `true`（服務靠 `gorm.ErrDuplicatedKey` 判斷重複，不比對 driver 錯誤碼）。這兩個開關出現之前，identity、datahub、night_market 都為了它們繞過 gosdk 自己 `gorm.Open`。`<KEY>_<NAME>` 一律沿用 `<KEY>`，只有 DSN 例外
 - `stringer` 以 `GeneratorEx` 組合模式擴充標準庫 `stringer`：嵌入 `service.Generator`，額外產生 `List()`、`ValueList()`、`Map()`、`ValueMap()` 四個輔助函式
 - 日誌模組在 `init()` 時即以預設值初始化 slog 全域 logger：確保任何 import 此套件的模組都能立即使用套件層級 `slog.*`，`log.Init()` 可在設定載入後再次呼叫以套用 `LOG_LEVEL` / `LOG_FORMAT`。不提供 wrapper 函式，消費端直接使用 stdlib `log/slog`
+- `pstate` 包住並執行呼叫端的函式，而不是讓呼叫端回報狀態：狀態轉換只發生在 scheduler 內（claimReady → complete），因此畫面與實際執行不可能分歧，也才有辦法「重試」——重試需要函式與參數都在手上。`Wrap[P]` 在包裝當下以值保存參數，重試時原封不動再傳一次，divider 列以 `%+v` 顯示它。上游必須先 `Add`，相依關係因此不可能成環，不需要循環偵測。失敗只擋下游、不中止其他分支；`Pending` 專指工作函式呼叫 `T.Wait` 等待觸發。`Execute` 跑到沒有可啟動的節點就返回，`Run` 的 scheduler 則持續等待重試直到使用者離開
+- `pstate` 節點圖是 Sugiyama 分層圖的簡化版：依深度（或 priority）分欄，跨多欄的連線在中間欄插入 dummy 佔位，barycenter 上下各掃三輪減少交叉。連線走欄間通道的垂直主幹：多來源的目標用自己的主幹（fan-in 匯成一條），單一來源的目標沿用來源的主幹（fan-out 從一條分出）——兩種都用「每個來源一條」或「每個目標一條」時，平行 build 這種多對多的形狀會變成一叢 `┼┼┼┼`。整張圖畫在可比畫面大的虛擬 `canvas`，每格記連線方向位元再轉成 box-drawing 字元，viewport 依 `ScrollX/ScrollY` 輸出。橫向平移不能只靠 `shift+wheel`：VS Code 系列（含 Antigravity）的 terminal 是 xterm.js，其 `consumeWheelEvent` 寫死 `if (deltaY === 0 || shiftKey) return 0`，帶 shift 的滾輪與水平捲動（`deltaX`）一律不送給程式（已在 Antigravity 內建的 xterm.js 原始碼確認）；`option+wheel` 會照常送出且帶 Alt 位元，因此另有三條路——方向鍵選取時橫向置中（每次換欄畫面都會動）、`<` `>` / `shift+←→` 純平移、`option+wheel` 以及「圖高度放得下時一般滾輪即左右平移」。終端機實際送出哪些滑鼠事件可用 `go run ./cmd/sample/mousescroll` 檢查。box-drawing 字元屬 East Asian Ambiguous，在設定成「ambiguous = 寬」的 CJK 終端機會錯位，這是畫成真正的圖必須付出的代價；狀態標記與甘特圖仍只用 ASCII 與背景色
+- `pstate` 版面`矮而寬`：graph 預設 15 列、log 預設 5 列，畫面只佔需要的列數。滑鼠點擊「先選取、再點一次才重試」，避免只想看錯誤訊息就誤觸重跑。每個可拖曳邊界都是它上方區塊的下緣（divider = graph 下緣、footer = log 下緣）
 - CSV 處理使用歸檔標記檔（`.archived`）防止重複處理：以簡單的檔案系統機制取代資料庫或 Redis 的已處理紀錄
 - Helmet 中介層採用靜態安全標頭：直接在 response header 注入 `X-Content-Type-Options`、`X-Frame-Options`、`CSP` 等，不依賴外部套件
 - 排程器採用極簡設計：`Scheduler` 僅負責按 `Interval` 觸發 `Job.Fn`，錯誤處理、日誌、重試等策略完全由呼叫方透過 `Job.OnError` 自行決定
@@ -302,6 +331,7 @@ gosdk/
 | 設定檢視/修改 CLI     | `cmd/` (`config.go`)                                    | `cmd.ConfigCmd`                                                                                                           |
 | Cobra Hook 範例       | `cmd/sample/`                                           | `cmd/sample/main.go`                                                                                                      |
 | 通用通知              | `notify/`                                               | 各通知器獨立建構與呼叫                                                                                                    |
+| Pipeline 狀態視覺化   | `cmd/pstate/`                                              | `pstate.New()` / `Pipeline.Add()` / `pstate.Wrap()` / `pstate.Run()` / `Pipeline.Execute()`                               |
 | 排程管理              | `scheduler/`                                            | `scheduler.New()`                                                                                                         |
 | 編碼與資料處理        | `encode/`, `utils/`, `time/`                            | 各函式獨立呼叫                                                                                                            |
 | 通用驗證              | `validator/`, `validator/string/`, `validator/numeric/` | `validator.New()` (composite), `string.NewNotEmpty()` / `string.NewEmail()` / `string.NewEqualTo()`, `numeric.NewRange()` |
