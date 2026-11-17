@@ -32,7 +32,7 @@ Load **only** the chapter that matches the task. Do not read the rest.
 | ------- | --------- |
 | [cli.md](references/cli.md) | cobra, where `main.go` goes, one- and two-layer subcommands, `ConfigCmd`, `CobraCMDHook` |
 | [tui.md](references/tui.md) | `monitor`, bubbletea, columns misalign, flicker, wheel / mouse events missing |
-| [pstate.md](references/pstate.md) | multi-step job with dependencies, parallel stages, retry a failed step, pipeline progress TUI |
+| [pstate.md](references/pstate.md) | multi-step job with dependencies, parallel stages, retry a failed step, pipeline progress TUI; what pstate does at runtime and on screen |
 | [config.md](references/config.md) | `config.Default`, viper keys, dual-file; `db.Init` / `db.Open` with `DB_DRIVER` + `DB_DSN`, `DB_LOG`, `DB_TRANSLATE_ERROR`; legacy `MYSQL_DSN` / `SQLITE_PATH` |
 | [logging.md](references/logging.md) | slog, `LOG_LEVEL`, zap leftovers |
 | [http.md](references/http.md) | client/server timeouts, drain body, TLS, retries |
