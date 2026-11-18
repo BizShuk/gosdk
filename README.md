@@ -498,8 +498,8 @@ Based on codebase analysis:
 ## 歷史側記 (Deprecation Notes)
 
 下列 API 與目錄曾出現在既有設計文件中，`目前已不存在於本 repo`。
-歷史脈絡見 [docs/specs/2026-08-12-Summary.md](docs/specs/2026-08-12-Summary.md)、
-[plans/2026-08-12-Refresh.md](plans/2026-08-12-Refresh.md) 與 [docs/CHANGELOG.md](docs/CHANGELOG.md)。
+歷史脈絡見 [docs/specs/2026-08-12-summary.md](docs/specs/2026-08-12-summary.md)、
+[plans/2026-08-12-refresh.md](plans/2026-08-12-refresh.md) 與 [docs/CHANGELOG.md](docs/CHANGELOG.md)。
 
 | 已淘汰 (Deprecated)                                                                                        | 現行替代 (Replacement)                                                                   |
 | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
