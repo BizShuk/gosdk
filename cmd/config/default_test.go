@@ -17,14 +17,12 @@ import (
 func runDefault(t *testing.T, args ...string) (string, error) {
 	t.Helper()
 
-	file, mode, dryRun, local := DEFAULT_CONFIG_FILE, DefaultModeSkip, false, false
+	file, mode, dryRun, local := DEFAULT_CONFIG_FILE, DefaultModeMerge, false, false
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--file":
 			i++
 			file = args[i]
-		case "--merge":
-			mode = DefaultModeMerge
 		case "--force":
 			mode = DefaultModeForce
 		case "--dry-run":
@@ -65,7 +63,7 @@ func TestConfigDefaultWritesIntoAppConfigDir(t *testing.T) {
 	}
 }
 
-func TestConfigDefaultKeepsExistingFileUnlessForced(t *testing.T) {
+func TestConfigDefaultMergesExistingFileUnlessForced(t *testing.T) {
 	dir := appDirFixture(t, "seedapp")
 	MustRegisterDefault("settings.json", []byte(`{"seed":true}`))
 
@@ -81,14 +79,15 @@ func TestConfigDefaultKeepsExistingFileUnlessForced(t *testing.T) {
 	if err != nil {
 		t.Fatalf("config default: %v", err)
 	}
-	if !strings.Contains(out, "already exists") {
-		t.Fatalf("output %q does not warn about the existing file", out)
+	if !strings.Contains(out, "+ seed") {
+		t.Fatalf("output %q does not report the merged key", out)
 	}
-	if !strings.Contains(out, "--merge") {
-		t.Fatalf("output %q does not point at --merge as the upgrade path", out)
+	body, _ := os.ReadFile(path)
+	if !strings.Contains(string(body), `"mine": 1`) || !strings.Contains(string(body), `"seed": true`) {
+		t.Fatalf("default run did not merge into the existing file: %s", body)
 	}
-	if body, _ := os.ReadFile(path); string(body) != `{"mine":1}` {
-		t.Fatalf("existing file was overwritten: %s", body)
+	if bak, _ := os.ReadFile(path + ".bak"); string(bak) != `{"mine":1}` {
+		t.Fatalf(".bak = %q, want the pre-merge file", bak)
 	}
 
 	out, err = runDefault(t, "--force")
@@ -98,8 +97,11 @@ func TestConfigDefaultKeepsExistingFileUnlessForced(t *testing.T) {
 	if body, _ := os.ReadFile(path); string(body) != `{"seed":true}` {
 		t.Fatalf("--force did not overwrite: %s", body)
 	}
-	if body, _ := os.ReadFile(path + ".bak"); string(body) != `{"mine":1}` {
-		t.Fatalf("--force did not back up the replaced file to .bak: %q", body)
+	if !strings.Contains(string(mustRead(t, path+".bak")), `"mine": 1`) {
+		t.Fatalf("--force did not back up the replaced (merged) file to .bak")
+	}
+	if dated, _ := filepath.Glob(path + ".bak.2*"); len(dated) != 1 {
+		t.Fatalf("want the first .bak rotated to one .bak.<date>, got %v", dated)
 	}
 	if !strings.Contains(out, "backed up previous file to "+path+".bak") {
 		t.Fatalf("output %q does not name the backup", out)
@@ -265,7 +267,7 @@ func TestRegisterDefaultConfigValidatesContent(t *testing.T) {
 	}
 }
 
-// --- --merge (upgrade path) ---------------------------------------------
+// --- merge (default, upgrade path) ---------------------------------------------
 
 // The upgrade case: a new release adds fields to the shipped default, and the
 // operator's existing file must gain them without losing a single local edit.
@@ -288,9 +290,9 @@ func TestConfigDefaultMergeAddsOnlyMissingFields(t *testing.T) {
 		t.Fatalf("write existing: %v", err)
 	}
 
-	out, err := runDefault(t, "--merge")
+	out, err := runDefault(t)
 	if err != nil {
-		t.Fatalf("config default --merge: %v (output %q)", err, out)
+		t.Fatalf("config default: %v (output %q)", err, out)
 	}
 
 	m := map[string]any{}
@@ -343,7 +345,7 @@ func TestConfigDefaultMergeIsIdempotent(t *testing.T) {
 	path := filepath.Join(dir, "settings.json")
 	first, _ := os.ReadFile(path)
 
-	out, err := runDefault(t, "--merge")
+	out, err := runDefault(t)
 	if err != nil {
 		t.Fatalf("merge: %v", err)
 	}
@@ -368,7 +370,7 @@ func TestConfigDefaultMergeDryRunWritesNothing(t *testing.T) {
 		t.Fatalf("write existing: %v", err)
 	}
 
-	out, err := runDefault(t, "--merge", "--dry-run")
+	out, err := runDefault(t, "--dry-run")
 	if err != nil {
 		t.Fatalf("merge --dry-run: %v", err)
 	}
@@ -394,7 +396,7 @@ func TestConfigDefaultMergeLeavesTypeConflictsAlone(t *testing.T) {
 		t.Fatalf("write existing: %v", err)
 	}
 
-	if _, err := runDefault(t, "--merge"); err != nil {
+	if _, err := runDefault(t); err != nil {
 		t.Fatalf("merge: %v", err)
 	}
 	m := map[string]any{}
@@ -425,7 +427,7 @@ func TestConfigDefaultMergeSupportsEnvAndYaml(t *testing.T) {
 		t.Fatalf("write config.yaml: %v", err)
 	}
 
-	out, err := runDefault(t, "--file", ".env", "--merge")
+	out, err := runDefault(t, "--file", ".env")
 	if err != nil {
 		t.Fatalf("merge .env: %v", err)
 	}
@@ -443,7 +445,7 @@ func TestConfigDefaultMergeSupportsEnvAndYaml(t *testing.T) {
 		t.Errorf(".env merge did not write LOG_LEVEL: %s", envBody)
 	}
 
-	if out, err = runDefault(t, "--file", "config.yaml", "--merge"); err != nil {
+	if out, err = runDefault(t, "--file", "config.yaml"); err != nil {
 		t.Fatalf("merge config.yaml: %v", err)
 	}
 	if !strings.Contains(out, "+ server.port") {
@@ -455,14 +457,14 @@ func TestConfigDefaultMergeSupportsEnvAndYaml(t *testing.T) {
 	}
 }
 
-// --merge on a missing file creates it. The report has to say so: an installer
-// that runs "config default --merge" unconditionally would otherwise be told
+// A merge on a missing file creates it. The report has to say so: an installer
+// that runs "config default" unconditionally would otherwise be told
 // "already up to date" on the very run that produced the file.
 func TestConfigDefaultMergeReportsCreation(t *testing.T) {
 	dir := appDirFixture(t, "seedapp")
 	MustRegisterDefault("settings.json", []byte(`{"a":1}`))
 
-	out, err := runDefault(t, "--merge")
+	out, err := runDefault(t)
 	if err != nil {
 		t.Fatalf("merge: %v", err)
 	}
@@ -484,7 +486,7 @@ func TestDefaultAllSeedsEveryRegisteredFile(t *testing.T) {
 	MustRegisterDefault("settings.json", []byte(`{"server_addr":":8080"}`))
 	MustRegisterDefault(".env", []byte("DB_DSN=\n"))
 
-	reports, err := DefaultAll(DefaultModeSkip, false, false)
+	reports, err := DefaultAll(DefaultModeMerge, false, false)
 	if err != nil {
 		t.Fatalf("DefaultAll: %v", err)
 	}
@@ -506,7 +508,7 @@ func TestDefaultAllSeedsEveryRegisteredFile(t *testing.T) {
 func TestDefaultAllWithoutRegistrationIsEmpty(t *testing.T) {
 	appDirFixture(t, "seedapp")
 
-	reports, err := DefaultAll(DefaultModeSkip, false, false)
+	reports, err := DefaultAll(DefaultModeMerge, false, false)
 	if err != nil || len(reports) != 0 {
 		t.Fatalf("DefaultAll = %v, %v; want no reports, no error", reports, err)
 	}
@@ -544,4 +546,53 @@ func TestDefaultForceKeepsEnvOwnerOnly(t *testing.T) {
 	if body, _ := os.ReadFile(path + ".bak"); string(body) != "DB_DSN=secret\n" {
 		t.Errorf(".bak = %q, want the replaced credentials", body)
 	}
+}
+
+// A merge copies the file aside before rewriting it in place: the backup holds
+// the pre-merge content and the original keeps its mode (0640 here, the shape
+// a container reading through a group needs).
+func TestDefaultMergeBacksUpAndKeepsMode(t *testing.T) {
+	dir := appDirFixture(t, "seedapp")
+	MustRegisterDefault("settings.json", []byte(`{"mine":0,"added":true}`))
+	path := filepath.Join(dir, "settings.json")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(`{"mine":1}`), 0o640); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path, 0o640); err != nil {
+		t.Fatal(err)
+	}
+	before, _ := os.Stat(path)
+
+	out, err := runDefault(t)
+	if err != nil {
+		t.Fatalf("config default: %v", err)
+	}
+	if !strings.Contains(out, "backed up previous file to "+path+".bak") {
+		t.Fatalf("output %q does not name the backup", out)
+	}
+	if body, _ := os.ReadFile(path + ".bak"); string(body) != `{"mine":1}` {
+		t.Fatalf(".bak = %q, want the pre-merge content", body)
+	}
+	after, _ := os.Stat(path)
+	if got := after.Mode().Perm(); got != 0o640 {
+		t.Errorf("merged file mode = %o, want 640 kept", got)
+	}
+	if !os.SameFile(before, after) {
+		t.Error("merge replaced the file instead of rewriting it in place")
+	}
+	if bak, _ := os.Stat(path + ".bak"); bak.Mode().Perm() != 0o640 {
+		t.Errorf(".bak mode = %o, want 640", bak.Mode().Perm())
+	}
+}
+
+func mustRead(t *testing.T, path string) []byte {
+	t.Helper()
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	return body
 }

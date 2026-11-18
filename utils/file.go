@@ -306,6 +306,61 @@ func backupAndRemoveIfExists(path string) error {
 	return nil
 }
 
+// BackupFile copies path to path.bak and leaves path in place, so a caller
+// that then rewrites it keeps the original inode, owner and mode (a file read
+// through a group or a bind mount stays readable). An existing path.bak is
+// rotated to path.bak.<date> first; keep > 0 caps the total like
+// WithBackupKeep. It returns the backup path, or "" when path does not exist.
+func BackupFile(path string, keep int) (string, error) {
+	info, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+
+	backupPath := path + BACKUP_EXT
+	if bak, err := os.Stat(backupPath); err == nil {
+		if err := moveFile(backupPath, datedBackupPath(backupPath, bak.ModTime())); err != nil {
+			return "", fmt.Errorf("rotate backup %s: %w", backupPath, err)
+		}
+	}
+	if err := copyFile(path, backupPath, info); err != nil {
+		return "", fmt.Errorf("copy %s to %s: %w", path, backupPath, err)
+	}
+	if err := pruneBackups(path, keep); err != nil {
+		return "", fmt.Errorf("prune backups of %s: %w", path, err)
+	}
+	return backupPath, nil
+}
+
+// copyFile copies src to a new dst with src's mode and modification time, so
+// a later rotation dates the backup by when its content was written.
+func copyFile(src, dst string, info os.FileInfo) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_EXCL, info.Mode().Perm())
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(out, in); err != nil {
+		out.Close()
+		return err
+	}
+	if err := out.Close(); err != nil {
+		return err
+	}
+	if err := os.Chmod(dst, info.Mode().Perm()); err != nil { // OpenFile mode is masked by umask
+		return err
+	}
+	return os.Chtimes(dst, info.ModTime(), info.ModTime())
+}
+
 // datedBackupPath returns backupPath.<date>, adding -1, -2, ... when two
 // backups share the same second.
 func datedBackupPath(backupPath string, modTime time.Time) string {

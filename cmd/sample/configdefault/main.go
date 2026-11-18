@@ -6,13 +6,12 @@
 // where the file goes, whether it may overwrite an existing one, and how the
 // result is reported.
 //
-//	seedapp config default              # write ~/.config/seedapp/settings.json
-//	seedapp config default --dry-run    # show the target path, touch nothing
-//	seedapp config default --merge      # after an upgrade: add newly shipped fields
+//	seedapp config default              # create ~/.config/seedapp/settings.json, or merge new fields into it
+//	seedapp config default --dry-run    # show what would be created or added, touch nothing
 //	seedapp config default --force      # replace an existing file
 //	seedapp config default --file config.yaml
 //
-// --merge is the upgrade path. A release that adds a field to
+// Merge is the default and the upgrade path. A release that adds a field to
 // settings.example.json reaches existing installs through it: the new keys are
 // grafted into the operator's file and every value already there is left
 // alone. Pair it with --dry-run to see the additions before committing.
@@ -23,7 +22,7 @@
 //     implicitly, before the user has run anything. Good for "the app must not
 //     start without a config".
 //   - "config default" writes only when the user asks, reports what it did,
-//     and refuses to clobber an edited file without --force. Good for
+//     and never discards an edited value without --force. Good for
 //     "give me a config I can edit".
 //
 // Run it via the test in this directory: go test ./cmd/sample/configdefault

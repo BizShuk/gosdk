@@ -180,7 +180,7 @@ func RenderDefaultReport(r DefaultReport) string {
 
 	// Bytes is only set when the seed was written wholesale — a file that did
 	// not exist yet, or one replaced by --force. That case is checked first
-	// because it can happen *in merge mode*: a first run with --merge creates
+	// because it can happen *in merge mode*: a first run creates
 	// the file, and reporting that as "already up to date" would tell an
 	// installer nothing happened on the one run where everything did.
 	switch {
@@ -189,7 +189,7 @@ func RenderDefaultReport(r DefaultReport) string {
 		if r.Backup != "" {
 			fmt.Fprintf(&b, "%s previous file to %s\n", verb("backed up", "would back up"), r.Backup)
 		}
-	case r.Mode == DefaultModeMerge:
+	case r.Mode != DefaultModeForce:
 		if len(r.Changes) == 0 {
 			fmt.Fprintf(&b, "%s is already up to date\n", r.Path)
 			break
@@ -202,6 +202,9 @@ func RenderDefaultReport(r DefaultReport) string {
 			verb("merged", "would merge"), len(r.Changes), noun, r.Path)
 		for _, ch := range r.Changes {
 			fmt.Fprintf(&b, "  + %s\n", ch.Key)
+		}
+		if r.Backup != "" {
+			fmt.Fprintf(&b, "%s previous file to %s\n", verb("backed up", "would back up"), r.Backup)
 		}
 	case r.Written || r.DryRun:
 		fmt.Fprintf(&b, "%s %s (%d bytes)\n", verb("wrote", "would write"), r.Path, r.Bytes)

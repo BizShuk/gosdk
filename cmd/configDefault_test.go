@@ -44,7 +44,6 @@ func runDefault(t *testing.T, args ...string) (string, error) {
 
 	configDefaultFile = ""
 	configDefaultForce = false
-	configDefaultMerge = false
 	configDefaultDryRun = false
 	configDefaultLocal = false
 	ConfigDefaultCmd.Flags().VisitAll(func(f *pflag.Flag) { f.Changed = false })
@@ -108,9 +107,9 @@ func TestConfigDefaultCmdHonoursDryRun(t *testing.T) {
 	}
 }
 
-// --merge and --force select different modes; only the mapping is under test
-// here, the merge semantics themselves live in cmd/config.
-func TestConfigDefaultCmdMapsMergeAndForceToModes(t *testing.T) {
+// No flag merges, --force replaces; only the mapping is under test here, the
+// merge semantics themselves live in cmd/config.
+func TestConfigDefaultCmdMergesByDefaultAndForceReplaces(t *testing.T) {
 	dir := seedFixture(t, "settings.json", `{"a":1,"b":2}`)
 	path := filepath.Join(dir, "settings.json")
 
@@ -121,15 +120,15 @@ func TestConfigDefaultCmdMapsMergeAndForceToModes(t *testing.T) {
 		t.Fatalf("write existing: %v", err)
 	}
 
-	out, err := runDefault(t, "--merge")
+	out, err := runDefault(t)
 	if err != nil {
-		t.Fatalf("--merge: %v", err)
+		t.Fatalf("config default: %v", err)
 	}
 	if !strings.Contains(out, "+ b") {
-		t.Fatalf("--merge did not reach merge mode:\n%s", out)
+		t.Fatalf("default run did not merge:\n%s", out)
 	}
 	if body, _ := os.ReadFile(path); !strings.Contains(string(body), `"a": 99`) {
-		t.Fatalf("--merge overwrote an existing value: %s", body)
+		t.Fatalf("default merge overwrote an existing value: %s", body)
 	}
 
 	if _, err := runDefault(t, "--force"); err != nil {
@@ -137,16 +136,6 @@ func TestConfigDefaultCmdMapsMergeAndForceToModes(t *testing.T) {
 	}
 	if body, _ := os.ReadFile(path); string(body) != `{"a":1,"b":2}` {
 		t.Fatalf("--force did not replace the file: %s", body)
-	}
-}
-
-// Merging and replacing are opposite answers to the same question; cobra is
-// configured to reject the pair rather than let one silently win.
-func TestConfigDefaultCmdRejectsMergeWithForce(t *testing.T) {
-	seedFixture(t, "settings.json", `{"a":1}`)
-
-	if _, err := runDefault(t, "--merge", "--force"); err == nil {
-		t.Fatal("expected --merge --force to be rejected")
 	}
 }
 

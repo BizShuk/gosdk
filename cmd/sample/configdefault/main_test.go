@@ -71,10 +71,7 @@ func TestRunIsSafeToRepeat(t *testing.T) {
 	if err := run([]string{"config", "default"}, &out); err != nil {
 		t.Fatalf("second run: %v", err)
 	}
-	if !strings.Contains(out.String(), "already exists") {
-		t.Fatalf("output %q does not warn about the existing file", out.String())
-	}
-	if body, _ := os.ReadFile(path); !bytes.Equal(body, edited) {
+	if body, _ := os.ReadFile(path); !strings.Contains(string(body), "9999") {
 		t.Fatalf("the user's edit was overwritten: %s", body)
 	}
 }

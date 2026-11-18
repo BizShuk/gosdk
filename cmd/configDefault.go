@@ -45,28 +45,25 @@ been configured with config.Default(config.WithAppName("myapp")) first. Without
 an app name the command refuses rather than dropping a config file into the
 working directory by accident; pass --local when that is what you want.
 
-An existing file is left alone. Two flags change that:
+A missing file is copied from the default byte-for-byte. An existing file is
+merged: the fields the default has and the file lacks are added, every value
+already in the file is kept, so running this after every upgrade picks up new
+settings safely. --force replaces the file with the default instead,
+discarding local edits.
 
-    --merge   add the fields the default has and the file lacks, keeping
-              every value already in the file. Use this after an upgrade to
-              pick up settings a new release introduced.
-    --force   replace the file with the default, discarding local edits.
-
---merge rewrites the file through the config parser, so comments and key
-order in a .env or config.yaml are not preserved. Run --merge --dry-run
-first to see exactly which keys would be added.
+Before a merge or --force rewrites a file, the old one is copied to
+<file>.bak (older backups become <file>.bak.<date>, newest 5 kept). A merge
+goes through the config parser, so comments and key order in a .env or
+config.yaml are not preserved; --dry-run shows which keys would be added.
 
 An application that ships no default for the requested file is not an error:
 the command says so and exits successfully, so an installer can call it
 without knowing whether this build carries a default.`,
-	Example: `  # write every registered default (settings.json, .env, ...) into ~/.config/myapp/
+	Example: `  # create missing files, add newly introduced settings to existing ones
   app config default
 
-  # after upgrading: add newly introduced settings, keep local edits
-  app config default --merge
-
-  # see which keys an upgrade would add, touching nothing
-  app config default --merge --dry-run
+  # see which files would be created and which keys added, touching nothing
+  app config default --dry-run
 
   # seed only one file
   app config default --file config.yaml
@@ -86,7 +83,6 @@ without knowing whether this build carries a default.`,
 var (
 	configDefaultFile   string
 	configDefaultForce  bool
-	configDefaultMerge  bool
 	configDefaultDryRun bool
 	configDefaultLocal  bool
 )
@@ -95,16 +91,11 @@ func init() {
 	f := ConfigDefaultCmd.Flags()
 	f.StringVar(&configDefaultFile, "file", "",
 		"write only this file (default: every registered one): "+strings.Join(config.SupportedFiles(), ", "))
-	f.BoolVar(&configDefaultMerge, "merge", false,
-		"add fields the default has and the existing file lacks, keeping existing values")
-	f.BoolVar(&configDefaultForce, "force", false, "overwrite the file if it already exists")
+	f.BoolVar(&configDefaultForce, "force", false,
+		"replace an existing file instead of merging the missing fields into it")
 	f.BoolVar(&configDefaultDryRun, "dry-run", false, "report what would happen without writing anything")
 	f.BoolVar(&configDefaultLocal, "local", false,
 		"write to the working directory instead of the app config dir (GetAppConfigDir)")
-
-	// Merging and replacing are opposite answers to the same question, so
-	// let cobra reject the combination instead of silently picking one.
-	ConfigDefaultCmd.MarkFlagsMutuallyExclusive("merge", "force")
 
 	ConfigCmd.AddCommand(ConfigDefaultCmd)
 }
@@ -126,11 +117,8 @@ func RunConfigDefault(c *cobra.Command, args []string) error {
 			"or pass --local to write to the working directory")
 	}
 
-	mode := config.DefaultModeSkip
-	switch {
-	case configDefaultMerge:
-		mode = config.DefaultModeMerge
-	case configDefaultForce:
+	mode := config.DefaultModeMerge
+	if configDefaultForce {
 		mode = config.DefaultModeForce
 	}
 

@@ -1,10 +1,10 @@
 package config
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
@@ -12,8 +12,8 @@ import (
 	"github.com/bizshuk/gosdk/utils"
 )
 
-// DEFAULT_BACKUP_KEEP is how many backups --force keeps of the file it
-// replaces: <file>.bak plus the newest DEFAULT_BACKUP_KEEP-1 <file>.bak.<date>.
+// DEFAULT_BACKUP_KEEP is how many backups a merge or --force keeps of the file
+// they rewrite: <file>.bak plus the newest DEFAULT_BACKUP_KEEP-1 <file>.bak.<date>.
 const DEFAULT_BACKUP_KEEP = 5
 
 // registeredDefault is one seed file plus where it was registered from. The
@@ -104,19 +104,15 @@ func RegisteredDefaults() []string {
 	return names
 }
 
-// DefaultMode decides what happens when the target file already exists. It is
-// a mode rather than a pair of booleans because the three outcomes are
-// mutually exclusive, and a (force, merge) tuple can express a fourth state
-// that has no meaning.
+// DefaultMode decides what happens when the target file already exists. A
+// missing file is always created from the seed verbatim, whatever the mode.
 type DefaultMode string
 
 const (
-	// DefaultModeSkip leaves an existing file untouched and reports it.
-	DefaultModeSkip DefaultMode = "skip"
-	// DefaultModeMerge adds the fields the seed has and the file lacks,
-	// leaving every value already in the file alone. This is the upgrade
-	// path: a new release introduces settings, existing installs pick them
-	// up without losing local edits.
+	// DefaultModeMerge is the default: add the fields the seed has and the
+	// file lacks, leaving every value already in the file alone. A new release
+	// introduces settings, existing installs pick them up without losing local
+	// edits, so running it on every install or deploy is safe.
 	DefaultModeMerge DefaultMode = "merge"
 	// DefaultModeForce replaces an existing file wholesale.
 	DefaultModeForce DefaultMode = "force"
@@ -144,7 +140,7 @@ type DefaultReport struct {
 	Registered bool
 	Bytes      int
 	Written    bool
-	Backup     string // <path>.bak when --force replaced an existing file
+	Backup     string // <path>.bak when a merge or --force rewrote an existing file
 	Changes    []Change
 	DryRun     bool
 	Warnings   []string
@@ -158,13 +154,11 @@ type DefaultReport struct {
 // or no app name was set. That shared resolution is what keeps "seed the
 // default" and "edit a value" pointing at the same file.
 //
-// When the file does not exist yet it is created from the seed and mode is
-// irrelevant. When it does exist, mode decides: skip leaves it alone, merge
-// adds only the fields it is missing, force replaces it.
-//
-// An untouched existing file is reported as a warning with Written false
-// rather than as an error, so a first-run bootstrap can call this
-// unconditionally.
+// When the file does not exist yet it is created from the seed verbatim and
+// mode is irrelevant. When it does exist, merge adds only the fields it is
+// missing and force replaces it; both back the old file up to <path>.bak
+// first. Merge on an up-to-date file writes nothing, so a bootstrap can call
+// this unconditionally.
 func Default(file string, mode DefaultMode, dryRun, local bool) (DefaultReport, error) {
 	name, err := normalizeFile(file, DEFAULT_CONFIG_FILE)
 	if err != nil {
@@ -192,14 +186,8 @@ func Default(file string, mode DefaultMode, dryRun, local bool) (DefaultReport, 
 		exists = false
 	}
 
-	if exists && mode == DefaultModeMerge {
-		return mergeDefaultInto(path, name, seed.content, report)
-	}
-
 	if exists && mode != DefaultModeForce {
-		report.Warnings = append(report.Warnings, fmt.Sprintf(
-			"%s already exists; pass --merge to add new fields or --force to replace it", path))
-		return report, nil
+		return mergeDefaultInto(path, name, seed.content, report)
 	}
 
 	// Create and force both write the seed verbatim rather than through the
@@ -212,16 +200,18 @@ func Default(file string, mode DefaultMode, dryRun, local bool) (DefaultReport, 
 	if dryRun {
 		return report, nil
 	}
-	opts := []utils.FileOptionFunc{utils.WithCreate()}
+	// Force rewrites in place after copying the old file aside, so the file
+	// keeps its inode, owner and mode — a container that reads it through a
+	// group or a bind mount keeps reading it. filePerm only applies on create.
 	if exists {
-		opts = append(opts, utils.WithBackupKeep(DEFAULT_BACKUP_KEEP))
+		if _, err := utils.BackupFile(path, DEFAULT_BACKUP_KEEP); err != nil {
+			return DefaultReport{}, fmt.Errorf("back up %s: %w", path, err)
+		}
+	} else if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return DefaultReport{}, fmt.Errorf("create %s: %w", filepath.Dir(path), err)
 	}
-	if err := utils.WriteFile(path, bytes.NewReader(seed.content), opts...); err != nil {
+	if err := os.WriteFile(path, seed.content, filePerm(name)); err != nil {
 		return DefaultReport{}, fmt.Errorf("write %s: %w", path, err)
-	}
-	// WriteFile creates with 0666 &^ umask; .env must stay owner-only.
-	if err := os.Chmod(path, filePerm(name)); err != nil {
-		return DefaultReport{}, fmt.Errorf("chmod %s: %w", path, err)
 	}
 	report.Written = true
 	return report, nil
@@ -278,10 +268,14 @@ func mergeDefaultInto(path, name string, content []byte, report DefaultReport) (
 	}
 	if fileFormat(name) != "json" {
 		report.Warnings = append(report.Warnings, fmt.Sprintf(
-			"comments and key order in %s are not preserved by --merge", name))
+			"comments and key order in %s are not preserved by a merge", name))
 	}
+	report.Backup = path + utils.BACKUP_EXT
 	if report.DryRun {
 		return report, nil
+	}
+	if _, err := utils.BackupFile(path, DEFAULT_BACKUP_KEEP); err != nil {
+		return DefaultReport{}, fmt.Errorf("back up %s: %w", path, err)
 	}
 	if err := writeConfigFile(path, name, current); err != nil {
 		return DefaultReport{}, err

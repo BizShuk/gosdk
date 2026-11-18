@@ -71,10 +71,11 @@ Invalid JSON or a second registration panics at `init()`; overriding a dependenc
 
 | Command | When | Effect |
 | ------- | ---- | ------ |
-| `app config default` | first install | writes `~/.config/<app>/settings.json` + `.env` byte-for-byte; an existing file is skipped with a warning |
-| `app config default --merge` (`--dry-run` first) | after an upgrade, or a host pre-seeded the file | adds only missing keys, keeps every existing value |
-| `app config default --force` | reset | replaces the files; the replaced file moves to `<file>.bak` (older ones `<file>.bak.<date>`, newest 5 kept) |
+| `app config default` (`--dry-run` first) | every install, upgrade and deploy | a missing file is copied from the example byte-for-byte; an existing one is merged — only missing keys added, every existing value kept, the pre-merge file copied to `<file>.bak` |
+| `app config default --force` | reset | replaces the files; the replaced file is copied to `<file>.bak` |
 | `--file .env` | one file only | any of the above, limited to that file |
+
+A merge and `--force` rewrite in place (inode, owner, mode kept — a container reading through a group keeps reading) after `utils.BackupFile` copies the old file aside; older backups become `<file>.bak.<date>`, newest 5 kept.
 
 Then fill the empty `.env` values on the machine (`app config --file .env --update DB_DSN=...`, or by hand); they never go into the repo.
 
@@ -88,12 +89,13 @@ Legacy layouts and where they go:
 | inline `const defaultSettings = `{...}`` | `config/example/settings.example.json` |
 | `viper.SetDefault` loop over the embedded JSON (`applyEmbeddedDefaults`) | deleted once the repo pins gosdk ≥ v1.3.27 (`WithDefaultValue` is the fallback layer) |
 | setup script `cp config/example/env ~/.config/<app>/.env` | `app config default` (until ≥ v1.3.27, `cp` both examples) |
+| `app config default --merge`, `cfgcmd.DefaultModeSkip` (gosdk < v1.8.5) | `app config default` / `cfgcmd.DefaultModeMerge` — merge is the default, the flag and the skip mode are gone |
 
 Conflicts to avoid:
 
 - `config default` is the only path that writes into the config directory. No `CreateIfNotExist`, no seed-on-start helper, no Dockerfile `COPY` of the example.
-- A credential the host already keeps in `settings.json` (liva seeds `ip_hash_salt` there) stays in `settings.example.json` until the host file moves too: `--merge --file .env` would add it empty to `.env`, which outranks `settings.json` and blanks the real value.
-- A pre-existing `settings.json` (liva `setup-app-config.sh` seeds `{}` or a per-host salt, the image writes `{}`) makes plain `config default` a no-op — deploy runs `--merge`. A bare `{}` left as is reads every key empty (`server_addr` empty → listens on `:80`).
+- A credential the host already keeps in `settings.json` (liva seeds `ip_hash_salt` there) stays in `settings.example.json` until the host file moves too: `config default --file .env` would merge it empty to `.env`, which outranks `settings.json` and blanks the real value.
+- A pre-existing `settings.json` (liva `setup-app-config.sh` seeds `{}` or a per-host salt, the image writes `{}`) is fine: `config default` merges every shipped key into it. Skipping that step leaves a bare `{}` that reads every key empty (`server_addr` empty → listens on `:80`).
 - Names are fixed: `config/example/settings.example.json` and `config/example/.env.example` — not repo-root examples, not `config/default_settings.json`, not `config/example/env`. No `*.local.example.*`: `.local` files belong to the operator (`config --update` writes `settings.local.json`).
 
 ## DB
