@@ -54,8 +54,12 @@ target from the list the config package actually loads.
 
 Precedence, lowest to highest:
 
-    config.yaml < config.local.yaml < settings.json < settings.local.json
+    default < config.yaml < config.local.yaml < settings.json < settings.local.json
               < .env.vault < .env.local.vault < .env < .env.local
+
+"default" is the JSON the application passed to config.WithDefaultValue; it
+lives in the binary, not in a file, so it shows with source "default" and
+cannot be written here.
 
 A write to a lower-precedence file is shadowed by every file above it, and the
 report will warn when that happens at runtime.

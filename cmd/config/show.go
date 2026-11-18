@@ -17,7 +17,7 @@ const LAYER_OS_ENV = "os-env"
 // ShadowedValue is a value lost to a higher-precedence file or variable.
 type ShadowedValue struct {
 	Value  any
-	Layer  string // env | yaml | json | os-env
+	Layer  string // default | env | yaml | json | os-env
 	Source string // the file path it was read from, or the env var name
 }
 
@@ -36,7 +36,8 @@ type Entry struct {
 	Shadowed []ShadowedValue
 }
 
-// Show returns the merged configuration entries, sorted by key. Each entry
+// Show returns the merged configuration entries, sorted by key, starting from
+// the WithDefaultValue layer (source "default") under every file. Each entry
 // carries the winning value, the file or variable it came from, and the values
 // it overrode (lowest precedence first); the renderer decides what to display.
 //
@@ -52,6 +53,14 @@ type Entry struct {
 // The returned slice is always non-nil; an empty config yields an empty slice.
 func Show() []Entry {
 	byKey := map[string]*Entry{}
+
+	// The WithDefaultValue layer sits under every file; it has no path, so its
+	// source is the layer name.
+	defaults := map[string]any{}
+	flattenSettings(sdkconfig.DefaultValues(), "", defaults)
+	for k, val := range defaults {
+		byKey[k] = &Entry{Key: k, Value: val, Layer: sdkconfig.LAYER_DEFAULT, Source: sdkconfig.LAYER_DEFAULT}
+	}
 
 	for _, src := range sdkconfig.Sources() {
 		if src.Path == "" {

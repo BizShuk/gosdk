@@ -56,7 +56,7 @@ config.Default(config.WithAppName(APP_NAME), config.WithDefaultValue(string(exam
 
 A repo that already has its own `config` package (`config/config.go` beside `example/`) may embed `example/settings.example.json` there instead — one embed site per repo, never both.
 
-`WithDefaultValue` (gosdk ≥ v1.3.27) only merges the JSON under every file — a key missing from an old or empty `settings.json` still reads its shipped value; it never writes a file. Older pins wrote `settings.json` on first run and needed a hand-rolled `viper.SetDefault` loop for the fallback; both go away on upgrade.
+`WithDefaultValue` (gosdk ≥ v1.3.27) only merges the JSON under every file (`app config` lists it with source `default`, gosdk ≥ v1.3.28) — a key missing from an old or empty `settings.json` still reads its shipped value; it never writes a file. Older pins wrote `settings.json` on first run and needed a hand-rolled `viper.SetDefault` loop for the fallback; both go away on upgrade.
 
 Invalid JSON or a second registration panics at `init()`; overriding a dependency's seed on purpose is `cfgcmd.SetDefault`. `cmd.ConfigCmd` brings `config default`, which copies every registered example into `GetAppConfigDir()` (`.env` created `0600`):
 

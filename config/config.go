@@ -18,6 +18,14 @@ type Config interface {
 
 var appName string
 
+// LAYER_DEFAULT names the WithDefaultValue layer: the lowest one, read from
+// the binary rather than from a file.
+const LAYER_DEFAULT = "default"
+
+// defaultValues is the parsed WithDefaultValue JSON of the last Default()
+// call, nil when none was given.
+var defaultValues map[string]any
+
 // forcedConfigDir is the directory installed by WithConfigDir. Empty means
 // "derive from appName", which is the default behaviour.
 var forcedConfigDir string
@@ -64,11 +72,13 @@ func Default(opts ...ConfigOption) {
 	// The seed JSON is also the lowest layer on every start, not only the
 	// content of a freshly created settings.json: a key added to the seed after
 	// the file was written still has a value, and every file layer overrides it.
+	defaultValues = nil
 	if o.defaultValue != "" {
 		defaults, err := ParseJSON([]byte(o.defaultValue))
 		if err != nil {
 			slog.Warn("invalid default config", "app", appName, "err", err, "config_dir", GetAppConfigDir())
 		} else {
+			defaultValues = defaults
 			viper.MergeConfigMap(defaults)
 		}
 	}
@@ -251,4 +261,18 @@ func SetConfigDir(dir string) {
 		return
 	}
 	forcedConfigDir = ExpandHome(dir)
+}
+
+// DefaultValues returns the settings installed by WithDefaultValue in the last
+// Default() call, keys normalized the way viper reads them; nil when there were
+// none. The map is a fresh copy, safe to modify.
+func DefaultValues() map[string]any {
+	if defaultValues == nil {
+		return nil
+	}
+	v := viper.New()
+	if err := v.MergeConfigMap(defaultValues); err != nil {
+		return nil
+	}
+	return v.AllSettings()
 }
