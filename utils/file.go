@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	sdkcsv "github.com/bizshuk/gosdk/encode/csv"
 	"github.com/gocarina/gocsv"
@@ -271,25 +272,51 @@ func CreateFile(absPath string, payload io.Reader, opts ...FileOptionFunc) error
 	return WriteFile(absPath, payload, opts...)
 }
 
-// backupAndRemoveIfExists checks if path exists. If it does, recursively backups to path.bak.
+// BACKUP_EXT is appended to a file's path to name its latest backup.
+const BACKUP_EXT = ".bak"
+
+// BACKUP_DATE_LAYOUT names a rotated backup: <path>.bak.<date>, the date being
+// the rotated backup's modification time, i.e. when that content was last written.
+const BACKUP_DATE_LAYOUT = "20060102-150405"
+
+// backupAndRemoveIfExists moves path to path.bak. An existing path.bak is first
+// rotated to path.bak.<date> so it is never overwritten; path.bak is always the
+// most recent backup.
 func backupAndRemoveIfExists(path string) error {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return nil
 	}
 
-	backupPath := path + ".bak"
-	if _, err := os.Stat(backupPath); err == nil {
-		if err := backupAndRemoveIfExists(backupPath); err != nil {
-			return err
+	backupPath := path + BACKUP_EXT
+	if info, err := os.Stat(backupPath); err == nil {
+		if err := moveFile(backupPath, datedBackupPath(backupPath, info.ModTime())); err != nil {
+			return fmt.Errorf("rotate backup %s: %w", backupPath, err)
 		}
 	}
 
-	if err := os.Rename(path, backupPath); err != nil {
-		if err := copyAndRemove(path, backupPath); err != nil {
-			return fmt.Errorf("rename/copy backup failed: %w", err)
-		}
+	if err := moveFile(path, backupPath); err != nil {
+		return fmt.Errorf("rename/copy backup failed: %w", err)
 	}
 
+	return nil
+}
+
+// datedBackupPath returns backupPath.<date>, adding -1, -2, ... when two
+// backups share the same second.
+func datedBackupPath(backupPath string, modTime time.Time) string {
+	base := backupPath + "." + modTime.Format(BACKUP_DATE_LAYOUT)
+	candidate := base
+	for i := 1; FileExists(candidate); i++ {
+		candidate = fmt.Sprintf("%s-%d", base, i)
+	}
+	return candidate
+}
+
+// moveFile renames src to dst, falling back to copy + remove across devices.
+func moveFile(src, dst string) error {
+	if err := os.Rename(src, dst); err != nil {
+		return copyAndRemove(src, dst)
+	}
 	return nil
 }
 

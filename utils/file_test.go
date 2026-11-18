@@ -395,30 +395,48 @@ func TestFileUtilities(t *testing.T) {
 			t.Errorf("Expected backup content %q, got %q", content2, string(bakData))
 		}
 
-		// 5. 再次寫入，且指定 WithBackup() -> 遞迴備份
+		// 5. 再次寫入，且指定 WithBackup() -> 最新備份留在 .bak，舊 .bak 輪替成 .bak.<date>
+		bakInfo, _ := os.Stat(bakPath)
 		content4 := "version 4"
 		err = CreateFile(fpath, bytes.NewBufferString(content4), WithCreate(), WithBackup())
 		if err != nil {
-			t.Fatalf("Failed to create with recursive backup: %v", err)
+			t.Fatalf("Failed to create with rotated backup: %v", err)
 		}
 		data, _ = os.ReadFile(fpath)
 		if string(data) != content4 {
 			t.Errorf("Expected content %q, got %q", content4, string(data))
 		}
-		if !FileExists(bakPath) {
-			t.Error("Expected backup file to exist")
-		}
 		bakData, _ = os.ReadFile(bakPath)
 		if string(bakData) != content3 {
 			t.Errorf("Expected backup content %q, got %q", content3, string(bakData))
 		}
-		bakBakPath := bakPath + ".bak"
-		if !FileExists(bakBakPath) {
-			t.Error("Expected recursive backup file to exist")
+		datedPath := bakPath + "." + bakInfo.ModTime().Format(BACKUP_DATE_LAYOUT)
+		datedData, err := os.ReadFile(datedPath)
+		if err != nil {
+			t.Fatalf("Expected dated backup %s: %v", datedPath, err)
 		}
-		bakBakData, _ := os.ReadFile(bakBakPath)
-		if string(bakBakData) != content2 {
-			t.Errorf("Expected recursive backup content %q, got %q", content2, string(bakBakData))
+		if string(datedData) != content2 {
+			t.Errorf("Expected dated backup content %q, got %q", content2, string(datedData))
+		}
+		if FileExists(bakPath + ".bak") {
+			t.Error("Expected no .bak.bak chain")
+		}
+
+		// 6. 同一秒內再輪替 -> 加 -1 後綴，不覆蓋既有的 dated backup
+		if err := os.Chtimes(bakPath, bakInfo.ModTime(), bakInfo.ModTime()); err != nil {
+			t.Fatal(err)
+		}
+		err = CreateFile(fpath, bytes.NewBufferString("version 5"), WithCreate(), WithBackup())
+		if err != nil {
+			t.Fatalf("Failed to create with colliding rotated backup: %v", err)
+		}
+		datedData, _ = os.ReadFile(datedPath)
+		if string(datedData) != content2 {
+			t.Errorf("Dated backup overwritten: got %q", string(datedData))
+		}
+		collided, _ := os.ReadFile(datedPath + "-1")
+		if string(collided) != content3 {
+			t.Errorf("Expected %s-1 content %q, got %q", datedPath, content3, string(collided))
 		}
 	})
 
@@ -474,5 +492,3 @@ func TestFileUtilities(t *testing.T) {
 		}
 	})
 }
-
-

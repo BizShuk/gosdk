@@ -20,6 +20,15 @@ Merge (later wins): yaml → json → vault → env → OS env. Call `viper.SetD
 
 In files, `.` nests and `_` is literal — `a.b.c` ≠ `a_b_c`. OS env is `UPPER(key)` with `.` → `_` (`SERVER_PORT` overrides `server.port`, `LOG_LEVEL` overrides `log_level`). No `SetEnvPrefix`, no `SetEnvKeyReplacer`.
 
+Key casing is fixed per file:
+
+| File | Casing | Example | Not |
+| ---- | ------ | ------- | --- |
+| `.env*` (`.env`, `.env.local`, `.env.vault`, `.env.example`) | `SCREAMING_SNAKE_CASE` — credentials | `DB_DSN`, `SLACK_TOKEN`, `IP_HASH_SALT` | `db_dsn`, `slackToken` |
+| `settings*.json` (`settings.json`, `settings.local.json`, `settings.example.json`) | `snake_case` — words split by `_` | `server_addr`, `log_level`, `fetch_interval` | `serveraddr`, `serverAddr`, `SERVER_ADDR` |
+
+viper lowercases every key, so the two forms meet at one key (`ip_hash_salt`); the `_` is what lets `UPPER(key)` produce the matching env name. A run-together lowercase key (`serveraddr`) only maps to `SERVERADDR`, which no one writes. Code reads the lowercase form: `viper.GetString("db_dsn")` and `viper.GetString("DB_DSN")` are the same call — pick the lowercase one.
+
 ## Shipped defaults (`config/example/`)
 
 A service that reads **any** setting keeps its examples in `config/example/`, one per config file it uses:

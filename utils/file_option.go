@@ -11,7 +11,8 @@ type FileOptions struct {
 // FileOptionFunc defines configuration builder for CreateFile.
 type FileOptionFunc func(*FileOptions)
 
-// WithBackup enables recursive backup of existing files.
+// WithBackup moves an existing file to <path>.bak before writing; an older
+// .bak is kept as <path>.bak.<date> (see BACKUP_DATE_LAYOUT).
 func WithBackup() FileOptionFunc {
 	return func(o *FileOptions) {
 		o.backup = true
