@@ -2,10 +2,12 @@ package utils
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestFileUtilities(t *testing.T) {
@@ -491,4 +493,52 @@ func TestFileUtilities(t *testing.T) {
 			t.Errorf("expected file path %q, got %q", fpath2, osFile2.Name())
 		}
 	})
+}
+
+func TestWithBackupKeep(t *testing.T) {
+	dir := t.TempDir()
+	fpath := filepath.Join(dir, "keep.txt")
+	if err := os.WriteFile(fpath, []byte("v0"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// 每次寫入前把 .bak 的 mtime 往前推一小時，模擬分散在不同時間的備份
+	base := time.Date(2026, 11, 18, 10, 0, 0, 0, time.Local)
+	// 無關檔案：日期格式不符，不能被清掉
+	unrelated := fpath + BACKUP_EXT + ".manual"
+	if err := os.WriteFile(unrelated, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 1; i <= 6; i++ {
+		if FileExists(fpath + BACKUP_EXT) {
+			at := base.Add(time.Duration(i) * time.Hour)
+			if err := os.Chtimes(fpath+BACKUP_EXT, at, at); err != nil {
+				t.Fatal(err)
+			}
+		}
+		payload := bytes.NewBufferString(fmt.Sprintf("v%d", i))
+		if err := WriteFile(fpath, payload, WithBackupKeep(3)); err != nil {
+			t.Fatalf("write v%d: %v", i, err)
+		}
+	}
+
+	matches, _ := filepath.Glob(fpath + BACKUP_EXT + ".2*")
+	if len(matches) != 2 {
+		t.Fatalf("want 2 dated backups (keep=3 incl. .bak), got %v", matches)
+	}
+	got := map[string]bool{}
+	for _, m := range matches {
+		data, _ := os.ReadFile(m)
+		got[string(data)] = true
+	}
+	if !got["v3"] || !got["v4"] {
+		t.Errorf("want newest dated backups v3+v4, got %v", got)
+	}
+	if data, _ := os.ReadFile(fpath + BACKUP_EXT); string(data) != "v5" {
+		t.Errorf(".bak = %q, want v5", data)
+	}
+	if !FileExists(unrelated) {
+		t.Error("non-dated .bak.* file was pruned")
+	}
 }

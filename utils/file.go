@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -222,6 +224,9 @@ func OpenFile(absPath string, opts ...FileOptionFunc) (*os.File, error) {
 			if err := backupAndRemoveIfExists(absPath); err != nil {
 				return nil, fmt.Errorf("failed to backup existing file: %w", err)
 			}
+			if err := pruneBackups(absPath, config.backupKeep); err != nil {
+				return nil, fmt.Errorf("failed to prune backups: %w", err)
+			}
 		}
 	}
 
@@ -310,6 +315,61 @@ func datedBackupPath(backupPath string, modTime time.Time) string {
 		candidate = fmt.Sprintf("%s-%d", base, i)
 	}
 	return candidate
+}
+
+// datedBackup is one <path>.bak.<date>[-<n>] file.
+type datedBackup struct {
+	path string
+	at   time.Time
+	seq  int
+}
+
+// pruneBackups keeps <path>.bak and the newest keep-1 dated backups, deleting
+// the rest. keep <= 0 keeps everything. Files whose suffix is not a
+// BACKUP_DATE_LAYOUT date are never touched.
+func pruneBackups(path string, keep int) error {
+	if keep <= 0 {
+		return nil
+	}
+	prefix := filepath.Base(path) + BACKUP_EXT + "."
+	entries, err := os.ReadDir(filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+
+	var dated []datedBackup
+	for _, e := range entries {
+		suffix, ok := strings.CutPrefix(e.Name(), prefix)
+		if !ok || e.IsDir() {
+			continue
+		}
+		stamp, seqText, _ := strings.Cut(suffix, "-") // layout is YYYYMMDD-HHMMSS
+		rest, seqText, hasSeq := strings.Cut(seqText, "-")
+		at, err := time.ParseInLocation(BACKUP_DATE_LAYOUT, stamp+"-"+rest, time.Local)
+		if err != nil {
+			continue
+		}
+		seq := 0
+		if hasSeq {
+			if seq, err = strconv.Atoi(seqText); err != nil || seq < 1 {
+				continue
+			}
+		}
+		dated = append(dated, datedBackup{path: filepath.Join(filepath.Dir(path), e.Name()), at: at, seq: seq})
+	}
+
+	sort.Slice(dated, func(i, j int) bool { // newest first
+		if !dated[i].at.Equal(dated[j].at) {
+			return dated[i].at.After(dated[j].at)
+		}
+		return dated[i].seq > dated[j].seq
+	})
+	for _, b := range dated[min(keep-1, len(dated)):] {
+		if err := os.Remove(b.path); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // moveFile renames src to dst, falling back to copy + remove across devices.

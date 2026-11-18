@@ -73,7 +73,7 @@ Invalid JSON or a second registration panics at `init()`; overriding a dependenc
 | ------- | ---- | ------ |
 | `app config default` | first install | writes `~/.config/<app>/settings.json` + `.env` byte-for-byte; an existing file is skipped with a warning |
 | `app config default --merge` (`--dry-run` first) | after an upgrade, or a host pre-seeded the file | adds only missing keys, keeps every existing value |
-| `app config default --force` | reset | replaces the files |
+| `app config default --force` | reset | replaces the files; the replaced file moves to `<file>.bak` (older ones `<file>.bak.<date>`, newest 5 kept) |
 | `--file .env` | one file only | any of the above, limited to that file |
 
 Then fill the empty `.env` values on the machine (`app config --file .env --update DB_DSN=...`, or by hand); they never go into the repo.

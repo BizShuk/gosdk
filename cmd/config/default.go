@@ -1,14 +1,20 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
+
+	"github.com/bizshuk/gosdk/utils"
 )
+
+// DEFAULT_BACKUP_KEEP is how many backups --force keeps of the file it
+// replaces: <file>.bak plus the newest DEFAULT_BACKUP_KEEP-1 <file>.bak.<date>.
+const DEFAULT_BACKUP_KEEP = 5
 
 // registeredDefault is one seed file plus where it was registered from. The
 // origin is only ever used to make a duplicate-registration error actionable.
@@ -138,6 +144,7 @@ type DefaultReport struct {
 	Registered bool
 	Bytes      int
 	Written    bool
+	Backup     string // <path>.bak when --force replaced an existing file
 	Changes    []Change
 	DryRun     bool
 	Warnings   []string
@@ -199,16 +206,22 @@ func Default(file string, mode DefaultMode, dryRun, local bool) (DefaultReport, 
 	// format encoder, so the file on disk is byte-identical to what the
 	// application shipped — comments and key order included.
 	report.Bytes = len(seed.content)
+	if exists { // force: keep the replaced file as <path>.bak, never lose it
+		report.Backup = path + utils.BACKUP_EXT
+	}
 	if dryRun {
 		return report, nil
 	}
-	if dir := filepath.Dir(path); dir != "" && dir != "." {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return DefaultReport{}, fmt.Errorf("create %s: %w", dir, err)
-		}
+	opts := []utils.FileOptionFunc{utils.WithCreate()}
+	if exists {
+		opts = append(opts, utils.WithBackupKeep(DEFAULT_BACKUP_KEEP))
 	}
-	if err := os.WriteFile(path, seed.content, filePerm(name)); err != nil {
+	if err := utils.WriteFile(path, bytes.NewReader(seed.content), opts...); err != nil {
 		return DefaultReport{}, fmt.Errorf("write %s: %w", path, err)
+	}
+	// WriteFile creates with 0666 &^ umask; .env must stay owner-only.
+	if err := os.Chmod(path, filePerm(name)); err != nil {
+		return DefaultReport{}, fmt.Errorf("chmod %s: %w", path, err)
 	}
 	report.Written = true
 	return report, nil

@@ -3,9 +3,10 @@ package utils
 import "io"
 
 type FileOptions struct {
-	backup bool
-	create bool
-	writer *io.Writer
+	backup     bool
+	backupKeep int // 0 = keep every backup
+	create     bool
+	writer     *io.Writer
 }
 
 // FileOptionFunc defines configuration builder for CreateFile.
@@ -16,6 +17,16 @@ type FileOptionFunc func(*FileOptions)
 func WithBackup() FileOptionFunc {
 	return func(o *FileOptions) {
 		o.backup = true
+	}
+}
+
+// WithBackupKeep is WithBackup that keeps at most n backups in total: <path>.bak
+// plus the newest n-1 <path>.bak.<date>; older dated backups are deleted.
+// n <= 0 keeps every backup, same as WithBackup.
+func WithBackupKeep(n int) FileOptionFunc {
+	return func(o *FileOptions) {
+		o.backup = true
+		o.backupKeep = max(n, 0)
 	}
 }
 

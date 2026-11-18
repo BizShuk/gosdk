@@ -91,11 +91,18 @@ func TestConfigDefaultKeepsExistingFileUnlessForced(t *testing.T) {
 		t.Fatalf("existing file was overwritten: %s", body)
 	}
 
-	if _, err := runDefault(t, "--force"); err != nil {
+	out, err = runDefault(t, "--force")
+	if err != nil {
 		t.Fatalf("config default --force: %v", err)
 	}
 	if body, _ := os.ReadFile(path); string(body) != `{"seed":true}` {
 		t.Fatalf("--force did not overwrite: %s", body)
+	}
+	if body, _ := os.ReadFile(path + ".bak"); string(body) != `{"mine":1}` {
+		t.Fatalf("--force did not back up the replaced file to .bak: %q", body)
+	}
+	if !strings.Contains(out, "backed up previous file to "+path+".bak") {
+		t.Fatalf("output %q does not name the backup", out)
 	}
 }
 
@@ -502,5 +509,39 @@ func TestDefaultAllWithoutRegistrationIsEmpty(t *testing.T) {
 	reports, err := DefaultAll(DefaultModeSkip, false, false)
 	if err != nil || len(reports) != 0 {
 		t.Fatalf("DefaultAll = %v, %v; want no reports, no error", reports, err)
+	}
+}
+
+// --force on .env keeps both the new file and its backup owner-only: the
+// replaced file holds real credentials, the new one is about to.
+func TestDefaultForceKeepsEnvOwnerOnly(t *testing.T) {
+	dir := appDirFixture(t, "seedapp")
+	MustRegisterDefault(".env", []byte("DB_DSN=\n"))
+	path := filepath.Join(dir, ".env")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("DB_DSN=secret\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := Default(".env", DefaultModeForce, false, false)
+	if err != nil {
+		t.Fatalf("Default --force: %v", err)
+	}
+	if report.Backup != path+".bak" {
+		t.Fatalf("Backup = %q, want %q", report.Backup, path+".bak")
+	}
+	for _, p := range []string{path, path + ".bak"} {
+		info, err := os.Stat(p)
+		if err != nil {
+			t.Fatalf("%s: %v", p, err)
+		}
+		if got := info.Mode().Perm(); got != 0o600 {
+			t.Errorf("%s mode = %o, want 600", p, got)
+		}
+	}
+	if body, _ := os.ReadFile(path + ".bak"); string(body) != "DB_DSN=secret\n" {
+		t.Errorf(".bak = %q, want the replaced credentials", body)
 	}
 }

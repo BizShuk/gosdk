@@ -186,6 +186,9 @@ func RenderDefaultReport(r DefaultReport) string {
 	switch {
 	case r.Bytes > 0:
 		fmt.Fprintf(&b, "%s %s (%d bytes)\n", verb("wrote", "would write"), r.Path, r.Bytes)
+		if r.Backup != "" {
+			fmt.Fprintf(&b, "%s previous file to %s\n", verb("backed up", "would back up"), r.Backup)
+		}
 	case r.Mode == DefaultModeMerge:
 		if len(r.Changes) == 0 {
 			fmt.Fprintf(&b, "%s is already up to date\n", r.Path)
