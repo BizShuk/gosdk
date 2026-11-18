@@ -36,7 +36,7 @@ var defaultConfigs = map[string]registeredDefault{}
 // from the hosting application, with the content supplied by an embed
 // directive:
 //
-//	//go:embed settings.example.json
+//	//go:embed config/example/settings.example.json
 //	var defaultSettings []byte
 //
 //	func init() {
@@ -207,11 +207,37 @@ func Default(file string, mode DefaultMode, dryRun, local bool) (DefaultReport, 
 			return DefaultReport{}, fmt.Errorf("create %s: %w", dir, err)
 		}
 	}
-	if err := os.WriteFile(path, seed.content, 0o644); err != nil {
+	if err := os.WriteFile(path, seed.content, filePerm(name)); err != nil {
 		return DefaultReport{}, fmt.Errorf("write %s: %w", path, err)
 	}
 	report.Written = true
 	return report, nil
+}
+
+// DefaultAll runs Default for every registered file, in RegisteredDefaults
+// order. It is what "config default" does without --file: a service ships its
+// examples together (settings.example.json, .env.example) and an install
+// seeds them together. No registration is not an error — the result is empty.
+func DefaultAll(mode DefaultMode, dryRun, local bool) ([]DefaultReport, error) {
+	names := RegisteredDefaults()
+	reports := make([]DefaultReport, 0, len(names))
+	for _, name := range names {
+		report, err := Default(name, mode, dryRun, local)
+		if err != nil {
+			return reports, err
+		}
+		reports = append(reports, report)
+	}
+	return reports, nil
+}
+
+// filePerm is the mode a seeded file is created with. .env files hold
+// credentials, so only the owner may read them; the rest are plain settings.
+func filePerm(name string) os.FileMode {
+	if fileFormat(name) == "env" {
+		return 0o600
+	}
+	return 0o644
 }
 
 // mergeDefaultInto adds the seed's missing fields to an existing file.

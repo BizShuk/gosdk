@@ -81,7 +81,7 @@ func WriteEnv(path string, m map[string]any) error {
 	for _, k := range keys {
 		fmt.Fprintf(&b, "%s=%s\n", k, renderEnvValue(m[k]))
 	}
-	if err := os.WriteFile(path, []byte(b.String()), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(b.String()), 0o600); err != nil {
 		return fmt.Errorf("write %s: %w", path, err)
 	}
 	return nil

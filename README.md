@@ -264,8 +264,8 @@ config.Default()
 // 方式 2：以 option 設定 app 名稱（載入 ~/.config/<app_name>/）
 config.Default(config.WithAppName("myapp"))
 
-// 方式 3：以 option 設定 app 名稱與預設值（載入 ~/.config/<app_name>/，
-// settings.json 不存在時以 defaultJSON 建立）
+// 方式 3：以 option 設定 app 名稱與預設值（defaultJSON 是最低層 fallback, 不寫檔;
+// 複製 config/example/ 到設定目錄由 `app config default` 負責）
 config.Default(
     config.WithAppName("myapp"),
     config.WithDefaultValue(defaultJSON),

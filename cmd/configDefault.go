@@ -22,13 +22,22 @@ var ConfigDefaultCmd = &cobra.Command{
 	Short: "Write the application's default configuration file",
 	Long: `Write the application's default configuration file.
 
-The content is supplied by the hosting application, normally from a
-settings.example.json or config.example.yaml embedded with go:embed:
+The content is supplied by the hosting application, normally the files in its
+config/example/ directory embedded with go:embed:
 
-    //go:embed settings.example.json
+    //go:embed config/example/settings.example.json
     var defaultSettings []byte
 
-    func init() { config.MustRegisterDefault("settings.json", defaultSettings) }
+    //go:embed config/example/.env.example
+    var defaultEnv []byte
+
+    func init() {
+        config.MustRegisterDefault("settings.json", defaultSettings)
+        config.MustRegisterDefault(".env", defaultEnv)
+    }
+
+Without --file every registered file is written; --file picks one. .env files
+are created with mode 0600 because they hold credentials.
 
 The file is written into the application config directory reported by
 config.GetAppConfigDir() — ~/.config/<appName> — so the application must have
@@ -50,7 +59,7 @@ first to see exactly which keys would be added.
 An application that ships no default for the requested file is not an error:
 the command says so and exits successfully, so an installer can call it
 without knowing whether this build carries a default.`,
-	Example: `  # write ~/.config/myapp/settings.json
+	Example: `  # write every registered default (settings.json, .env, ...) into ~/.config/myapp/
   app config default
 
   # after upgrading: add newly introduced settings, keep local edits
@@ -59,7 +68,7 @@ without knowing whether this build carries a default.`,
   # see which keys an upgrade would add, touching nothing
   app config default --merge --dry-run
 
-  # seed a YAML config instead
+  # seed only one file
   app config default --file config.yaml
 
   # replace an existing file
@@ -84,8 +93,8 @@ var (
 
 func init() {
 	f := ConfigDefaultCmd.Flags()
-	f.StringVar(&configDefaultFile, "file", config.DEFAULT_CONFIG_FILE,
-		"config file to write: "+strings.Join(config.SupportedFiles(), ", "))
+	f.StringVar(&configDefaultFile, "file", "",
+		"write only this file (default: every registered one): "+strings.Join(config.SupportedFiles(), ", "))
 	f.BoolVar(&configDefaultMerge, "merge", false,
 		"add fields the default has and the existing file lacks, keeping existing values")
 	f.BoolVar(&configDefaultForce, "force", false, "overwrite the file if it already exists")
@@ -125,10 +134,26 @@ func RunConfigDefault(c *cobra.Command, args []string) error {
 		mode = config.DefaultModeForce
 	}
 
-	report, err := config.Default(configDefaultFile, mode, configDefaultDryRun, configDefaultLocal)
+	if configDefaultFile != "" {
+		report, err := config.Default(configDefaultFile, mode, configDefaultDryRun, configDefaultLocal)
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprint(c.OutOrStdout(), config.RenderDefaultReport(report))
+		return err
+	}
+
+	reports, err := config.DefaultAll(mode, configDefaultDryRun, configDefaultLocal)
+	for _, report := range reports {
+		if _, werr := fmt.Fprint(c.OutOrStdout(), config.RenderDefaultReport(report)); werr != nil {
+			return werr
+		}
+	}
 	if err != nil {
 		return err
 	}
-	_, err = fmt.Fprint(c.OutOrStdout(), config.RenderDefaultReport(report))
+	if len(reports) == 0 {
+		_, err = fmt.Fprintln(c.OutOrStdout(), "no default configuration registered; nothing to do")
+	}
 	return err
 }

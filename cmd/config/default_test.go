@@ -469,3 +469,38 @@ func TestConfigDefaultMergeReportsCreation(t *testing.T) {
 		t.Fatalf("a file that was just created is reported as unchanged:\n%s", out)
 	}
 }
+
+// DefaultAll seeds every registered example in one call, and the .env it
+// writes is owner-only because .env holds credentials.
+func TestDefaultAllSeedsEveryRegisteredFile(t *testing.T) {
+	dir := appDirFixture(t, "seedapp")
+	MustRegisterDefault("settings.json", []byte(`{"server_addr":":8080"}`))
+	MustRegisterDefault(".env", []byte("DB_DSN=\n"))
+
+	reports, err := DefaultAll(DefaultModeSkip, false, false)
+	if err != nil {
+		t.Fatalf("DefaultAll: %v", err)
+	}
+	if len(reports) != 2 {
+		t.Fatalf("got %d reports, want 2", len(reports))
+	}
+
+	for name, want := range map[string]os.FileMode{"settings.json": 0o644, ".env": 0o600} {
+		info, err := os.Stat(filepath.Join(dir, name))
+		if err != nil {
+			t.Fatalf("%s not written: %v", name, err)
+		}
+		if got := info.Mode().Perm(); got != want {
+			t.Errorf("%s mode = %o, want %o", name, got, want)
+		}
+	}
+}
+
+func TestDefaultAllWithoutRegistrationIsEmpty(t *testing.T) {
+	appDirFixture(t, "seedapp")
+
+	reports, err := DefaultAll(DefaultModeSkip, false, false)
+	if err != nil || len(reports) != 0 {
+		t.Fatalf("DefaultAll = %v, %v; want no reports, no error", reports, err)
+	}
+}

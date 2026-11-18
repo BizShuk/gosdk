@@ -1,7 +1,8 @@
 # CLI (cobra)
 
 ```tree
-main.go        # repo root — cmd.Execute() only; binary name = module's last element
+main.go        # repo root — cmd.Execute() + embeds config/example/*; binary name = module's last element
+config/example/  # settings.example.json + .env.example, seeded by `config default` (config.md)
 cmd/
   root.go      # RootCmd + Execute
   monitor.go   # monitor (alias m) — only interactive command
@@ -76,7 +77,7 @@ A package-level command keeps parsed flag state across `Execute()` in one proces
 | `logs`    | `log` | streaming   | What happened; `--process` lists recent processes (default 20) |
 | `list`    | `l`   | snapshot    | Domain state now, then exit |
 | `ps`      | —     | snapshot    | Live OS processes (PID first); omit if the app has no daemons |
-| `config`  | —     | snapshot    | `cmd.ConfigCmd` — do not hand-roll |
+| `config`  | —     | snapshot    | `cmd.ConfigCmd` (+ `config default`) — do not hand-roll |
 | `web`     | —     | server      | Serve only; migrations/seed are other commands |
 
 `logs` vs `list` vs `ps` are three objects — never fold with a flag. Tabular `ps`/`list` output uses `tui.Table` (`Align` one value per header: `0` left, `1` right). `config` writes `settings.local.json` only (`--update`/`--add`/`--delete`; `--source` shows provenance).

@@ -153,9 +153,8 @@ func TestWithConfigDirExpandsHome(t *testing.T) {
 	}
 }
 
-// The seed file and the loader must agree, exactly as they do for the derived
-// path: WithDefaultValue writes where GetAppConfigDir later reads.
-func TestWithConfigDirSeedsTheDirectoryItReadsFrom(t *testing.T) {
+// The default layer applies with a forced directory too.
+func TestWithConfigDirAppliesDefaultValue(t *testing.T) {
 	viper.Reset()
 	origName := GetAppName()
 	t.Cleanup(func() {
@@ -173,9 +172,6 @@ func TestWithConfigDirSeedsTheDirectoryItReadsFrom(t *testing.T) {
 		WithDefaultValue(`{"name": "forced"}`),
 	)
 
-	if _, err := os.Stat(filepath.Join(forced, "settings.json")); err != nil {
-		t.Fatalf("settings.json not seeded into the forced dir: %v", err)
-	}
 	if got := viper.GetString("name"); got != "forced" {
 		t.Fatalf("viper.GetString(\"name\") = %q, want %q — the loader read a different directory", got, "forced")
 	}

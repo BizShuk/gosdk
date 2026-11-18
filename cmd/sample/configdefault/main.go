@@ -1,8 +1,8 @@
 // Package configdefault shows how a hosting application seeds its own default
 // configuration file through the SDK's "config default" subcommand.
 //
-// The application owns the content — a settings.example.json sitting in its
-// repository root, compiled in with go:embed — and the SDK owns the plumbing:
+// The application owns the content — a settings.example.json in its
+// repository's config/example/, compiled in with go:embed — and the SDK owns the plumbing:
 // where the file goes, whether it may overwrite an existing one, and how the
 // result is reported.
 //

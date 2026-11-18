@@ -1,10 +1,7 @@
 package config
 
 import (
-	"path/filepath"
 	"strings"
-
-	"github.com/bizshuk/gosdk/utils"
 )
 
 type configOptions struct {
@@ -18,29 +15,19 @@ type configOptions struct {
 // ConfigOption defines the functional option type for config loading.
 type ConfigOption func(*configOptions)
 
-// WithDefaultValue specifies a default JSON configuration string. It is written
-// to settings.json when that file does not exist, and on every Default() call it
-// is also merged as the lowest layer, so keys missing from an older
-// settings.json fall back to their default instead of reading as empty.
+// WithDefaultValue sets the lowest configuration layer: the JSON is merged
+// under every config file on each Default() call, so a key missing from an
+// older or empty settings.json still reads its shipped value. It never writes
+// a file — copying the example into the config directory is the job of
+// "config default" (cmd/config.MustRegisterDefault). Pass both the same
+// embedded bytes:
 //
-// How to set up: Provide a valid JSON string literal. Example for a settings.json
-// with "host" and "port" fields:
+//	//go:embed example/settings.example.json
+//	var defaultSettings []byte
 //
-//	  // file locaation: config/default_settings.json
-//	  ```json
-//	  {}
-//	  ```
+//	func init() { cfgcmd.MustRegisterDefault("settings.json", defaultSettings) }
 //
-//	  //go:embed default_settings.json
-//	  var defaultConfigJSON string
-//
-//		 config.Default(
-//			  WithAppName("myapp"),
-//			  WithDefaultValue(defaultConfigJSON),
-//		 )
-//
-// When the settings.json file does not exist at appConfigDir, it will be created
-// with this JSON content automatically.
+//	config.Default(config.WithAppName("myapp"), config.WithDefaultValue(string(defaultSettings)))
 func WithDefaultValue(defaultValue string) ConfigOption {
 	return func(o *configOptions) {
 		o.defaultValue = defaultValue
@@ -99,12 +86,6 @@ func applyOptions(opts ...ConfigOption) *configOptions {
 	// lands in the directory Default() then installs as GetAppConfigDir().
 	if dir := strings.TrimSpace(o.configDir); dir != "" {
 		o.appConfigDir = ExpandHome(dir)
-	}
-
-	// Only automatically create settings.json if it is using the appName config directory
-	if o.appConfigDir != "" && o.defaultValue != "" {
-		jsonPath := filepath.Join(o.appConfigDir, "settings.json")
-		_ = utils.CreateIfNotExist(jsonPath, o.defaultValue)
 	}
 
 	return o

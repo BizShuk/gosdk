@@ -5,7 +5,6 @@ Always `config.Default(opts ...ConfigOption)`. No global `ConfigSchema`. Read wi
 | Option | Effect |
 | ------ | ------ |
 | `WithAppName("myapp")` | Enables `~/.config/myapp` (`GetAppConfigDir` / `GetAppDataDir` / `GetAppLogsDir`) |
-| `WithDefaultValue(json)` | Seeds `settings.json` there on first run — no-op without `WithAppName` |
 | `WithConfigDir(dir)` | Forces that dir (`~` expanded); data/logs follow |
 
 Search (first hit wins per filename): `.` → `./conf` → `GetAppConfigDir()`. Dual-file per format: base then `.local`.
@@ -21,7 +20,72 @@ Merge (later wins): yaml → json → vault → env → OS env. Call `viper.SetD
 
 In files, `.` nests and `_` is literal — `a.b.c` ≠ `a_b_c`. OS env is `UPPER(key)` with `.` → `_` (`SERVER_PORT` overrides `server.port`, `LOG_LEVEL` overrides `log_level`). No `SetEnvPrefix`, no `SetEnvKeyReplacer`.
 
-Embed a seed with `cmd/config.MustRegisterDefault("settings.json", bytes)` from `init()`. Duplicate file → error; deliberate override → `SetDefault`.
+## Shipped defaults (`config/example/`)
+
+A service that reads **any** setting keeps its examples in `config/example/`, one per config file it uses:
+
+| Example | Seeds | Holds |
+| ------- | ----- | ----- |
+| `settings.example.json` | `settings.json` | every non-secret key, each with a working value — the single source of defaults (`viper.SetDefault` only for computed values) |
+| `.env.example` | `.env` | credential key **names only**, every value empty (`DB_DSN=`) — `.env*` is for credentials |
+
+A key lives in exactly one example. `.env` outranks `settings.json`, so a key listed in both reads as the empty `.env` value and the JSON default is dead. The loader never reads `*.example.*` (files resolve by exact name), so the examples never shadow real config.
+
+`config/example/example.go` (`package example`) embeds them and registers them for `config default`; the code that calls `config.Default` imports it and passes the settings as the runtime fallback layer. Same directory as the files, so `go:embed` needs no `..`, and the name never collides with gosdk's `config`.
+
+```go
+// config/example/example.go
+package example
+
+//go:embed settings.example.json
+var Settings []byte
+
+//go:embed .env.example
+var Env []byte
+
+func init() { // cfgcmd = gosdk/cmd/config
+    cfgcmd.MustRegisterDefault("settings.json", Settings)
+    cfgcmd.MustRegisterDefault(".env", Env)
+}
+```
+
+```go
+// cmd/root.go — the command tree must also mount sdkcmd.ConfigCmd, or "config default" is unreachable
+config.Default(config.WithAppName(APP_NAME), config.WithDefaultValue(string(example.Settings)))
+```
+
+A repo that already has its own `config` package (`config/config.go` beside `example/`) may embed `example/settings.example.json` there instead — one embed site per repo, never both.
+
+`WithDefaultValue` (gosdk ≥ v1.3.27) only merges the JSON under every file — a key missing from an old or empty `settings.json` still reads its shipped value; it never writes a file. Older pins wrote `settings.json` on first run and needed a hand-rolled `viper.SetDefault` loop for the fallback; both go away on upgrade.
+
+Invalid JSON or a second registration panics at `init()`; overriding a dependency's seed on purpose is `cfgcmd.SetDefault`. `cmd.ConfigCmd` brings `config default`, which copies every registered example into `GetAppConfigDir()` (`.env` created `0600`):
+
+| Command | When | Effect |
+| ------- | ---- | ------ |
+| `app config default` | first install | writes `~/.config/<app>/settings.json` + `.env` byte-for-byte; an existing file is skipped with a warning |
+| `app config default --merge` (`--dry-run` first) | after an upgrade, or a host pre-seeded the file | adds only missing keys, keeps every existing value |
+| `app config default --force` | reset | replaces the files |
+| `--file .env` | one file only | any of the above, limited to that file |
+
+Then fill the empty `.env` values on the machine (`app config --file .env --update DB_DSN=...`, or by hand); they never go into the repo.
+
+Legacy layouts and where they go:
+
+| Found | Becomes |
+| ----- | ------- |
+| `config/default_settings.json` + `//go:embed default_settings.json` | `config/example/settings.example.json`, embed path `example/settings.example.json` |
+| `settings.example.json` / `.env.example` / `config.example.yaml` at repo root or in `cmd/` | `config/example/` + `example.go` |
+| `config/example/env` (dotenv with values) | secrets → `.env.example` (empty), everything else → `settings.example.json` |
+| inline `const defaultSettings = `{...}`` | `config/example/settings.example.json` |
+| `viper.SetDefault` loop over the embedded JSON (`applyEmbeddedDefaults`) | deleted once the repo pins gosdk ≥ v1.3.27 (`WithDefaultValue` is the fallback layer) |
+| setup script `cp config/example/env ~/.config/<app>/.env` | `app config default` (until ≥ v1.3.27, `cp` both examples) |
+
+Conflicts to avoid:
+
+- `config default` is the only path that writes into the config directory. No `CreateIfNotExist`, no seed-on-start helper, no Dockerfile `COPY` of the example.
+- A credential the host already keeps in `settings.json` (liva seeds `ip_hash_salt` there) stays in `settings.example.json` until the host file moves too: `--merge --file .env` would add it empty to `.env`, which outranks `settings.json` and blanks the real value.
+- A pre-existing `settings.json` (liva `setup-app-config.sh` seeds `{}` or a per-host salt, the image writes `{}`) makes plain `config default` a no-op — deploy runs `--merge`. A bare `{}` left as is reads every key empty (`server_addr` empty → listens on `:80`).
+- Names are fixed: `config/example/settings.example.json` and `config/example/.env.example` — not repo-root examples, not `config/default_settings.json`, not `config/example/env`. No `*.local.example.*`: `.local` files belong to the operator (`config --update` writes `settings.local.json`).
 
 ## DB
 

@@ -29,15 +29,9 @@ func TestDefaultWithValueOption(t *testing.T) {
 		WithDefaultValue(defaultJSON),
 	)
 
-	// Verify settings.json was created
-	settingsPath := filepath.Join(expectedDir, "settings.json")
-	data, err := os.ReadFile(settingsPath)
-	if err != nil {
-		t.Fatalf("failed to read settings.json: %v", err)
-	}
-
-	if string(data) != defaultJSON {
-		t.Errorf("Expected content %s, got %s", defaultJSON, string(data))
+	// WithDefaultValue is a fallback layer only; it never writes a file.
+	if _, err := os.Stat(filepath.Join(expectedDir, "settings.json")); !os.IsNotExist(err) {
+		t.Fatalf("settings.json was written (stat err = %v)", err)
 	}
 
 	// Verify Viper successfully read the config

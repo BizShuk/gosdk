@@ -42,7 +42,7 @@ func seedFixture(t *testing.T, file, content string) string {
 func runDefault(t *testing.T, args ...string) (string, error) {
 	t.Helper()
 
-	configDefaultFile = cfgcmd.DEFAULT_CONFIG_FILE
+	configDefaultFile = ""
 	configDefaultForce = false
 	configDefaultMerge = false
 	configDefaultDryRun = false
@@ -182,5 +182,22 @@ func TestConfigDefaultCmdLocalWritesToWorkingDirectory(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, "settings.json")); err != nil {
 		t.Fatalf("--local did not write to the working directory: %v", err)
+	}
+}
+
+// Without --file every registered default is written.
+func TestConfigDefaultCmdWritesEveryRegisteredFile(t *testing.T) {
+	dir := seedFixture(t, "settings.json", `{"a":1}`)
+	if err := cfgcmd.SetDefault(".env", []byte("TOKEN=\n")); err != nil {
+		t.Fatalf("seed .env: %v", err)
+	}
+
+	if _, err := runDefault(t); err != nil {
+		t.Fatalf("config default: %v", err)
+	}
+	for _, name := range []string{"settings.json", ".env"} {
+		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
+			t.Errorf("%s not written: %v", name, err)
+		}
 	}
 }
