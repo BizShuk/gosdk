@@ -89,16 +89,13 @@ func Default(opts ...ConfigOption) {
 		slog.Debug("config load warning", "err", err)
 	}
 
-	// --- 4. 環境變數設定 (Environment Variables) ---
-	// 啟用 AutomaticEnv + bindAllEnvVars 後，每次 viper.Get*() 都會動態查 OS 環境變數。
-	//
-	// ⚠️ viper 行為與機制：
-	//   1. 對 flat key（含底線）：env 名稱 = UPPER(key)
-	//      viper.Get("app_name")  → 查 APP_NAME
-	//      viper.Get("log_level") → 查 LOG_LEVEL
-	//   2. 對 nested key（如 "server.port"）：AutomaticEnv 預設不生效。
-	//      bindAllEnvVars() 透過 reflection 走完所有 leaf 並呼叫 BindEnv，
-	//      讓 nested key 也能被 SERVER_PORT 等 OS env 覆寫。
+	// --- OS 環境變數 (Environment Variables) ---
+	// 每次 viper.Get*() 才查 OS env（不把整份 environ 載入 viper）。
+	// viper 的查找順序是 override > env > config > default：設定檔放在 override
+	// 層，WithDefaultValue 放在 config 層，所以 env 只補上檔案沒有的 key。
+	//   1. flat key：env 名稱 = UPPER(key)，log_level → LOG_LEVEL
+	//   2. nested key：AutomaticEnv 不涵蓋，bindAllEnvVars() 對每個 leaf
+	//      BindEnv，server.port → SERVER_PORT
 	viper.AutomaticEnv()
 	bindAllEnvVars()
 
@@ -124,39 +121,46 @@ func Default(opts ...ConfigOption) {
 	}
 }
 
-// loadAllConfigs 載入所有設定格式並合併至全域 viper。
-// 合併順序決定跨格式優先權（後者覆蓋前者）：
+// loadAllConfigs 載入所有設定檔並寫入全域 viper 的 override 層。
 //
-//	config.yaml < settings.json < .env.vault < .env （YAML 最低、ENV 最高）
+// 整體優先權，低到高（後者覆蓋前者）：
+//
+//	WithDefaultValue < OS env < config.yaml < settings.json < .env.vault < .env
+//
+// 每種格式內 base 檔先載、.local 檔後載，所以 .env.local 是最高的一層。
+//
+// 設定檔寫進 override 層（viper.Set）而非 config 層，是讓檔案勝過 OS env 的
+// 唯一方式：viper 查值固定 override > env > config > default，而 env 必須維持
+// 讀值時才查——把整份 environ 載入 viper 會讓 AllSettings() 帶出每一個環境
+// 變數，包括 shell 裡的 secret。代價：之後對同一個 key 呼叫 MergeConfigMap /
+// SetDefault 都蓋不過設定檔，只有 viper.Set 可以。
 //
 // .env.vault 排在 .env 之下：vault 是`可提交`的檔案，代表整個團隊共用的值，
-// 而 .env 是開發者自己機器上的覆寫。已提交的設定不應該蓋掉未提交的本機設定。
+// 而 .env 是開發者自己機器上的覆寫。
 //
 // 供 Default() 首次載入與 watcher reload 共用。
 func loadAllConfigs() error {
-	v1 := NewYamlConfig().Load()
-	viper.MergeConfigMap(v1.AllSettings())
-	v2 := NewJsonConfig().Load()
-	viper.MergeConfigMap(v2.AllSettings())
-	v3 := NewVaultConfig().Load()
-	viper.MergeConfigMap(v3.AllSettings())
-	v4 := NewEnvConfig().Load()
-	viper.MergeConfigMap(v4.AllSettings())
+	for k, v := range fileSettings() {
+		viper.Set(k, v)
+	}
 	return nil
+}
+
+// fileSettings 依優先權合併所有設定檔（yaml → json → vault → env）。
+func fileSettings() map[string]any {
+	files := viper.New()
+	files.MergeConfigMap(NewYamlConfig().Load().AllSettings())
+	files.MergeConfigMap(NewJsonConfig().Load().AllSettings())
+	files.MergeConfigMap(NewVaultConfig().Load().AllSettings())
+	files.MergeConfigMap(NewEnvConfig().Load().AllSettings())
+	return files.AllSettings()
 }
 
 // bindAllEnvVars walks viper.AllSettings() recursively and calls viper.BindEnv
 // for every leaf key. This works around viper's AutomaticEnv limitation where
 // nested keys (e.g. "server.port") are NOT covered, even though flat keys are.
-//
-// Env name composition: UPPER(key with "." → "_")
-//
-//	"server.port"    → "SERVER_PORT"
-//	"db.mysql.host"  → "DB_MYSQL_HOST"
-//	"log_level"      → "LOG_LEVEL"
-//
-// Side effect: also re-binds flat top-level keys, guaranteeing coverage for
-// both flat and nested keys.
+// A binding only matters for keys no config file sets: those sit in the
+// override layer, which viper checks before env.
 func bindAllEnvVars() {
 	for key, val := range viper.AllSettings() {
 		bindNestedEnv(key, val)
@@ -170,8 +174,16 @@ func bindNestedEnv(key string, val any) {
 		}
 		return
 	}
-	envName := strings.ToUpper(strings.ReplaceAll(key, ".", "_"))
-	_ = viper.BindEnv(key, envName)
+	_ = viper.BindEnv(key, EnvName(key))
+}
+
+// EnvName 回傳 viper 為 key 查找的 OS 環境變數名稱：UPPER(key)，"." 換成 "_"，無前綴。
+//
+//	"log_level"     → "LOG_LEVEL"
+//	"server.port"   → "SERVER_PORT"
+//	"db.mysql.host" → "DB_MYSQL_HOST"
+func EnvName(key string) string {
+	return strings.ToUpper(strings.ReplaceAll(key, ".", "_"))
 }
 
 // configBaseDir returns the directory that holds every application's config

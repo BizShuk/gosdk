@@ -2,7 +2,6 @@ package config
 
 import (
 	"log/slog"
-	"maps"
 	"path/filepath"
 	"sync"
 	"time"
@@ -13,11 +12,11 @@ import (
 
 // knownConfigFiles lists the config file basenames that trigger a reload.
 var knownConfigFiles = map[string]bool{
-	".env":               true,
-	".env.local":         true,
-	"config.yaml":        true,
-	"config.local.yaml":  true,
-	"settings.json":      true,
+	".env":                true,
+	".env.local":          true,
+	"config.yaml":         true,
+	"config.local.yaml":   true,
+	"settings.json":       true,
 	"settings.local.json": true,
 }
 
@@ -216,26 +215,14 @@ func isConfigFile(path string) bool {
 // reloadAllConfigs reloads every configuration source and overwrites the
 // global viper instance with the new values.
 //
-// Strategy: create temporary vipers for each config format, merge them,
-// then use viper.Set() per top-level key to overwrite the global viper.
-// viper.Set() always overwrites — unlike MergeConfigMap which preserves
-// existing values — so changed config values are correctly reflected.
+// It reads the same files as Default() (fileSettings order) and writes them to
+// the same override layer with viper.Set() per top-level key, so OS env keeps
+// the place Default() gave it and changed values are reflected.
 //
 // Limitation: keys removed from config files persist in the global viper
 // from the previous load. In practice config files are additive.
 func reloadAllConfigs() error {
-	v1 := NewEnvConfig().Load()
-	v2 := NewYamlConfig().Load()
-	v3 := NewJsonConfig().Load()
-
-	// Merge in load order: env < yaml < json (same priority as Default())
-	merged := make(map[string]any)
-	maps.Copy(merged, v1.AllSettings())
-	maps.Copy(merged, v2.AllSettings())
-	maps.Copy(merged, v3.AllSettings())
-
-	// Overwrite global viper top-level keys.
-	// viper.Set() overwrites existing values (unlike MergeConfigMap).
+	merged := fileSettings()
 	for k, v := range merged {
 		viper.Set(k, v)
 	}

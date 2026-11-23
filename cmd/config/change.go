@@ -223,7 +223,6 @@ func Apply(updates, deletes, appends, removes []string, opts WriteOptions) (Chan
 		return ChangeReport{}, err
 	}
 
-	warnings = append(warnings, envShadowWarnings(updates, deletes, appends, removes)...)
 	warnings = append(warnings, shadowedWriteWarning(fileName, path)...)
 
 	return ChangeReport{
@@ -255,35 +254,6 @@ func FilePath(fileName string, local bool) string {
 		return filepath.Join("conf", fileName)
 	}
 	return fileName
-}
-
-// envShadowWarnings returns keys whose new value will not take effect because
-// an OS environment variable outranks every config file.
-func envShadowWarnings(updates, deletes, appends, removes []string) []string {
-	keys := make([]string, 0, len(updates)+len(deletes)+len(appends)+len(removes))
-	for _, spec := range updates {
-		key, _, _ := strings.Cut(spec, "=")
-		keys = append(keys, key)
-	}
-	keys = append(keys, deletes...)
-	for _, spec := range appends {
-		key, _, _ := strings.Cut(spec, "=")
-		keys = append(keys, key)
-	}
-	for _, spec := range removes {
-		key, _, _ := strings.Cut(spec, "=")
-		keys = append(keys, key)
-	}
-
-	warnings := make([]string, 0, len(keys))
-	for _, key := range keys {
-		name, value, ok := envOverride(strings.ToLower(key))
-		if !ok {
-			continue
-		}
-		warnings = append(warnings, fmt.Sprintf("warning: %s is still overridden by %s=%s", key, name, value))
-	}
-	return warnings
 }
 
 // shadowedWriteWarning returns one warning when path sits in a directory that

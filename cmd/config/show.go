@@ -3,15 +3,14 @@ package config
 import (
 	"os"
 	"sort"
-	"strings"
 
 	sdkconfig "github.com/bizshuk/gosdk/config"
 )
 
 // LAYER_OS_ENV is the layer name for a value that came from an OS environment
 // variable rather than a file. It is not one of sdkconfig's loader layers —
-// nothing reads it off disk — but it sits on top of all of them, so the merged
-// view needs a name for it.
+// nothing reads it off disk — and it sits under all of them (above only the
+// WithDefaultValue layer), so the merged view needs a name for it.
 const LAYER_OS_ENV = "os-env"
 
 // ShadowedValue is a value lost to a higher-precedence file or variable.
@@ -62,6 +61,18 @@ func Show() []Entry {
 		byKey[k] = &Entry{Key: k, Value: val, Layer: sdkconfig.LAYER_DEFAULT, Source: sdkconfig.LAYER_DEFAULT}
 	}
 
+	// Files are read before anything is merged: the OS env layer sits between
+	// the defaults and the files, and it can only fill keys that some layer
+	// names, so the full key set has to be known first.
+	type fileLayer struct {
+		src  sdkconfig.Source
+		flat map[string]any
+	}
+	var files []fileLayer
+	keys := map[string]bool{}
+	for k := range defaults {
+		keys[k] = true
+	}
 	for _, src := range sdkconfig.Sources() {
 		if src.Path == "" {
 			continue
@@ -70,30 +81,37 @@ func Show() []Entry {
 		if err != nil {
 			continue
 		}
-
 		flat := map[string]any{}
 		flattenSettings(v.AllSettings(), "", flat)
+		for k := range flat {
+			keys[k] = true
+		}
+		files = append(files, fileLayer{src: src, flat: flat})
+	}
 
-		for k, val := range flat {
-			if prev, seen := byKey[k]; seen {
-				prev.Shadowed = append(prev.Shadowed,
-					ShadowedValue{Value: prev.Value, Layer: prev.Layer, Source: prev.Source})
-				prev.Value, prev.Layer, prev.Source = val, src.Layer, src.Path
-				continue
+	set := func(k string, val any, layer, source string) {
+		if prev, seen := byKey[k]; seen {
+			prev.Shadowed = append(prev.Shadowed,
+				ShadowedValue{Value: prev.Value, Layer: prev.Layer, Source: prev.Source})
+			prev.Value, prev.Layer, prev.Source = val, layer, source
+			return
+		}
+		byKey[k] = &Entry{Key: k, Value: val, Layer: layer, Source: source}
+	}
+
+	// OS environment variables outrank only the defaults.
+	for k := range keys {
+		if name := sdkconfig.EnvName(k); name != "" {
+			if value, ok := os.LookupEnv(name); ok {
+				set(k, value, LAYER_OS_ENV, name)
 			}
-			byKey[k] = &Entry{Key: k, Value: val, Layer: src.Layer, Source: src.Path}
 		}
 	}
 
-	// OS environment variables outrank every config file.
-	for k, e := range byKey {
-		name, value, ok := envOverride(k)
-		if !ok {
-			continue
+	for _, f := range files {
+		for k, val := range f.flat {
+			set(k, val, f.src.Layer, f.src.Path)
 		}
-		e.Shadowed = append(e.Shadowed,
-			ShadowedValue{Value: e.Value, Layer: e.Layer, Source: e.Source})
-		e.Value, e.Layer, e.Source = value, LAYER_OS_ENV, name
 	}
 
 	entries := make([]Entry, 0, len(byKey))
@@ -119,18 +137,4 @@ func flattenSettings(m map[string]any, prefix string, out map[string]any) {
 		}
 		out[key] = v
 	}
-}
-
-// envOverride reports the OS environment variable shadowing a key, if any.
-//
-// sdkconfig.Default() calls AutomaticEnv() and then binds every leaf key with
-// bindAllEnvVars, so the name viper looks up is UPPER(key) with "." replaced by
-// "_" and no prefix: log_level reads LOG_LEVEL, and the nested server.port
-// reads SERVER_PORT. Composing the name the same way here is what keeps this
-// view honest — a mismatch reports an override the application will not apply,
-// or hides one it will.
-func envOverride(key string) (name, value string, ok bool) {
-	name = strings.ToUpper(strings.ReplaceAll(key, ".", "_"))
-	value, ok = os.LookupEnv(name)
-	return name, value, ok
 }

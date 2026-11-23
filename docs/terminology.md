@@ -9,7 +9,7 @@
 | --- | --- |
 | `Config Source` | 一個實際存在的設定檔絕對路徑。`config.Sources()` 依 merge 順序（低到高）列出 6 個 source。 |
 | `Layer` | 設定的格式層級：`yaml` → `json` → `env`，後者覆蓋前者。與 `Priority` 不同，Layer 只描述`檔案格式`。 |
-| `Priority` | 跨來源的覆蓋順序，共 4 層：`OS env` > `.env` > `settings.json` > `config.yaml`。 |
+| `Priority` | 跨來源的覆蓋順序，低到高：`WithDefaultValue` < `OS env` < `config.yaml` < `settings.json` < `.env.vault` < `.env`，各格式內 `.local` 勝過 base。 |
 | `Dual-file Mode` | 每種格式固定載入 base 檔 + `.local` 覆寫檔（`config.yaml` + `config.local.yaml`）。取代已廢除的 `PROFILE` 切換。 |
 | `Search Path` | 設定檔的目錄搜尋順序 `.` → `./conf` → app config dir。`同一檔名只有第一個命中的目錄生效`（fallback chain，非跨目錄 merge）。 |
 | `App Config Dir` | `~/.config/<appName>`，由 `WithAppName` 決定，可被 `WithConfigDir` 強制覆寫。其下固定有 `data/` 與 `logs/`。 |

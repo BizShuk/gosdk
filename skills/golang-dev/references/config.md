@@ -16,9 +16,9 @@ Search (first hit wins per filename): `.` → `./conf` → `GetAppConfigDir()`. 
 | json | `settings.json` | `settings.local.json` |
 | yaml | `config.yaml` | `config.local.yaml` |
 
-Merge (later wins): yaml → json → vault → env → OS env. Call `viper.SetDefault` **after** `Default()`. `viper.Set` is for tests/computed values only.
+Merge (later wins): `WithDefaultValue` → OS env → yaml → json → vault → env; `.local` beats its base, so `.env.local` is top. Files beat OS env: an env var only fills a key no file sets (compose `environment:` cannot override a file value). Call `viper.SetDefault` **after** `Default()`. `viper.Set` is for tests/computed values only.
 
-In files, `.` nests and `_` is literal — `a.b.c` ≠ `a_b_c`. OS env is `UPPER(key)` with `.` → `_` (`SERVER_PORT` overrides `server.port`, `LOG_LEVEL` overrides `log_level`). No `SetEnvPrefix`, no `SetEnvKeyReplacer`.
+In files, `.` nests and `_` is literal — `a.b.c` ≠ `a_b_c`. OS env is `UPPER(key)` with `.` → `_` (`SERVER_PORT` fills `server.port`, `LOG_LEVEL` fills `log_level`). No `SetEnvPrefix`, no `SetEnvKeyReplacer`.
 
 Key casing is fixed per file:
 

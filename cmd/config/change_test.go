@@ -6,6 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	sdkconfig "github.com/bizshuk/gosdk/config"
+	"github.com/spf13/viper"
 )
 
 // jsonNumber is the type parseValue returns for numeric JSON literals. Using
@@ -122,37 +125,34 @@ func TestShow_SourceIsTheResolvedFilePath(t *testing.T) {
 	}
 }
 
-func TestShow_EnvOverrideCapturedAsShadowed(t *testing.T) {
-	// config.Default binds keys unprefixed, so the variable that actually
-	// overrides "shared" at runtime is SHARED — not APP_SHARED.
+func TestShow_FileShadowsEnvVar(t *testing.T) {
+	// config.Default binds keys unprefixed, so the variable that fills
+	// "shared" at runtime is SHARED; any config file setting it wins.
 	t.Setenv("SHARED", "from-envvar")
 	fixture(t, map[string]string{
 		"settings.json": `{"shared":"from-json"}`,
 	})
 
 	found := entryFor(t, Show(), "shared")
-	if found.Value != "from-envvar" {
-		t.Errorf("shared value = %v, want from-envvar", found.Value)
-	}
-	if found.Layer != LAYER_OS_ENV || found.Source != "SHARED" {
-		t.Errorf("shared source = %q/%q, want os-env/SHARED", found.Layer, found.Source)
+	if found.Value != "from-json" || found.Layer != "json" {
+		t.Errorf("shared = %v from %q, want from-json from json", found.Value, found.Layer)
 	}
 	if len(found.Shadowed) != 1 {
-		t.Fatalf("shared shadowed = %+v, want exactly one (the json value)", found.Shadowed)
+		t.Fatalf("shared shadowed = %+v, want exactly one (the env value)", found.Shadowed)
 	}
-	if found.Shadowed[0].Value != "from-json" || found.Shadowed[0].Layer != "json" {
-		t.Errorf("shared shadowed[0] = %+v, want {from-json, json}", found.Shadowed[0])
+	if sh := found.Shadowed[0]; sh.Value != "from-envvar" || sh.Layer != LAYER_OS_ENV || sh.Source != "SHARED" {
+		t.Errorf("shared shadowed[0] = %+v, want {from-envvar, os-env, SHARED}", sh)
 	}
 }
 
-// bindAllEnvVars binds nested keys too (server.port -> SERVER_PORT), so the
-// merged view has to compose the same name or it reports a value the
-// application will not use.
-func TestShow_NestedKeyEnvOverride(t *testing.T) {
+// An env variable outranks the WithDefaultValue layer, nested keys included
+// (server.port <- SERVER_PORT), so the view must report it as the winner there.
+func TestShow_EnvVarOverridesDefault(t *testing.T) {
 	t.Setenv("SERVER_PORT", "9999")
-	fixture(t, map[string]string{
-		"settings.json": `{"server":{"port":8080}}`,
-	})
+	fixture(t, nil)
+	viper.Reset()
+	t.Cleanup(func() { viper.Reset(); sdkconfig.Default() })
+	sdkconfig.Default(sdkconfig.WithDefaultValue(`{"server":{"port":8080}}`))
 
 	found := entryFor(t, Show(), "server.port")
 	if found.Value != "9999" || found.Source != "SERVER_PORT" {
@@ -272,9 +272,8 @@ func TestUpdate_FailsWhenScalarBlocksPath(t *testing.T) {
 	}
 }
 
-func TestUpdate_CollectsEnvShadowWarnings(t *testing.T) {
-	// LOG_LEVEL shadows the flat key log_level; the report must surface this
-	// so the CLI can print a warning after the change is applied.
+func TestUpdate_EnvVarIsNotAShadow(t *testing.T) {
+	// OS env sits under every config file, so a write is never shadowed by it.
 	t.Setenv("LOG_LEVEL", "debug")
 	fixture(t, nil)
 
@@ -282,12 +281,8 @@ func TestUpdate_CollectsEnvShadowWarnings(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Update failed: %v", err)
 	}
-	if len(report.Warnings) != 1 {
-		t.Fatalf("Warnings = %+v, want exactly one (LOG_LEVEL shadows log_level)", report.Warnings)
-	}
-	w := report.Warnings[0]
-	if !containsAll(w, "log_level", "LOG_LEVEL", "warning") {
-		t.Errorf("warning %q does not name the key or the env var", w)
+	if len(report.Warnings) != 0 {
+		t.Fatalf("Warnings = %+v, want none (OS env never outranks a file)", report.Warnings)
 	}
 }
 

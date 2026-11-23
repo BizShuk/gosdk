@@ -86,8 +86,8 @@ func TestDefaultRuns(t *testing.T) {
 	Default()
 }
 
-func TestDefault_EnvVarOverridesAllFiles(t *testing.T) {
-	// 驗證 4 層優先權：OS env > .env > settings.json > config.yaml
+func TestDefault_FilesOverrideEnvVar(t *testing.T) {
+	// 驗證優先權：.env > settings.json > config.yaml > OS env
 	dir := t.TempDir()
 
 	// config.yaml（最低）
@@ -110,14 +110,19 @@ func TestDefault_EnvVarOverridesAllFiles(t *testing.T) {
 	t.Chdir(dir)
 	t.Cleanup(func() { viper.Reset() })
 
-	// OS env 設最高優先權。
+	// OS env 是檔案之下的一層。
 	t.Setenv("APP_NAME", "from-os-env")
+	t.Setenv("ONLY_OS_ENV", "from-os-env")
 
 	Default()
 
-	// 1. OS env 最高：覆寫 JSON/YAML 的 from-json / from-yaml
-	if got := viper.GetString("app_name"); got != "from-os-env" {
-		t.Errorf("expected app_name=from-os-env (AutomaticEnv wins), got %s", got)
+	// 1. 檔案勝過 OS env：settings.json 覆寫 APP_NAME
+	if got := viper.GetString("app_name"); got != "from-json" {
+		t.Errorf("expected app_name=from-json (files win over OS env), got %s", got)
+	}
+	// 1b. 沒有任何檔案設定的 key 仍由 OS env 提供
+	if got := viper.GetString("only_os_env"); got != "from-os-env" {
+		t.Errorf("expected only_os_env=from-os-env (no file sets it), got %s", got)
 	}
 	// 2. 沒設 OS env 的 key：仍走檔案優先權鏈（JSON > YAML）
 	if got := viper.GetBool("app_debug"); !got {
@@ -133,13 +138,12 @@ func TestDefault_EnvVarOverridesAllFiles(t *testing.T) {
 	}
 }
 
-// TestDefault_NestedKeyEnvOverride 驗證 bindAllEnvVars() 透過 reflection BindEnv
-// 所有 leaf 後，OS env 能覆寫 nested key（如 SERVER_PORT → server.port）。
-// 這是對 viper AutomaticEnv 不覆蓋 nested key 的 workaround。
-func TestDefault_NestedKeyEnvOverride(t *testing.T) {
+// TestDefault_NestedKeyEnvFillsDefaults 驗證 OS env 的巢狀 key 對應
+// （SERVER_PORT → server.port）：它勝過 WithDefaultValue，但輸給設定檔。
+func TestDefault_NestedKeyEnvFillsDefaults(t *testing.T) {
 	dir := t.TempDir()
 
-	yamlContent := "server:\n  port: 7000\n  host: yaml-host\n  db:\n    mysql:\n      host: yaml-db-host\n      port: 3306\n"
+	yamlContent := "server:\n  port: 7000\n"
 	if err := os.WriteFile(filepath.Join(dir, "config.yaml"), []byte(yamlContent), 0644); err != nil {
 		t.Fatalf("failed to create config.yaml: %v", err)
 	}
@@ -147,26 +151,22 @@ func TestDefault_NestedKeyEnvOverride(t *testing.T) {
 	t.Chdir(dir)
 	t.Cleanup(func() { viper.Reset() })
 
-	// 三個不同深度的 nested key，驗證 reflection 確實走完整棵樹
-	t.Setenv("SERVER_PORT", "9090")             // depth 2
-	t.Setenv("SERVER_HOST", "env-host")         // depth 2
-	t.Setenv("SERVER_DB_MYSQL_HOST", "env-db")  // depth 4
+	t.Setenv("SERVER_PORT", "9090")            // config.yaml 有，檔案勝
+	t.Setenv("SERVER_HOST", "env-host")        // 只有 default 有，env 勝
+	t.Setenv("SERVER_DB_MYSQL_HOST", "env-db") // depth 4，只有 default 有
 
-	Default()
+	Default(WithDefaultValue(`{"server":{"host":"default-host","db":{"mysql":{"host":"default-db","port":3306}}}}`))
 
-	// depth-2 nested key 覆寫
-	if got := viper.GetInt("server.port"); got != 9090 {
-		t.Errorf("expected server.port=9090 (from SERVER_PORT via BindEnv), got %d", got)
+	if got := viper.GetInt("server.port"); got != 7000 {
+		t.Errorf("expected server.port=7000 (config.yaml wins over SERVER_PORT), got %d", got)
 	}
 	if got := viper.GetString("server.host"); got != "env-host" {
-		t.Errorf("expected server.host=env-host (from SERVER_HOST via BindEnv), got %s", got)
+		t.Errorf("expected server.host=env-host (SERVER_HOST wins over default), got %s", got)
 	}
-	// depth-4 nested key 覆寫（reflection 必須遞迴到深層）
 	if got := viper.GetString("server.db.mysql.host"); got != "env-db" {
-		t.Errorf("expected server.db.mysql.host=env-db (from SERVER_DB_MYSQL_HOST via BindEnv), got %s", got)
+		t.Errorf("expected server.db.mysql.host=env-db (SERVER_DB_MYSQL_HOST wins over default), got %s", got)
 	}
-	// 沒被 OS env 覆寫的同層 leaf 仍由 config.yaml 提供
 	if got := viper.GetInt("server.db.mysql.port"); got != 3306 {
-		t.Errorf("expected server.db.mysql.port=3306 (no OS env, config.yaml wins), got %d", got)
+		t.Errorf("expected server.db.mysql.port=3306 (default, no env), got %d", got)
 	}
 }

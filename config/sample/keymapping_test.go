@@ -124,25 +124,24 @@ func TestKeyLookupIsCaseInsensitive(t *testing.T) {
 	assertGet(t, "SeRvEr.HoSt", "localhost")
 }
 
-// TestKeyEnvOverridesFlatAndNestedKeys 驗證 OS 環境變數（如 A_B_C / SERVER_PORT）
-// 可同時覆蓋扁平 key 與巢狀 key（由 bindAllEnvVars 進行 BindEnv）。
-func TestKeyEnvOverridesFlatAndNestedKeys(t *testing.T) {
+// TestKeyFilesOverrideEnvVar 驗證設定檔勝過 OS 環境變數：同名的扁平 key 與
+// 巢狀 key 都由檔案提供，環境變數只補上檔案沒有的 key。
+func TestKeyFilesOverrideEnvVar(t *testing.T) {
 	t.Setenv("A_B_C", "from-envvar")
 
 	loadFixture(t, map[string]string{
 		"settings.local.json": `{"a_b_c":"from-file","a":{"b":{"c":"nested-from-file"}}}`,
 	})
 
-	// 扁平 key 與巢狀 key：環境變數覆蓋皆生效。
-	assertGet(t, "a_b_c", "from-envvar")
-	assertGet(t, "a.b.c", "from-envvar")
+	assertGet(t, "a_b_c", "from-file")
+	assertGet(t, "a.b.c", "nested-from-file")
 }
 
 // TestKeySourcePrecedence 釘住六個設定檔的合併順序。
 //
 // 跨格式設定優先權（後載入者覆蓋先載入者）：
 //
-//	config.yaml < config.local.yaml < settings.json < settings.local.json < .env < .env.local < OS 環境變數
+//	OS 環境變數 < config.yaml < config.local.yaml < settings.json < settings.local.json < .env < .env.local
 func TestKeySourcePrecedence(t *testing.T) {
 	loadFixture(t, map[string]string{
 		"config.yaml":         "shared: 3-yaml\nonly_yaml: yaml\n",

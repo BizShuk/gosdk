@@ -6,9 +6,8 @@ import (
 )
 
 // DEFAULT_CONFIG_FILE is the file "config default" and "config" use when no
-// --file is passed. It is the highest-precedence JSON file in the merge order,
-// so a value written there overrides every other config file but never an
-// APP_ environment variable.
+// --file is passed. A value written there overrides config.yaml and every OS
+// environment variable, but not settings.local.json, the vault or .env files.
 const DEFAULT_CONFIG_FILE = "settings.json"
 
 // LOCAL_SETTINGS_FILE is the layer-local override of the default JSON file.
@@ -32,8 +31,8 @@ var defaultConfigFiles = []string{
 
 // configFilePrecedence is the order, lowest to highest, in which the loader
 // chain merges files. A write to a file lower in the list can be overridden by
-// every file above it (and by APP_ environment variables, which sit on top
-// of the whole list).
+// every file above it. OS environment variables sit under the whole list, so
+// they never override a write.
 //
 // Keep this in sync with config/config.go:loadAllConfigs and the per-loader
 // MergeInConfig calls — any new file added there needs a slot here.
