@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	sdkconfig "github.com/bizshuk/gosdk/config"
+	sdkconfig "github.com/bizshuk/gosdk/v2/config"
 )
 
 // WriteOptions selects the file a mutation writes to and where that file

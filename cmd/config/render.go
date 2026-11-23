@@ -8,7 +8,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	sdkconfig "github.com/bizshuk/gosdk/config"
+	sdkconfig "github.com/bizshuk/gosdk/v2/config"
 )
 
 // formatValue renders a value for display. Non-strings go through JSON so

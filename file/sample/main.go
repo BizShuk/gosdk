@@ -23,7 +23,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/bizshuk/gosdk/file"
+	"github.com/bizshuk/gosdk/v2/file"
 )
 
 func main() {

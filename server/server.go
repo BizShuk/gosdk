@@ -12,8 +12,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/bizshuk/gosdk/mw"
-	"github.com/bizshuk/gosdk/router"
+	"github.com/bizshuk/gosdk/v2/mw"
+	"github.com/bizshuk/gosdk/v2/router"
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
 )

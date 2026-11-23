@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	sdkconfig "github.com/bizshuk/gosdk/config"
+	sdkconfig "github.com/bizshuk/gosdk/v2/config"
 )
 
 // fixture builds a temp working directory holding the given config files.

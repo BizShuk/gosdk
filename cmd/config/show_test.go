@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	sdkconfig "github.com/bizshuk/gosdk/config"
+	sdkconfig "github.com/bizshuk/gosdk/v2/config"
 	"github.com/spf13/viper"
 )
 

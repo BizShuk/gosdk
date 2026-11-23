@@ -1,13 +1,13 @@
 # pstate (pipeline run + graph TUI)
 
-`github.com/bizshuk/gosdk/cmd/pstate` runs a set of dependent steps in parallel and draws them live as a node graph. Use it for any multi-step job with dependencies (release, ETL, batch, migration). Do not hand-roll goroutine fan-out, `sync.WaitGroup` stage barriers, retry loops for a human to re-run, or a custom progress TUI.
+`github.com/bizshuk/gosdk/v2/cmd/pstate` runs a set of dependent steps in parallel and draws them live as a node graph. Use it for any multi-step job with dependencies (release, ETL, batch, migration). Do not hand-roll goroutine fan-out, `sync.WaitGroup` stage barriers, retry loops for a human to re-run, or a custom progress TUI.
 
 ## How to use
 
 pstate *runs* your functions; callers never report status. Three steps: write the step functions, register them with their upstreams, run.
 
 ```go
-import "github.com/bizshuk/gosdk/cmd/pstate"
+import "github.com/bizshuk/gosdk/v2/cmd/pstate"
 
 // 1. Step function: (ctx, *pstate.T, params) error. Return nil = finished, error = failed.
 type BuildArgs struct{ Target, Arch string }

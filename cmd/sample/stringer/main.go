@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/bizshuk/gosdk/service/stringer"
+	"github.com/bizshuk/gosdk/v2/service/stringer"
 )
 
 // Usage is a replacement usage function for the flags package.

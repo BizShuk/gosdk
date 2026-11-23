@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	sdkconfig "github.com/bizshuk/gosdk/config"
+	sdkconfig "github.com/bizshuk/gosdk/v2/config"
 )
 
 // configData is the in-memory representation of a config file. The same type

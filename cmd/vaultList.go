@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/bizshuk/gosdk/config/vault"
+	"github.com/bizshuk/gosdk/v2/config/vault"
 	"github.com/spf13/cobra"
 )
 

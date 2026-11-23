@@ -19,8 +19,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/bizshuk/gosdk/config"
-	"github.com/bizshuk/gosdk/db"
+	"github.com/bizshuk/gosdk/v2/config"
+	"github.com/bizshuk/gosdk/v2/db"
 	"github.com/spf13/viper"
 )
 

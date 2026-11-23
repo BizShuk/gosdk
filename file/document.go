@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/bizshuk/gosdk/validator"
+	"github.com/bizshuk/gosdk/v2/validator"
 )
 
 // Write 把 v 序列化為 JSON 並寫入 name 對應的檔案。

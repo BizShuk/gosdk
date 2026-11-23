@@ -25,7 +25,7 @@ metadata:
 
 # golang-dev
 
-Go + `github.com/bizshuk/gosdk` playbook. Prefer SDK helpers over reimplementation.
+Go + `github.com/bizshuk/gosdk/v2` playbook. Prefer SDK helpers over reimplementation.
 
 Load **only** the chapter that matches the task. Do not read the rest.
 

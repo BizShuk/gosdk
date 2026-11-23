@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/bizshuk/gosdk/mw"
+	"github.com/bizshuk/gosdk/v2/mw"
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
 )

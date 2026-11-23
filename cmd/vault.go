@@ -8,8 +8,8 @@ import (
 	"strings"
 	"syscall"
 
-	sdkconfig "github.com/bizshuk/gosdk/config"
-	"github.com/bizshuk/gosdk/config/vault"
+	sdkconfig "github.com/bizshuk/gosdk/v2/config"
+	"github.com/bizshuk/gosdk/v2/config/vault"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )

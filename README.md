@@ -256,7 +256,7 @@ Go 語言通用開發工具包 (Shared SDK)，提供設定管理、HTTP 服務�
 ### 設定管理
 
 ```go
-import "github.com/bizshuk/gosdk/config"
+import "github.com/bizshuk/gosdk/v2/config"
 
 // 方式 1：載入預設設定（搜尋 .、./conf、~/.config/<appName>）
 config.Default()
@@ -285,8 +285,8 @@ config.Default(
 
 ```go
 import "log/slog"
-import "github.com/bizshuk/gosdk/config"
-import "github.com/bizshuk/gosdk/db"
+import "github.com/bizshuk/gosdk/v2/config"
+import "github.com/bizshuk/gosdk/v2/db"
 
 config.Default(config.WithAppName("myapp"))
 
@@ -305,8 +305,8 @@ defer trifecta.Close()
 ### HTTP 服務
 
 ```go
-import "github.com/bizshuk/gosdk/router"
-import "github.com/bizshuk/gosdk/mw"
+import "github.com/bizshuk/gosdk/v2/router"
+import "github.com/bizshuk/gosdk/v2/mw"
 
 s := gin.Default()
 s.Use(mw.CorrelationID())             // 啟用請求追蹤
@@ -333,7 +333,7 @@ go test ./cmd/sample/gotmpl -run TestRun -v
 
 ```go
 import (
-    "github.com/bizshuk/gosdk/cmd"
+    "github.com/bizshuk/gosdk/v2/cmd"
     "github.com/spf13/cobra"
 )
 
@@ -363,7 +363,7 @@ key 使用 viper 的點號路徑（`a.b.c` 代表巢狀三層）；`_` 是一般
 ### 通用通知
 
 ```go
-import "github.com/bizshuk/gosdk/notify"
+import "github.com/bizshuk/gosdk/v2/notify"
 
 // Slack 通知
 slackN := notify.NewSlackNotifier("xoxb-token", "C1234567890")
@@ -379,7 +379,7 @@ multi.Notify(ctx, "任務完成摘要")
 ### 排程管理
 
 ```go
-import "github.com/bizshuk/gosdk/scheduler"
+import "github.com/bizshuk/gosdk/v2/scheduler"
 import "go.uber.org/zap"
 
 s := scheduler.New()
@@ -400,7 +400,7 @@ s.Start(ctx)
 ### Pipeline 狀態視覺化
 
 ```go
-import "github.com/bizshuk/gosdk/cmd/pstate"
+import "github.com/bizshuk/gosdk/v2/cmd/pstate"
 
 type BuildArgs struct{ Target string }
 
@@ -432,9 +432,9 @@ err := pstate.Run(ctx, p,
 ### 編碼與資料處理
 
 ```go
-import roctime "github.com/bizshuk/gosdk/time"
-import "github.com/bizshuk/gosdk/utils"
-import encode "github.com/bizshuk/gosdk/encode/io"
+import roctime "github.com/bizshuk/gosdk/v2/time"
+import "github.com/bizshuk/gosdk/v2/utils"
+import encode "github.com/bizshuk/gosdk/v2/encode/io"
 
 t := roctime.ParseROCDate("100/08/07")              // 2011-08-07
 utils.NewCSVFilelistCallback("data/*.csv", myProcessor)
@@ -445,7 +445,7 @@ utils.CreateIfNotExist("~/config.yaml", defaultYAML) // 若不存在則建立預
 ### 指標監控
 
 ```go
-import "github.com/bizshuk/gosdk/metric"
+import "github.com/bizshuk/gosdk/v2/metric"
 
 // Remote write：推送單筆或批次指標（後端由 METRIC_URL 控制）
 svc := metric.NewMetricService("")

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/bizshuk/gosdk/cmd/sample/gotmpl/tmpl"
+	"github.com/bizshuk/gosdk/v2/cmd/sample/gotmpl/tmpl"
 )
 
 type TemplateLoader struct {

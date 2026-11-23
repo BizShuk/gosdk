@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/bizshuk/gosdk/cmd/config"
-	sdkconfig "github.com/bizshuk/gosdk/config"
+	"github.com/bizshuk/gosdk/v2/cmd/config"
+	sdkconfig "github.com/bizshuk/gosdk/v2/config"
 	"github.com/spf13/cobra"
 )
 

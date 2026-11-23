@@ -17,7 +17,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/bizshuk/gosdk/cmd/pstate"
+	"github.com/bizshuk/gosdk/v2/cmd/pstate"
 )
 
 // BuildArgs 是 build 步驟的參數; Wrap 時保存, 重試時原封不動再傳一次.

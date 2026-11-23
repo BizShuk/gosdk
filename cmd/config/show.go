@@ -4,7 +4,7 @@ import (
 	"os"
 	"sort"
 
-	sdkconfig "github.com/bizshuk/gosdk/config"
+	sdkconfig "github.com/bizshuk/gosdk/v2/config"
 )
 
 // LAYER_OS_ENV is the layer name for a value that came from an OS environment

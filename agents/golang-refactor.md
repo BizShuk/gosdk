@@ -57,7 +57,7 @@ Delete dead code only after per-batch confirmation; never auto-delete exported s
 ### Group B — Architecture, naming, SDK (`golang-dev`)
 
 `golang-dev` is the playbook for MVC layers, naming (`gopls rename`), cobra/config/slog,
-HTTP/networking, TUI, and `github.com/bizshuk/gosdk` APIs.
+HTTP/networking, TUI, and `github.com/bizshuk/gosdk/v2` APIs.
 
 | Concern | Action |
 | ------- | ------ |

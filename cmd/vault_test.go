@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	sdkconfig "github.com/bizshuk/gosdk/config"
-	"github.com/bizshuk/gosdk/config/vault"
+	sdkconfig "github.com/bizshuk/gosdk/v2/config"
+	"github.com/bizshuk/gosdk/v2/config/vault"
 )
 
 // The crypto and the file format are covered in config/vault. What is only

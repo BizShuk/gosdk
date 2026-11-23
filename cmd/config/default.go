@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/bizshuk/gosdk/utils"
+	"github.com/bizshuk/gosdk/v2/utils"
 )
 
 // DEFAULT_BACKUP_KEEP is how many backups a merge or --force keeps of the file

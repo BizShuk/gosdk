@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bizshuk/gosdk/cmd/sample/gotmpl/cmd"
+	"github.com/bizshuk/gosdk/v2/cmd/sample/gotmpl/cmd"
 )
 
 func TestRun(t *testing.T) {

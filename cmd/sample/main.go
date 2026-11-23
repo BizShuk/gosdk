@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/bizshuk/gosdk/metric"
+	"github.com/bizshuk/gosdk/v2/metric"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	sdkconfig "github.com/bizshuk/gosdk/config"
+	sdkconfig "github.com/bizshuk/gosdk/v2/config"
 )
 
 // runDefault drives Default the way the CLI does — flags in, rendered text out

@@ -8,7 +8,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/bizshuk/gosdk/encode"
+	"github.com/bizshuk/gosdk/v2/encode"
 	"github.com/spf13/viper"
 )
 

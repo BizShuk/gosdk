@@ -33,7 +33,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/bizshuk/gosdk/config"
+	"github.com/bizshuk/gosdk/v2/config"
 	"github.com/spf13/viper"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/sqlite"

@@ -32,9 +32,9 @@ import (
 	_ "embed"
 	"io"
 
-	"github.com/bizshuk/gosdk/cmd"
-	cfgcmd "github.com/bizshuk/gosdk/cmd/config"
-	"github.com/bizshuk/gosdk/config"
+	"github.com/bizshuk/gosdk/v2/cmd"
+	cfgcmd "github.com/bizshuk/gosdk/v2/cmd/config"
+	"github.com/bizshuk/gosdk/v2/config"
 	"github.com/spf13/cobra"
 )
 

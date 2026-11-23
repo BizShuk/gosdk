@@ -176,7 +176,7 @@ sum by (queue_name, job_type) (rate(queue_job_execute{status="failure"}[5m]))
 ### Go
 
 ```go
-import "github.com/bizshuk/gosdk/metric"
+import "github.com/bizshuk/gosdk/v2/metric"
 ```
 
 ### Python

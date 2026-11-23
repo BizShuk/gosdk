@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	cfgcmd "github.com/bizshuk/gosdk/cmd/config"
-	"github.com/bizshuk/gosdk/config"
+	cfgcmd "github.com/bizshuk/gosdk/v2/cmd/config"
+	"github.com/bizshuk/gosdk/v2/config"
 	"github.com/spf13/pflag"
 )
 

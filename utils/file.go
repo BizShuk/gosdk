@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	sdkcsv "github.com/bizshuk/gosdk/encode/csv"
+	sdkcsv "github.com/bizshuk/gosdk/v2/encode/csv"
 	"github.com/gocarina/gocsv"
 )
 

@@ -8,9 +8,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/bizshuk/gosdk/config"
-	"github.com/bizshuk/gosdk/db"
-	"github.com/bizshuk/gosdk/server"
+	"github.com/bizshuk/gosdk/v2/config"
+	"github.com/bizshuk/gosdk/v2/db"
+	"github.com/bizshuk/gosdk/v2/server"
 	"github.com/spf13/viper"
 )
 

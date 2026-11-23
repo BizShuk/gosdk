@@ -5,7 +5,7 @@
 ```tree
 gosdk/
 ├── main.go                  # HTTP 伺服器入口
-├── go.mod                   # Go 1.26, module: github.com/bizshuk/gosdk
+├── go.mod                   # Go 1.26, module: github.com/bizshuk/gosdk/v2
 ├── Makefile                 # build / test / generate / run / clean
 ├── build/
 │   └── dockerfile           # Multi-stage Docker 建置（golang:1.26-alpine）

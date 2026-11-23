@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bizshuk/gosdk/config"
+	"github.com/bizshuk/gosdk/v2/config"
 	"github.com/spf13/viper"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
