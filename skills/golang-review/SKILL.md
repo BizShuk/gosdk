@@ -8,7 +8,7 @@ description: >
     Triggers: review this Go, apply SOLID, dead code, unused, U1000,
     staticcheck, pprof, allocs/op, HeapAlloc, slow, GC, sync.Pool,
     import cycle, dependency graph, unused dependency, go.mod bloat,
-    layer violation, go-dependency-analysis.
+    layer violation.
     Layout, naming, HTTP, and build flags live in golang-dev.
 allowed-tools: Bash, Read, Edit, Grep, Glob, AskUserQuestion
 user-invocable: true

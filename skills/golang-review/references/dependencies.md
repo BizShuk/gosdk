@@ -1,54 +1,46 @@
 # Dependencies
 
-Import-graph review with `go-dependency-analysis`. Read-only — it never touches `go.mod` / `go.work`.
-
-Need `go-dependency-analysis` on `PATH`. If missing, ask before `go install github.com/bizshuk/go-dependency-analysis@latest`.
+Import-graph and module review using standard `go` tooling (`go list`, `go mod`). Read-only — never mutate `go.mod` / `go.work` during review.
 
 ```bash
-mkdir -p tmp
-# 1. facts (no policy) — the baseline every review starts from
-go-dependency-analysis --workspace ./go.mod --format text --fail-on none | tee tmp/dependency-report.txt
-go-dependency-analysis --workspace ./go.mod --format json --fail-on none --output tmp/dependency-report.json
-# 2. confirmation pass — required before reporting any unused dependency
-go-dependency-analysis --workspace ./go.mod --include-tests --format json --fail-on none --output tmp/dependency-report-tests.json
-# 3. optional: boundary enforcement
-go-dependency-analysis --workspace ./go.mod --policy <policy>.json --fail-on error
-go-dependency-analysis --workspace ./go.mod --format mermaid --output tmp/dependency.mmd
+# 1. package dependency graph inside the module (cycles fail go list / go build immediately)
+go list -f '{{.ImportPath}} -> {{.Imports}}' ./...
+# 2. module graph & direct-dependency bloat / unused check
+go mod graph
+go mod tidy -diff
+# 3. explain why any indirect or suspect module is pulled in
+go mod why -m <module>
+# 4. confirmation pass including tests (required before reporting an unused dependency)
+go list -test -f '{{.ImportPath}} -> {{.Imports}}' ./...
 ```
 
-Reports go in `tmp/`, never in the repo tree. Use `--workspace ./go.work` for a multi-module workspace, `--exclude` to drop sample/vendor modules.
+In a multi-module workspace (`go.work`), run `go list` from the workspace root or pass `-m all` to inspect resolved module versions (`go list -m -json all`).
 
 ## Evidence class
 
-The tool labels every diagnostic. Report them differently.
-
 | Class | Source | Treat as |
 | ----- | ------ | -------- |
-| `go-tool-fact` | `go list` / `go mod edit` | Verified — cite directly |
-| `policy-heuristic` | your `--policy` file | Only as strong as the policy; cite the rule that fired |
-
-Intrinsic diagnostics run without `--policy`. A policy can only re-rank their severity, not invent facts.
+| `go-tool-fact` | `go list` / `go mod graph` / `go mod why` / `go mod tidy -diff` | Verified — cite directly |
+| `boundary-rule` | repo architecture / layer convention (`AGENTS.md` / `golang-dev`) | Only as strong as the documented boundary; cite the violated rule |
 
 ## Diagnostics → severity
 
 | Diagnostic | Severity | Action |
-| ---------- | -------- | ------- |
+| ---------- | -------- | ------ |
 | module/package cycle inside the analyzed module | HIGH | Must-fix. Break with an interface at the consumer (`solid.md`) |
 | cycle wholly among third-party modules | ignore | Not yours. Do not report |
-| `layer-forbidden` on your own packages | HIGH | Wrong-direction import; invert the dependency |
-| `unused-direct-candidate` | MED | **Confirm first** — see below |
-| `multi-version` naming a module you require directly | LOW | Note the version spread; MVS still picks one |
-| `multi-version` from transitive pressure only | ignore | Noise on any real dependency tree |
+| wrong-direction import across own layers (e.g. `model/` → `svc/` or `handler/`) | HIGH | Invert the dependency via a consumer-side interface |
+| direct `require` dropped by `go mod tidy -diff` | MED | **Confirm first** — see below |
+| duplicate major/minor versions visible in `go mod graph` for a direct dep | LOW | Note the version spread; MVS picks the highest |
+| transitive-only version spread in `go mod graph` | ignore | Noise on any real dependency tree |
 
 ## Traps
 
-`unused-direct-candidate` is a candidate, not a verdict. Run the `--include-tests` pass and diff: a candidate that disappears is a test-only import and is `correct as written`. Also clear build tags, platform files, generated code, `//go:build tools` and blank imports (`_ "driver"`) before reporting. Only report what survives all five.
+`go mod tidy -diff` and `go list ./...` without `-test` do not clear every edge case automatically. Before reporting an unused dependency, check build tags, platform-specific files (`_linux.go`, `_darwin.go`), generated code, `//go:build tools` / `tool` directives, and blank imports (`_ "driver"`). Only report what survives all five.
 
-`package_edges` are `intra-module only`. A cross-module import is recorded as a **module** edge instead, so a package's third-party fan-out never shows in `package_edges` — read `module_edges` for that. An empty external fan-out means nothing.
+`go list -f '{{.ImportPath}} -> {{.Imports}}' ./...` includes stdlib imports; filter to the module prefix (e.g. `grep` for the module path from `go.mod`) when mapping internal package boundaries.
 
-Stdlib nodes are filtered from `packages[]` but `package_edges` keeps stdlib→stdlib edges (`--show-stdlib` says *nodes*). Any graph built from the JSON must drop edges whose endpoints are absent from `packages[]`, or ~38% of a typical edge list is stdlib plumbing.
-
-The graph reflects the host Go version, OS/arch and build tags. Cross-platform claims need one run per platform, kept as separate snapshots — never union them.
+The graph reflects the host Go version, `GOOS`/`GOARCH`, and active build tags. Cross-platform claims need separate checks per target (`GOOS=linux go list ./...`, `GOOS=darwin go list ./...`).
 
 ## Report
 
@@ -61,4 +53,4 @@ Why: …
 Fix: <before / after>
 ```
 
-State the headline counts (modules, packages, edges) so a later run is comparable, and say which diagnostics were dismissed as third-party noise — a silent filter looks like a missed finding.
+State the headline counts (modules, internal packages, direct dependencies) so a later run is comparable, and note any third-party noise that was dismissed.
